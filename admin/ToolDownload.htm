@@ -1,0 +1,827 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var list = [];
+		var originList = [];
+		var dataGridLs = new DataGrid();
+		var detailCon = $("div.detailCon");
+		var detailConCFUM = id("detailConCFUM");
+		var plugin;
+		var userId;
+
+		var curSysTimeSec = 0;
+		var SYSTEM = uciSystem.fileName;
+		var CLOCK_STATUS = uciSystem.secName.clockStatus;
+		var SECONDS = uciSystem.optName.seconds;
+		var oneWeekSec = 7*24*3600;
+		var beginDate = id("beginDate");
+		var endDate = id("endDate");
+		var beginTime = id("beginTime");
+		var endTimeD = id("endTime");
+		var searchType = "18446744073709551615";
+		var downloadTypeObj = {};
+		var typeOnShow ="18446744073709551615";
+		var PAGE_NUM = 10;
+		var INIT_PAGE_NUM = 1;
+		var bPageFirstLoaded = true;
+		var table = id("fileTbl");
+		var curDownloadType;
+		var sysTypeList = [{str:label.downloadTypeAll, value:"18446744073709551615"},
+			{str:label.downloadTypeTiming, value:"1"},
+			{str:label.downloadTypeAlarm, value:"131072"},
+			{str:label.downloadTypeMotionDet, value:"2"},
+			//{str:label.downloadTypeTamperDet, value:"4"},
+			{str:label.downloadTypeSmartDet, value:"18446744073709551608"},
+			{str:label.downloadTypeLineCrossing, value:"8"},
+			{str:label.downloadTypeIntrusion, value:"16"},
+			{str:label.downloadTypeRegionEntrance, value:"32"},
+			{str:label.downloadTypeRegionExiting, value:"64"},
+			{str:label.downloadTypeLoitering, value:"128"},
+			{str:label.downloadTypeGathering, value:"256"},
+			{str:label.downloadTypeFastMoving, value:"512"},
+			{str:label.downloadTypeParking, value:"1024"},
+			{str:label.downloadTypeUnattendedBaggage, value:"2048"},
+			{str:label.downloadTypeObjectRemove, value:"4096"},
+			{str:label.downloadTypeAudioException, value:"8192"},
+			{str:label.downloadTypeDefocusDet, value:"16384"},
+			{str:label.downloadTypeSceneChange, value:"32768"},
+			{str:label.downloadTypeFaceDet, value:"65536"}];
+		var totalNum = 0;
+
+		function errorHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case EINVARG:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function generateFileName(startTime) {
+			var fileName = formateDate(parseInt(startTime, 10) * 1000);
+			fileName = fileName.replace(/-/g, "");
+			fileName = fileName.replace(/ /g, "");
+			fileName = fileName.replace(/:/g, "");
+			if ("picture" == curDownloadType)
+			{
+				fileName += ".jpg ";
+			}
+			else
+			{
+				fileName += ".mp4";
+			}
+
+			return fileName;
+		}
+
+		function tranFileSize(fileSize)
+		{
+			var kSize = 1024;
+			var mSize = kSize * 1024;
+			var gSize = mSize * 1024;
+
+			fileSize = parseInt(fileSize, 10);
+
+			if (fileSize >= gSize)
+			{
+				fileSize = (fileSize/gSize).toFixed(0) + "GB";
+			}
+			else if (fileSize >= mSize)
+			{
+				fileSize = (fileSize/mSize).toFixed(0) + "MB";
+			}
+			else if (fileSize >= kSize)
+			{
+				fileSize = (fileSize/kSize).toFixed(0) + "KB";
+			}
+			else
+			{
+				fileSize = fileSize.toFixed(0) + "B";
+			}
+
+			return fileSize.toString();
+		}
+
+		function refreshTable(pageNum, files, totalNum)
+		{
+			var item, fileStr;
+			var fileOrder = 0;
+			var originItem;
+
+			dataGridLs.blankTable();
+			list = [];
+			originList = [];
+
+			if (true == $.local)
+			{
+				files = [];
+				totalNum = PAGE_NUM;
+				var file = {};
+				file["start_time"] = "123123123";
+				file["end_time"] = "123123456";
+				file["size"] = "147852";
+
+				for (var i = 1, len = 9; i < len; i++)
+				{
+					files[i - 1] = file;
+				}
+			}
+
+			for(var i = 0, len = files.length; i < len; i++)
+			{
+				item = {};
+				originItem = {};
+				fileStr = files[i];
+				if ("picture" == curDownloadType)
+				{
+					item["filename"] = generateFileName(fileStr["time"]);
+					item["time"] = formateDate(parseInt(fileStr["time"], 10) * 1000);
+					originItem["time"] = item["time"];
+				}
+				else
+				{
+					item["filename"] = generateFileName(fileStr["start_time"]);
+					item["starttime"] = formateDate(parseInt(fileStr["start_time"], 10) * 1000);
+					item["endtime"] = formateDate(parseInt(fileStr["end_time"], 10) * 1000);
+
+					originItem["starttime"] = item["starttime"];
+					originItem["endtime"] = item["endtime"];
+				}
+				item["size"] = tranFileSize(fileStr["size"]);
+				item["progress"] = "";
+				item["id_str"] = fileStr["id_str"];
+				list[fileOrder] = item;
+
+				originItem["filename"] = item["filename"];
+				originItem["size"] = fileStr["size"];
+				originItem["id_str"] = fileStr["id_str"];
+				originList[fileOrder] = originItem;
+				fileOrder++;
+			}
+
+			if (pageNum > 0)
+			{
+				dataGridLs.refreshPage(list, totalNum, pageNum);
+			}
+			else
+			{
+				dataGridLs.setDataSource(list);
+				dataGridLs.refresh(pageNum);
+			}
+		}
+
+		function getFiles(pageNum, startTime, endTime, type)
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+			var moduleName, actionName, listName;
+			if ("picture" == curDownloadType)
+			{
+				moduleName = "picture_info";
+				actionName = "get_picture_list";
+				listName = "picture_list";
+			}
+			else
+			{
+				moduleName = "playback";
+				actionName = "get_video_list";
+				listName = "video_list";
+			}
+
+			data[moduleName] = module;
+			module[actionName] = actObj;
+			actObj["start_time"] = startTime.toString();
+			actObj["end_time"] = endTime.toString();
+			actObj["type"] = type || typeOnShow;
+			actObj["id"] = userId;
+			actObj["index_start"] = (pageNum - 1) * PAGE_NUM + 1;
+			actObj["index_end"] = pageNum * PAGE_NUM;
+
+			if (true == $.local)
+			{
+				refreshTable(pageNum, list, totalNum);
+				return;
+			}
+
+			showToast();
+			$.action(data, function(result){
+				if (errorHandle(result[ERR_CODE]))
+				{
+					closeToast();
+					refreshTable(pageNum, result[moduleName][listName], totalNum);
+				}
+			});
+		}
+
+		function modifyTimeStr(value)
+		{
+			if (value < 10)
+			{
+				value = "0" + value;
+			}
+
+			return value;
+		}
+
+		function formateDate(msecs)
+		{
+			var now;
+
+			if (undefined == msecs)
+			{
+				now = new Date();
+			}
+			else
+			{
+				now = new Date(msecs);
+			}
+
+			return now.getFullYear() + "-" + modifyTimeStr(now.getMonth() + 1) + "-" + modifyTimeStr(now.getDate()) + " " +
+					modifyTimeStr(now.getHours()) + ":" + modifyTimeStr(now.getMinutes()) + ":" + modifyTimeStr(now.getSeconds());
+		}
+
+		function getSysTime(callBack)
+		{
+			var data = {};
+
+			data[SYSTEM] = {};
+			data[SYSTEM][NAME] = CLOCK_STATUS;
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						curSysTimeSec = 1000;
+					}
+					else
+					{
+						curSysTimeSec = parseInt(result[SYSTEM][CLOCK_STATUS][SECONDS]);
+					}
+
+					callBack(curSysTimeSec);
+				}
+			});
+		}
+
+		function getSelSeconds(date, time)
+		{
+			var dateObj = new Date();
+			var dataList = date.value.split("-");
+			var timeList = time.value.split(":");
+
+			dateObj.setFullYear(dataList[0], parseInt(dataList[1], 10) - 1, dataList[2]);
+			dateObj.setHours(parseInt(timeList[0], 10));
+			dateObj.setMinutes(parseInt(timeList[1], 10));
+			dateObj.setSeconds(parseInt(timeList[2], 10));
+
+			return parseInt(dateObj.getTime()/1000, 10);
+		}
+
+		function stopDownloadFunc() {
+			plugin.stopDownloading();
+		}
+
+		function downloadVideo(indexArry) {
+			var strStartTime, strEndTime;
+			var startDate, endDate;
+			var iStartTime, iEndTime;
+			var idStr;
+			var totalSize;
+			var path;
+			var downIndex = 0;
+			table = id("fileTbl");
+
+			for (var i in indexArry)
+			{
+				table.rows[parseInt(indexArry[i],10) + 1].cells[6].innerHTML = "<span class=noDownload>" + label.waitingToDownload +"</span>";
+			}
+
+			strStartTime = originList[indexArry[downIndex] % PAGE_NUM]["starttime"];
+			startDate = new Date(strStartTime.replace(/-/g, "/"));
+			iStartTime = startDate.getTime() / 1000;
+
+			strEndTime = originList[indexArry[downIndex] % PAGE_NUM]["endtime"];
+			endDate = new Date(strEndTime.replace(/-/g, "/"));
+			iEndTime = endDate.getTime() / 1000;
+
+			idStr = originList[indexArry[downIndex] % PAGE_NUM]["id_str"];
+			totalSize = parseInt(originList[indexArry[downIndex] % PAGE_NUM]["size"], 10);
+			plugin.setDownloadCallback(function (progress) {
+				if (-1 == progress)
+				{
+					for (var i = downIndex; i < indexArry.length; i++)
+					{
+						table.rows[parseInt(indexArry[i],10) + 1].cells[6].innerHTML = "<span class=downloadErr>" + label.alreadyStopped +"</span>";
+					}
+					return;
+				}
+				table.rows[parseInt(indexArry[downIndex],10) + 1].cells[6].innerHTML = "<span class=downloading>" + progress + "%" +"</span>";
+
+				if (progress == 100)
+				{
+					path = plugin.getFileStorageFolder();
+
+					$("#StorageFolder").css('background-image','url(../web-static/images/save_reddot.png)');
+					table.rows[parseInt(indexArry[downIndex],10) + 1].cells[6].innerHTML = "<i class=completeIcon>" + "</i>" + "<span class=downloaded>" + label.check +"</span>";
+					(function(path)
+					{
+						table.rows[parseInt(indexArry[downIndex],10) + 1].cells[6].childNodes[1].onclick = function()
+						{
+							plugin.openFileStorageFolder(path);
+						}
+					}(path));
+
+					downIndex++;
+
+					if (downIndex == indexArry.length)
+					{
+						$.find("li.stopDownload")[0].click();
+						return;
+					}
+
+					strStartTime = originList[indexArry[downIndex] % PAGE_NUM]["starttime"];
+					startDate = new Date(strStartTime.replace(/-/g, "/"));
+					iStartTime = startDate.getTime() / 1000;
+
+					strEndTime = originList[indexArry[downIndex] % PAGE_NUM]["endtime"];
+					endDate = new Date(strEndTime.replace(/-/g, "/"));
+					iEndTime = endDate.getTime() / 1000;
+
+					idStr = originList[indexArry[downIndex] % PAGE_NUM]["id_str"];
+					totalSize = parseInt(originList[indexArry[downIndex] % PAGE_NUM]["size"], 10);
+					plugin.downloadVideo(iStartTime, iEndTime, idStr, totalSize);
+				}
+			});
+
+			table.rows[parseInt(indexArry[downIndex],10) + 1].cells[6].innerHTML = "<span class=downloading>" + "0%" + "</span>";
+			plugin.downloadVideo(iStartTime, iEndTime, idStr, totalSize);
+		}
+
+		function downloadPicture(indexArry) {
+			var strTime;
+			var date;
+			var iTime;
+			var idStr;
+			var totalSize;
+			var path;
+			var downIndex = 0;
+			table = id("fileTbl");
+
+			for (var i in indexArry)
+			{
+				table.rows[parseInt(indexArry[i],10) + 1].cells[5].innerHTML = "<span class=noDownload>" + label.waitingToDownload +"</span>";
+			}
+
+			strTime = originList[indexArry[downIndex] % PAGE_NUM]["time"];
+			date = new Date(strTime.replace(/-/g, "/"));
+			iTime = date.getTime() / 1000;
+
+			idStr = originList[indexArry[downIndex] % PAGE_NUM]["id_str"];
+			totalSize = parseInt(originList[indexArry[downIndex] % PAGE_NUM]["size"], 10);
+			plugin.setDownloadCallback(function (progress) {
+				if (-1 == progress)
+				{
+					for (var i = downIndex; i < indexArry.length; i++)
+					{
+						table.rows[parseInt(indexArry[i],10) + 1].cells[5].innerHTML = "<span class=downloadErr>" + label.alreadyStopped +"</span>";
+					}
+					return;
+				}
+				table.rows[parseInt(indexArry[downIndex],10) + 1].cells[5].innerHTML = "<span class=downloading>" + progress + "%" +"</span>";
+				if (progress == 100)
+				{
+					path = plugin.getFileStorageFolder();
+
+					$("#StorageFolder").css('background-image','url(../web-static/images/save_reddot.png)');
+					table.rows[parseInt(indexArry[downIndex],10) + 1].cells[5].innerHTML = "<i class=completeIcon>" + "</i>" + "<span class=downloaded>" + label.check +"</span>";
+					(function(path)
+					{
+						table.rows[parseInt(indexArry[downIndex],10) + 1].cells[5].childNodes[1].onclick = function()
+						{
+							plugin.openFileStorageFolder(path);
+						}
+					}(path));
+
+					downIndex++;
+
+					if (downIndex == indexArry.length)
+					{
+						$.find("li.stopDownload")[0].click();
+						return;
+					}
+					strTime = originList[indexArry[downIndex] % PAGE_NUM]["time"];
+					date = new Date(strTime.replace(/-/g, "/"));
+					iTime = date.getTime() / 1000;
+
+					idStr = originList[indexArry[downIndex] % PAGE_NUM]["id_str"];
+					totalSize = parseInt(originList[indexArry[downIndex] % PAGE_NUM]["size"], 10);
+					plugin.downloadPicture(iTime, idStr, totalSize);
+				}
+			});
+
+			table.rows[parseInt(indexArry[downIndex],10) + 1].cells[5].innerHTML = "<span class=downloading>" + "0%" +"</span>";
+			plugin.downloadPicture(iTime, idStr, totalSize);
+		}
+
+		function downloadFunc(index) {
+			if (true == plugin.isIEProtected())
+			{
+				$.find("li.stopDownload")[0].click();
+				return;
+			}
+			var indexArry = index.toString().split("-");
+
+			if ("picture" == curDownloadType)
+			{
+				downloadPicture(indexArry);
+			}
+			else
+			{
+				downloadVideo(indexArry);
+			}
+		}
+
+		function getUserId(callBack)
+		{
+			var data = {};
+			data[uciSystem.fileName] = {};
+			data[uciSystem.fileName][uciSystem.actionName.getUserId] = null;
+
+			$.action(data, function(result) {
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					userId = result[uciSystem.optName.userId];
+					typeof callBack == "function" && callBack();
+				}
+			});
+		}
+
+		function tableInit(result)
+		{
+			list = [];
+			if (curDownloadType == "video")
+			{
+				dataGridLs.init({
+					id:"fileTbl",										// table ID
+					data:list,											// 数据源
+					hasID:true,
+					edit:false,
+					IDWidth:40,
+					selWidth:40,
+					head:[{field:label.downloadFileName, width:60},			// 表头选项
+						{field:label.downloadStartTime, width:60},
+						{field:label.downloadEndTime, width:60},
+						{field:label.downloadSize, width:20},
+						{field:label.downloadProgress, width:30}],
+					list:[{name:"filename"},
+						{name:"starttime"},
+						{name:"endtime"},
+						{name:"size"},
+						{name:"progress"}],
+					pageTurnFunc:function(pageNum){
+						getFiles(pageNum, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD));
+					},
+					toolBar:{id:"downloadUl", download:downloadFunc, stopDownload:stopDownloadFunc, asyn:true}
+				});
+			}
+			else
+			{
+				dataGridLs.init({
+					id:"fileTbl",										// table ID
+					data:list,											// 数据源
+					hasID:true,
+					edit:false,
+					IDWidth:40,
+					selWidth:40,
+					max:4000,
+					head:[{field:label.downloadFileName, width:90},			// 表头选项
+						{field:label.downloadPicTime, width:90},
+						{field:label.downloadSize, width:30},
+						{field:label.downloadProgress, width:45}],
+					list:[{name:"filename"},
+						{name:"time"},
+						{name:"size"},
+						{name:"progress"}],
+					pageTurnFunc:function(pageNum){
+						getFiles(pageNum, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD));
+					},
+					toolBar:{id:"downloadUl", download:downloadFunc, stopDownload:stopDownloadFunc, asyn:true}
+				});
+			}
+
+			showDetailCon();
+		}
+
+		function typeObjInit()
+		{
+			$.each(sysTypeList, function(idx, item){
+				downloadTypeObj[item.value] = item.str;
+			});
+		}
+
+		function changeSearchType(value)
+		{
+			searchType = value;
+		}
+
+		function fileTypeChange()
+		{
+			if (curDownloadType != getRadioChs("downloadTypeCheck"))
+			{
+				curDownloadType = getRadioChs("downloadTypeCheck");
+
+				var tableBorderCon = $.find("div.tableBorderCon")[0];
+				tableBorderCon.innerHTML = "";
+				var table = document.createElement("table");
+				table.id = "fileTbl";
+				table.className = "dataGrid";
+				tableBorderCon.appendChild(table);
+
+				var list = $("#downloadUl li");
+				list[0].innerHTML = label.download;
+				list[1].innerHTML = label.stopDownloading;
+
+				tableInit();
+			}
+		}
+
+		function getFileNum(startTime, endTime, type, callBack)
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+			var moduleName, actionName, numName;
+			if ("picture" == curDownloadType)
+			{
+				moduleName = "picture_info";
+				actionName = "get_picture_num";
+				numName = "picture_num";
+			}
+			else
+			{
+				moduleName = "playback";
+				actionName = "get_video_num";
+				numName = "video_num";
+			}
+
+			data[moduleName] = module;
+			module[actionName] = actObj;
+			actObj["start_time"] = startTime.toString();
+			actObj["end_time"] = endTime.toString();
+			actObj["type"] = type || typeOnShow;
+			actObj["id"] = userId;
+
+			if (true == $.local)
+			{
+				totalNum = 20;
+			}
+
+			$.action(data, function(result){
+				if (errorHandle(result[ERR_CODE]))
+				{
+					totalNum = result[moduleName][numName];
+					typeof callBack == "function" && callBack();
+				}
+
+				if (bPageFirstLoaded == true)
+				{
+					bPageFirstLoaded = false;
+					showDetailCon();
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			plugin = new Plugin({id:"downloadPluginCon",className:"downloadActiveX", downloadReadyHd:function (arg) {
+				var activeX = $.find("object.downloadActiveX")[0];
+				activeX.style.visibility = "hidden";
+			}});
+
+			if (false == plugin.checkInstalled())
+			{
+				var link = $.find("label.vedioInstallTip")[0];
+				link.style.visibility = "hidden";
+				showDetailCon();
+				showAlert(errStr.sLclPluginInstallTip);
+			}
+
+			initRadioInput("downloadTypeCheck", fileTypeChange);
+			curDownloadType = "picture";
+			laydate({elem:"#beginDate"});
+			laydate({elem:"#endDate"});
+			timePickerInit("beginTime");
+			timePickerInit("endTime");
+			selectInit("mainType", sysTypeList, "18446744073709551615", changeSearchType);
+			tableInit();
+//			typeObjInit();
+
+			getSysTime(function(seconds){
+				var startTime = seconds > oneWeekSec ? seconds - oneWeekSec : 0, seconds;
+				var startDT = formateDate(startTime * 1000).split(" ");
+				var endDT = formateDate(seconds * 1000).split(" ");
+
+				beginDate.value = startDT[0];
+				endDate.value = endDT[0];
+				beginTime.value = startDT[1].replace(/\:/g, " : ");
+				endTimeD.value = endDT[1].replace(/\:/g, " : ");
+			});
+			id("searchLog").onclick = function(){
+				showToast();
+				typeOnShow = searchType;
+				getUserId(function(){
+					plugin.setClientId(userId);
+					getFileNum(getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType, function (){
+						getFiles(INIT_PAGE_NUM, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType);
+					});
+				});
+			};
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	body{
+		min-width:1380px !important;
+		_width:expression(documentElement.clientWidth < 1380?"1380px":"auto");
+	}
+	div.authorityListCon{
+		color:#A0A0A0;
+		font-size:14px;
+		border:2px solid #404040;
+		padding:14px 14px 14px  14px;
+		margin:0 0 0 85px;
+		overflow:hidden;
+		*zoom:1;
+	}
+	div.authorityListCon h5{
+		margin-bottom:10px;
+	}
+	div.authorityListCon span{
+		float:left;
+		height:17px;
+		line-height:17px;
+		text-indent:26px;
+		width:70px;
+	}
+	div.authorityListCon input.text{
+		background:#404040 !important;
+	}
+	input.addItem{
+		position:absolute;
+		bottom:0px;
+	}
+	span.depSpan{
+		font-size:14px;
+		color:#A0A0A0;
+		display:none;
+		vertical-align:middle;
+		margin-left:20px;
+	}
+	ul.logType{
+		margin-top:24px;
+		position:relative;
+		z-index:2;
+	}
+	ul.logType li.search{
+		text-align:right;
+	}
+	div.layout{
+		margin:0 auto;
+	}
+	div.detailCon{
+		width:1000px;
+	}
+	div.tableBorderCon
+	{
+		margin-top:0px !important;
+	}
+	table.dataGrid{
+		width:1000px;
+	}
+	.downloadActiveX{
+		visibility:visible;
+		height:1px;
+		width:1px;
+	}
+	ul.line li.lineD{
+		width:50%;
+	}
+	ul.line li.lineD1{
+		display:block;
+	}
+	label.filterCheckCon{
+		margin:0 24px 0 8px;
+	}
+	ul.selOptsUl{
+		max-height:300px;
+	}
+	#downloadPluginCon{
+		height:8px;
+	}
+	input.textClock{
+		background:url(../web-static/images/clock.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+	}
+	input.textCalender{
+		background:url(../web-static/images/calender.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+		margin-right:8px;
+	}
+	div.pageListPo span.pageTotalNum
+	{
+		margin-right:180px;
+	}
+	i.completeIcon{
+		background:url(../web-static/images/download_complete.png) center no-repeat;
+		width:20px;
+		height:20px;
+		display:inline-block;
+		vertical-align:middle;
+	}
+	span.downloaded{
+		color:#325FE0;
+		cursor:pointer;
+		vertical-align:middle;
+		margin-left:30px;
+	}
+	span.downloadErr{
+		color:#FF5500;
+	}
+	span.downloading{
+		color:#19B68F;
+	}
+	span.noDownload{
+		color:#333333;
+	}
+	#selOptsUlmainType{
+		width:188px;
+	}
+</style>
+<div id="detailConCFUM" class="detailCon menuLessMT">
+	<div id="downloadPluginCon"></div>
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desA">{%label.downloadContent%}</label>
+			<i name="downloadTypeCheck" id="comeIn" value="picture" checked="true"></i>
+			<label for="forbid" class="des desH filterCheckCon">{%label.picture%}</label>
+			<i name="downloadTypeCheck" id="comeOut" value="video" checked="false"></i>
+			<label for="forbid" class="des desH filterCheckCon">{%label.kinescope%}</label>
+		</li>
+	</ul>
+	<ul class="line">
+		<li class="line lineD lineD1">
+			<label class="des desA">{%label.beginTime%}</label>
+			<input id="beginDate" type="text" class="text textA1 textCalender" readonly="true" />
+			<input id="beginTime" type="text" class="text textA1 textClock" readonly="true" />
+		</li>
+		<li class="line lineD lineD1">
+			<label class="des desA">{%label.endTime%}</label>
+			<input id="endDate" type="text" class="text textA1 textCalender" readonly="true" />
+			<input id="endTime" type="text" class="text textA1 textClock" readonly="true" />
+		</li>
+	</ul>
+	<ul class="line logType">
+		<li class="line lineD">
+			<label class="des desA">{%label.logTypeMain%}</label>
+			<span class="selCon">
+				<span id="mainType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD search">
+			<input id="searchLog" type="button" value="{%btn.searchLog%}" class="subBtnB btnA btnSmall" />
+		</li>
+	</ul>
+	<div class="tableCon">
+		<div class="tableBorderCon"><table id="fileTbl" class="dataGrid"></table></div>
+		<ul id="downloadUl" class="gridToolBar">
+			<li gridType="download">{%label.download%}</li>
+			<li gridType="stopDownload">{%label.stopDownloading%}</li>
+		</ul>
+	</div>
+</div>

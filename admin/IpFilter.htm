@@ -1,0 +1,537 @@
+﻿<style type="text/css">
+	div.tableBorderCon{
+		margin-top:32px;
+	}
+	div.funcBtnCon{
+		background:none;
+		padding-top:28px;
+	}
+	div.tableEditConA{
+		width:480px;
+	}
+	div.authorityListFunCon{
+		margin:20px 24px 5px 128px;
+	}
+	div.authorityListFunCon input{
+		margin-right:10px;
+	}
+	div.authorityListFunCon input{
+		*padding-left:18px;
+		*padding-right:18px;
+	}
+    ul.line label.desK{
+		font-size:13px;
+		line-height:32px;
+		width:128px;
+		text-align: right;
+		margin-right: 20px;
+    }
+    ul.line li.lineM{
+    	margin-top: 5px;
+    	margin-bottom: 5px;
+    }
+    ul.line li.lineD{
+    	display: block;
+    }
+
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case EINVIP:
+				showStr = errStr.ipAddrErr;
+				break;
+			case EINVIPFMT:
+				showStr = errStr.ipAddrFmtErr;
+				break;
+			case EINVGROUPIP:
+				showStr = errStr.ipAddrGroupErr;
+				break;
+			case EINVLOOPIP:
+				showStr = errStr.ipAddrLoopErr;
+				break;
+			case ENOTLANWANNET:
+				showStr = errStr.ipAddrNotLanWanNetErr;
+				break;
+			default:
+				showStr = errStr.ipfilterInvIp;
+				break;
+			}
+
+			showNote(objOrId, showStr);
+			return false;
+		}
+
+		function errorHandle(errNo)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case ESYSTEM:
+				showStr = errStr.systemErr;
+				break;
+			case IPCFWENERR:
+				showStr = errStr.paraErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCFWFMDERR:
+				showStr = errStr.ipfilterInvMode;
+				break;
+			case IPCFWIPERR:
+			case IPCFWIPRERR:
+				showStr = errStr.ipfilterInvIp;
+				break;
+			case ETABLEFULL:
+				if (addingListType && addingListType == uciFirewall.optValue.typeVal.forbid)
+				{
+					showStr = errStr.blackListItemFull;
+				}
+				else
+				{
+					showStr = errStr.whiteListItemFull;
+				}
+				break;
+			case IPCFWIPINVERR:
+				showStr = errStr.ipFilterIpCollision;
+				break;
+			case IPCSYSRPARAERR:
+			case IPCSYSRCONFERR:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr);
+			return false;
+		}
+
+		function ipFltrSwitchHd(state)
+		{
+			ipState = state;
+		}
+
+		function getIpFilterInfo(setEnableSign)
+		{
+			var data = {}, state, type;
+
+			data[uciIpFt] = {};
+			data[uciIpFt][NAME] = uciFirewall.secName.ipCtrl;
+			data[uciIpFt][KEY_TABLE] = [uciFirewall.secType.blacklist, uciFirewall.secType.whitelist];
+			ipFilterList.lenght = 0;
+			blackList.length = 0;
+			whiteList.length = 0;
+
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					state = result[uciIpFt][uciFirewall.secName.ipCtrl][uciFirewall.optName.enabled];
+					type = result[uciIpFt][uciFirewall.secName.ipCtrl][uciFirewall.optName.filterMode];
+					curFilterMode = filterMode = undefined == type ? uciFirewall.optValue.typeVal.forbid : type;
+					blackList = formatTableData(result[uciIpFt][uciFirewall.secType.blacklist]) || [];
+					whiteList = formatTableData(result[uciIpFt][uciFirewall.secType.whitelist]) || [];
+
+					if (true == setEnableSign)
+					{
+						ipState = uciFirewall.optValue.accessVal.some == state ? 1 : 0;
+						enableVal = ipState;
+						ipSwitch.setState(ipState);
+					}
+
+					if (uciFirewall.optValue.typeVal.forbid == filterMode)
+					{
+						changeRadioInput("blackName", true);
+						changeRadioInput("whiteName", false);
+						ipFilterList = blackList;
+					}
+					else
+					{
+						changeRadioInput("blackName", false);
+						changeRadioInput("whiteName", true);
+						ipFilterList = whiteList;
+					}
+					UPnPMtch.setDataSource(ipFilterList);
+					UPnPMtch.refresh();
+
+					if (true == bPageFirstLoad)
+					{
+						bPageFirstLoad = false;
+						showDetailCon();
+					}
+
+					// show success toast here will not worry about overlay
+					if (bOperationSucc == true)
+					{
+						bOperationSucc = false;
+						showToast("success");
+					}
+				}
+			});
+		}
+
+		function ipCheck() //添加失焦点检测函数
+		{
+			var descInfo = desc.value;
+			var ipInfo = hideLeadingZeros(ipAddr.value);
+
+			if (0 == descInfo.length)
+			{
+				showNote("desInfo", errStr.ipFilterDescNotBlk);
+			}
+			if (desMaxLen < descInfo.length)
+			{
+				showNote("desInfo", errStr.ipFilterDescLenExceed);
+			}
+			errHandle(checkIp(ipInfo), "ipAddrInfo");
+		}
+
+		function ipFilterSave(mode, index, funcCbk)
+		{
+			var descInfo = desc.value;
+			var ipInfo = hideLeadingZeros(ipAddr.value);
+
+			if (0 == descInfo.length)
+			{
+				showNote("desInfo", errStr.ipFilterDescNotBlk);
+				return;
+			}
+			else if (desMaxLen < descInfo.length)
+			{
+				showNote("desInfo", errStr.ipFilterDescLenExceed);
+				return;
+			}
+			else if (false == errHandle(checkIp(ipInfo), "ipAddrInfo"))
+			{
+				return;
+			}
+
+			if (true == $.local)
+			{
+				var cfgSecPara = {};
+				cfgSecPara[uciOptStartIp] = ipInfo;
+				cfgSecPara[uciOptEndIp] = ipInfo;
+				cfgSecPara[uciOptDesc] = descInfo;
+				funcCbk(true, cfgSecPara);
+
+				return;
+			}
+
+			showToast();
+			if (ADD == mode)
+			{
+				var cfg = {}, cfgBindFile = {}, cfgSecPara = {}, nowFilterMode;
+
+				addingListType = nowFilterMode = getRadioChs("ipFilterCheck");
+				cfg[uciIpFt] = cfgBindFile;
+				cfgBindFile[KEY_TABLE] = nowFilterMode;
+				cfgBindFile[KEY_NAME] = nowFilterMode + "_" + calcNextIndex(ipFilterList);
+				cfgBindFile[KEY_PARA] = cfgSecPara;
+
+				cfgSecPara[uciOptStartIp] = ipInfo;
+				cfgSecPara[uciOptEndIp] = ipInfo;
+				cfgSecPara[uciOptDesc] = descInfo;
+
+				$.add(cfg, function(result){
+					funcCbk(result[ERR_CODE] == ENONE, cfgSecPara);
+					if (true == errorHandle(result[ERR_CODE]))
+					{
+						filterModeInfoUpdate(true);
+					}
+				});
+			}
+			else if (EDIT == mode)
+			{
+				var secNameVal = ipFilterList[index][SEC_NAME];
+				var cfg = {}, cfgBindFile = {}, cfgSecPara = {};
+
+				cfg[uciIpFt] = cfgBindFile;
+				cfgBindFile[secNameVal] = cfgSecPara;
+
+				cfgSecPara[uciOptStartIp] = ipInfo;
+				cfgSecPara[uciOptEndIp] = ipInfo;
+				cfgSecPara[uciOptDesc] = descInfo;
+
+				$.modify(cfg, function(result){
+					funcCbk(result[ERR_CODE] == ENONE, cfgSecPara);
+					if (true == errorHandle(result[ERR_CODE]))
+					{
+						filterModeInfoUpdate(true);
+					}
+				});
+			}
+		}
+
+		function ipFilterDelSel(index, funcCbk)
+		{
+			var indexArry = index.split("-");
+			var secList = [], secName;
+			var cfg = {}, cfgSecPara = {};
+
+			for (var i in indexArry)
+			{
+				//排除dataGridStaList数组中的空元素
+				secName = ipFilterList[indexArry[i]][SEC_NAME];
+				if (!secName)
+				{
+					continue;
+				}
+
+				secList[i] = secName;
+			}
+			showToast();
+			cfg[uciIpFt] = {};
+			cfg[uciIpFt][KEY_NAME] = secList;
+
+			$.del(cfg, function(result){
+				errHandle(result[ERR_CODE]);
+				funcCbk(result[ERR_CODE] == ENONE);
+
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					filterModeInfoUpdate(true);
+				}
+			});
+		}
+
+		function onSave()
+		{
+			var data = {}, cfg = {};
+			data[uciIpFt] = {};
+			data[uciIpFt][uciFirewall.secName.ipCtrl] = cfg;
+			cfg[uciFirewall.optName.enabled] = ipState == 0 ? uciFirewall.optValue.accessVal.all : uciFirewall.optValue.accessVal.some;
+			cfg[uciFirewall.optName.filterMode] = getRadioChs("ipFilterCheck");
+
+			showToast();
+			$.modify(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					enableVal = ipState;
+					if (uciFirewall.optValue.typeVal.forbid == getRadioChs("ipFilterCheck"))
+					{
+						ipFilterList = blackList;
+					}
+					else
+					{
+						ipFilterList = whiteList;
+					}
+					filterMode = getRadioChs("ipFilterCheck");
+					UPnPMtch.setDataSource(ipFilterList);
+					UPnPMtch.refresh(UPnPMtch.getPageNum());
+					showToast("success");
+				}
+			});
+		}
+
+		function resetCon()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[uciSystem.fileName] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset][uciSystem.optName.configName] = [uciFirewall.secName.fireWall];
+
+					showToast();
+					$.action(data, function(result){
+						if (true == errorHandle(result[ERR_CODE]))
+						{
+							// don't show success toast here, it will be overlay by getIpFilterInfo
+							bOperationSucc = true;
+							getIpFilterInfo(true);
+							//showToast("success");
+						}
+					});
+				}
+			});
+		}
+
+		function popUpHd(type, index, para)
+		{
+			editIpFilterDiv.style.top = "0px";
+			closeNoteAll();
+			if (EDIT == type)
+			{
+				desc.value = ipFilterList[index].desc;
+				ipAddr.value = ipFilterList[index][uciOptStartIp];
+			}
+			else if (ADD == type)
+			{
+				desc.value = "";
+				ipAddr.value = "";
+			}
+		}
+
+		function ipFilterInit()
+		{
+			UPnPMtch = new DataGrid();
+			UPnPMtch.init({
+				max:32,
+				id:"ipFilterTable",
+				data:ipFilterList,
+				classCol:{gridClassName:"dataGrid"},
+				head:[{field:label.desc, width:275},
+					  {field:label.ipAddr, width:240}],
+				list:[{name:uciOptDesc, maxLength:16},
+					  {name:uciOptStartIp, type:"ip", maxSize:30}],
+				toolBar:{id:"ipFilterMgtUl", popUp:popUpHd, delSel:ipFilterDelSel, asyn:true},
+				popUpBar:{id:"editIpFilter", save:ipFilterSave, cancel:function(type, index, handle){
+					closeNoteAll();
+					handle(true);
+				}}
+			});
+		}
+
+		function filterModeChange()
+		{
+			if (curFilterMode != getRadioChs("ipFilterCheck"))
+			{
+				curFilterMode = getRadioChs("ipFilterCheck");
+				modeSwitch = true;
+				filterModeInfoUpdate(false);
+			}
+		}
+
+		/* 根据单选框选项值刷新表格 */
+		function filterModeInfoUpdate(showSuccess)
+		{
+			var data = {}, state, type, nowFilterMode;
+
+			data[uciIpFt] = {};
+			data[uciIpFt][NAME] = uciFirewall.secName.ipCtrl;
+			data[uciIpFt][KEY_TABLE] = [uciFirewall.secType.blacklist, uciFirewall.secType.whitelist];
+			ipFilterList.lenght = 0;
+			blackList.length = 0;
+			whiteList.length = 0;
+
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (showSuccess == true)
+					{
+						showToast("success");
+					}
+					nowFilterMode = getRadioChs("ipFilterCheck");
+					blackList = formatTableData(result[uciIpFt][uciFirewall.secType.blacklist]) || [];
+					whiteList = formatTableData(result[uciIpFt][uciFirewall.secType.whitelist]) || [];
+
+					if (uciFirewall.optValue.typeVal.forbid == nowFilterMode)
+					{
+						ipFilterList = blackList;
+					}
+					else
+					{
+						ipFilterList = whiteList;
+					}
+					UPnPMtch.setDataSource(ipFilterList);
+					UPnPMtch.refresh(modeSwitch == true ? 1 : UPnPMtch.getPageNum());
+					modeSwitch = false;
+				}
+			});
+
+		}
+
+		var uciIpFt = uciFirewall.fileName,
+			uciOptDesc = uciFirewall.optName.desc,
+			uciOptStartIp = uciFirewall.optName.startIp,
+			uciOptEndIp = uciFirewall.optName.endIp,
+			uciType = uciFirewall.secType.filterMode;
+		var ipSwitch = null, ipFilterList = [], ipState = 0;
+		var whiteList = [], blackList = [], filterMode, enableVal, curFilterMode;
+		var editIpFilterDiv = id("editIpFilter"),
+			desc = id("desInfo"), ipAddr = id("ipAddrInfo");
+		var ADD = "add", EDIT = "edit";
+		var bPageFirstLoad = true;
+		var modeSwitch = false;
+		var desMaxLen = 60;
+		var addingListType; // 当前正在添加的名单类型
+		var bOperationSucc = false;
+
+		ipSwitch = new Switch("ipFltrSwitch", 0, ipFltrSwitchHd);
+		initRadioInput("ipFilterCheck", filterModeChange);
+
+		if (true == $.local)
+		{
+			ipFilterList = [{"desc":"filter1", "start_ip":"192.168.1.56"}];
+		}
+
+		ipFilterInit();
+		id("save").onclick = onSave;
+		id("resetDefault").onclick = resetCon;
+		id("desInfo").onblur = ipCheck; //添加失焦点检测
+		id("ipAddrInfo").onblur = ipCheck; //添加失焦点检测
+		id("desInfo").onfocus = closeNoteAll;
+		id("ipAddrInfo").onfocus = closeNoteAll;
+		getIpFilterInfo(true);
+	}
+	init();
+</script>
+<div class="ipFltObj detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desF">{%label.enabled%}{%menuStr.ipFilter%}</label>
+			<div id="ipFltrSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+		<li class="line lineD">
+			<label class="des desF">{%label.filterMethod%}</label>
+			<i name="ipFilterCheck" id="blackName" value="blacklist"></i>
+			<label for="forbid" class="des desH">{%label.blacklist%}</label>
+		</li>
+		<li class="line lineD">
+			<label class="des desF"></label>
+			<i name="ipFilterCheck" id="whiteName" value="whitelist"></i>
+			<label for="allow" class="des desH">{%label.whitelist%}</label>
+		</li>
+	</ul>
+	<div id="detailConCFUM" class="">
+		<div class="tableCon">
+			<div class="tableBorderCon"><table id="ipFilterTable" class="dataGrid"></table></div>
+			<ul id="ipFilterMgtUl" class="gridToolBar">
+				<li gridType="delSel">{%btn.deleteSel%}</li>
+				<li gridType="popUp">{%btn.add%}</li>
+			</ul>
+			<div id="editIpFilter" class="tableEditLyCon">
+				<div class="tableEditCon tableEditConA">
+					<div class="innerCon">
+						<h4 class="title">{%label.setIpAddr%}</h4>
+						<i id="closeTip"></i>
+						<ul class="line">
+							<li class="line lineM">
+								<label class="des desK" for="desInfo">{%label.desc%}</label>
+								<input id="desInfo" class="text textB8" maxLength="60" />
+							</li>
+							<li class="line lineM">
+								<label class="des desK" for="ipAddrInfo">{%label.ipAddr%}</label>
+								<input id="ipAddrInfo" class="text textB8" maxLength="15" />
+							</li>
+						</ul>
+						<div class="tablePopUpToolBar authorityListFunCon"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input class="subBtnB btnA" type="button" id="resetDefault" value="{%btn.resetDefault%}" />
+		<input class="subBtn btnA" type="button" id="save" value="{%btn.save%}"/>
+	</div>
+</div>

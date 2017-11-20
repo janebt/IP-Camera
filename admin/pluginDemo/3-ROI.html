@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>ROI</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> ROI </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>  
+
+		<p>			
+			<input type="button" value="start ROI" id="startROI" >
+			<input type="button" value="控制台打印ROI信息" id="getROI" >
+			<input type="button" value="清空" id="resetROI" >
+			<input type="button" value="删除" id="delROI" >
+        </p>		
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480,
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	pluginObj.startROI = function(){
+		obj.bROIOn = 1;                             //开启ROI设置
+		
+		console.log(obj.ROIArrLen);          //ROIArrLen - 可绘制的ROI矩形个数，上限是8个，再多的话就不允许添加了
+		
+		//obj.addROIRect(200, 200, 400, 550); (我的测试环境分辨率为1280*720，其它情况做测试请适当调整)
+		obj.addROIRect(1562, 2777, 1562, 4861);        //用于从服务器读取已保存的矩形位置信息，并交给插件显示。   参数：start point X | start point Y | width | height
+	};
+	
+	pluginObj.stopROI = function(){
+		obj.bROIOn = 0;                //每次obj.bROIOn的值置为0时，插件中的ROI数组信息全都会重置，所以下次开启（obj.bROIOn = 1）必须重新调用obj.addROIRect将服务器中获取的矩形信息设置到插件中
+	};
+	
+	pluginObj.getROIArrInfo = function(){     //分别从插件获取ROI矩形的左上角X，Y坐标和矩形长、宽。之后就可以上传到服务器进行保存操作了。
+		var startPoint = {};  //左上角坐标的变换值    
+		var width, height;    //矩形长宽的变换值
+		var pos = [-1,-1,-1,-1];
+		for(var i=0; i<obj.ROIArrLen; i++)    //ROIArrLen - 可绘制的ROI矩形个数，上限是1个
+		{
+			obj.getROIRectPos(i, pos);   //getROIRectPos() 得到ROI矩形的左上角坐标和长宽。参数是下标和一个长度为4的数组（必须预先定义）。调用后参数数组的值发生变化，分别为ROI矩形的左上角x/y和矩形w/h。
+			startPoint.x = pos[0];      //点的x变换值为 实际值 * 10000 / 分辨率的width  （！！ROI，区域覆盖等取矩形的功能都采用这样的计算方法。对页面其实没有影响，只需要在服务器和插件中传递该值即可）
+			startPoint.y = pos[1];        //点的y变换值为 实际值 * 10000 / 分辨率的height
+			width = pos[2];              //width的变换值为 实际值 * 10000 / 分辨率的width
+			height = pos[3];               //height的变换值为 实际值 * 10000 / 分辨率的height
+			console.log("ROI Rect "+ i + ": startPoint(" +  startPoint.x + ", " + startPoint.y + ")    " + "width = " + width + ", " + "height = " + height);
+		}
+	};
+	
+	pluginObj.delCurROI = function(){
+		obj.delROIArr(1);      //删除当前选中状态的ROI矩形 delROIArr。obj.delROIArr()方法的参数分2种情况，正数和负数。正数则删除当前选中的矩形，负数则清空
+		                       //以后可能会增加右键删除或者del键删除，但是暂时只支持这种删除方法
+	};
+	pluginObj.resetROI = function(){
+		obj.delROIArr(-1);      //清除所有ROI矩形
+	};
+	
+	(function(){
+		document.getElementById("startROI").onclick = function(){
+			if(this.value == "start ROI")
+			{
+				this.value = "end ROI";
+				pluginObj.startROI();
+			}
+			else if(this.value == "end ROI")
+			{
+				this.value = "start ROI";
+				pluginObj.stopROI();
+			}
+		};
+		document.getElementById("getROI").onclick = pluginObj.getROIArrInfo;
+		
+		document.getElementById("resetROI").onclick = pluginObj.resetROI;
+		document.getElementById("delROI").onclick = pluginObj.delCurROI;
+		
+	})();
+
+</script>
+
+<div>
+<h2>ROI - 敏感区域</h2>
+<p>该功能的作用是让用户在视频上划定一个敏感区域，这个区域中的视频内容会更清晰。在预览时是看不到一个明显的ROI边界的，但是在设置页面中插件会提供一个矩形区域让用户设置ROI的具体区域。
+一开始从web server获取ROI区域的位置信息，并设置设置到插件中进行显示。用户通过插件添加或重新调整ROI的位置后，点击“保存”时，JS才从插件中取出新的ROI位置信息，并上传给web server进行处理。</p>
+
+<h5>bROIOn</h5>
+<p>属性：赋值为1时开启ROI区域绘制；赋值为0时关闭ROI区域绘制。</p>
+
+<h5>addROIRect(x, y, width, height)</h5>
+<p>
+	接口方法：在插件中绘制一个ROI矩形<br>
+	参数1：左上角X坐标；参数2：左上角Y坐标；参数3：矩形width；参数4：矩形height<br>
+	4个参数值都是经过转换后的值（转换方法同OSD中介绍的）。JS不需要处理，从web server中获取后直接设置到插件中即可。<br>
+</p>
+
+<h5>ROIArrLen</h5>
+<p>属性：可绘制的ROI矩形个数，应产品部需求上限限制为1个。该属性只读。</p>
+
+<h5>getROIRectPos(index, array)</h5>
+<p>
+	接口方法：得到ROI矩形的左上角坐标和矩形长、宽<br>
+	参数1：指定需要获取哪一个ROI矩形的信息；参数2：长度为4的数组，必须预先定义，否则会出错。<br>
+	经过这个方法调用后，参数array的值被修改为[左上角X坐标， 左上角Y坐标， 矩形width， 矩形height]。<br>
+	因为一开始需求没有明确支持的ROI矩形个数，所以按支持多个矩形的方式设计了接口；不知道以后会不会改回支持多个ROI矩形，这里暂时保留下标参数。<br>
+</p>
+
+<h5>getROIStartY(index)</h5>
+<p>
+	接口方法：得到ROI矩形的左上角Y坐标<br>
+	参数1：指定需要获取哪一个ROI矩形的信息<br>
+</p>
+
+<h5>getROIWidth(index)</h5>
+<p>
+	接口方法：得到ROI矩形的width信息<br>
+	参数1：指定需要获取哪一个ROI矩形的信息<br>
+</p>
+
+<h5>getROIHeight(index)</h5>
+<p>
+	接口方法：得到ROI矩形的height信息<br>
+	参数1：指定需要获取哪一个ROI矩形的信息<br>
+</p>
+
+<h5>delROIArr(number)</h5>
+<p>
+	接口方法：删除ROI矩形<br>
+	参数1：当参数为大于等于0时删除当前选中状态的ROI矩形，当参数为负数时清空所有ROI矩形。<br>
+	因为接口是按支持多个ROI矩形来设计的，限制改为只支持一个，则按钮“删除”对应清空的情况。
+</p>
+</div>
+
+</body>

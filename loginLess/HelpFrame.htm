@@ -1,0 +1,191 @@
+﻿<script type="text/javascript">
+	var gBasicMenuUl = id("basicMenuUl");
+
+	function init()
+	{
+		var basicAFObj = {
+			head:id("basicHead"),
+			basicCon:id("basicCon")
+		};
+
+		function basicPHAutoFit()
+		{
+			var height, tmpHeight, basicHeightL, basicHeightR;
+			var bodyHeight = parseInt(document.documentElement.clientHeight);
+			var basicCon = basicAFObj.basicCon;
+			var headHeight = parseInt(basicAFObj.head.offsetHeight);
+			var basicConL = $("div.basicConL")[0];
+			var basicConR = $("div.basicConR")[0];
+			var minHeight = 550;
+			var width = "980px";
+			var item;
+
+			try
+			{
+				if (document.documentElement.clientWidth < parseInt(width))
+				{
+					document.body.style.width = width;
+				}
+				else
+				{
+					document.body.style.width = document.documentElement.clientWidth + "px";
+				}
+
+				if (isIESix == true)
+				{
+					if (null != basicConR)
+					{
+						basicHeightR = parseInt(basicConR.offsetHeight);
+					}
+					else
+					{
+						basicHeightR = 0;
+					}
+
+					if (null != basicHeightL)
+					{
+						basicHeightL = parseInt(basicConL.offsetHeight) - parseInt(getNodeDefaultView(basicConL, "paddingBottom"));
+					}
+					else
+					{
+						basicHeightL = 0;
+					}
+
+					tmpHeight = basicHeightL > basicHeightR ? basicHeightL : basicHeightR;
+					height = bodyHeight - headHeight;
+					height = height > tmpHeight ? height : tmpHeight;
+					height = height < minHeight ? minHeight : height;
+					height = height + "px";
+					basicCon.style.height = height;
+
+					if (null != basicConR)
+					{
+						basicConR.style.height = height;
+					}
+
+					if (null != basicConL)
+					{
+						basicConL.style.height = height;
+					}
+				}
+				else
+				{
+					height = bodyHeight - headHeight;
+					height = height < minHeight ? minHeight : height;
+					height = height + "px";
+					basicCon.style.minHeight = height;
+
+					if (null != basicConR)
+					{
+						basicConR.style.minHeight = height;
+					}
+
+					if (null != basicConL)
+					{
+						basicConL.style.minHeight = height;
+					}
+				}
+
+				if (null != basicConR)
+				{
+					simulateMouseC(basicConR);
+				}
+			}catch(ex){
+				log("basicPHAutoFit:", ex);
+			}
+		}
+
+		function pageInit()
+		{
+			window.basicPHAutoFit = basicPHAutoFit;
+			helpInit(function(){
+				window.setTimeout(function(){
+					attachEvnt(window, "resize", function(){
+						if (id("basicCon") != null)
+						{
+							basicPHAutoFit();
+						}
+					});
+				}, 1000);
+				menuInit_Basic();
+			});
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	body{
+		background:#E6E7EB;
+		font-size:12px;
+		overflow-y:scroll;
+		*overflow-y:visible;
+		min-width:1100px;
+		_width:expression((documentElement.clientWidth < 1100)?"1100px":"auto");
+	}
+	div.basicHead{
+		background:url(../web-static/images/logoHelp.png) no-repeat 40px 12px;
+		background-color:#356BD5;
+		height:44px;
+		line-height:44px;
+		text-align:center;
+		position:relative;
+	}
+	div.basicCon{
+		overflow:visible;
+	}
+	div.basicConL{
+		background:#E6E7EB;
+		float:left;
+		padding-left:40px;
+		padding-right:16px;
+		overflow-y:auto;
+	}
+	div.basicConR{
+		position:relative;
+	}
+	div.basicMenuCon{
+		height:44px;
+		width: 396px;
+		display: inline-block;
+		_zoom:1;
+		_display:inline;
+	}
+	ul.basicMenuUl{
+		margin:0 auto;
+		list-style:none;
+		position:relative;
+		overflow:hidden;
+		text-align:center;
+	}
+	ul.basicMenuUl li{
+		cursor:pointer;
+		display:inline-block;
+		_zoom:1;
+		*display:inline;
+		font-size:16px;
+		margin:0 32px;
+		line-height:44px;
+		position:relative;/*删除此属性IE6下顶部栏会异常*/
+		width:32px;
+		*width: 34px;/*为了解决IE6下字体加粗后换行的bug*/
+		*margin: 0 31px;
+	}
+	ul.basicMenuUl li.menuLi{
+		color:#C0D0F0;
+	}
+	ul.basicMenuUl li.menuLiHover{
+		color:#FFFFFF;
+	}
+	ul.basicMenuUl li.menuLiClick{
+		font-weight: bold;
+		color:#FFFFFF;
+	}
+</style>
+<div id="basicHead" class="basicHead">
+	<div class="basicMenuCon">
+		<ul id="basicMenuUl" class="basicMenuUl"></ul>
+	</div>
+</div>
+<div id="basicCon" class="basicCon basicConHFit layout"></div>

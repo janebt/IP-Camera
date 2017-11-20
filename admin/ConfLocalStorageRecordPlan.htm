@@ -1,0 +1,558 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		// obj
+		var $timingRadio = $("#timingRadio");
+		var $motDetRadio = $("#motDetRadio");
+		var $timingLabel = $("#timingLabel");
+		var $mdtLabel = $("#mdtLabel");
+		var recPlanGrid;
+
+		// uci
+		var recPlFN = uciRecordPlan.fileName;
+		var highSetFN = uciPlanAdv.fileName;
+		var recPlanType = uciRecordPlan.secType.plan;
+		var curSecName = "chn1_channel";
+		var enabled = uciRecordPlan.optName.enabled;
+		var planAdvSecName = uciPlanAdv.secName.planAdv;
+		var preRecord = uciPlanAdv.optName.preRecord;
+		var streamType = uciPlanAdv.optName.stream_type;
+		var delayRecord = uciPlanAdv.optName.delayRecord;
+
+		// dynamic data
+		var chanOpt = [];
+		var serverData;
+		var gChannelList = [];
+
+		// static data
+		var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+		var uciDays = [uciRecordPlan.optName.mon, uciRecordPlan.optName.tue, uciRecordPlan.optName.wed, uciRecordPlan.optName.thu, uciRecordPlan.optName.fri, uciRecordPlan.optName.sat, uciRecordPlan.optName.sun];
+
+		// tmp
+		var querySecName, data, planData;
+		var tmp, tmpStr, chmInfo, i;
+
+		// switch
+		var exSwitch = null;
+		var exSwitchState = 0;
+
+		var kcPP = id("kcPP");
+		var kcDP = id("kcDP");
+
+		function errorHandler(code)
+		{
+			var str = "";
+
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case EINVARG:
+				str = errStr.IPCParamInvalid;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+
+		function typeSelCbk()
+		{
+			var value = getRadioChs("ipFilterCheck");
+			$timingRadio.addClass("peTypeRd");
+			$motDetRadio.addClass("peTypeRd");
+			if (1 == value)
+			{
+				$timingRadio.removeClass("timeUnSeled");
+				$timingRadio.addClass("timeSeled");
+				$motDetRadio.removeClass("mdtSeled");
+				$motDetRadio.addClass("mdtUnSeled");
+				$timingLabel.addClass("typeSeled");
+				$mdtLabel.removeClass("typeSeled");
+			}
+			else
+			{
+				$timingRadio.removeClass("timeSeled");
+				$timingRadio.addClass("timeUnSeled");
+				$motDetRadio.removeClass("mdtUnSeled");
+				$motDetRadio.addClass("mdtSeled");
+				$timingLabel.removeClass("typeSeled");
+				$mdtLabel.addClass("typeSeled");
+			}
+
+			recPlanGrid.curType = value;
+		}
+
+		function onCancel()
+		{
+			fetchServerSta();
+		}
+
+		function onSave()
+		{
+			var i;
+			var res = recPlanGrid.getTimeVal();
+
+			data = {};
+			data[recPlFN] = {};
+			data[recPlFN][curSecName] = {};
+			for (i = 0; i < weekArray.length; i++)
+			{
+				data[recPlFN][curSecName][uciDays[i]] = toolArrToString(res[weekArray[i]]);
+			}
+			data[recPlFN][curSecName][enabled] = exSwitch.state ? uciRecordPlan.optValue.on:uciRecordPlan.optValue.off;
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (!kcPPNumberCheck("kcPP") || !kcDPNumberCheck("kcDP"))
+					{
+						closeToast();
+						return;
+					}
+					planData = {};
+					planData[highSetFN] = {};
+
+					planData[highSetFN][planAdvSecName] = {};
+					planData[highSetFN][planAdvSecName][preRecord] = kcPP.value;
+					planData[highSetFN][planAdvSecName][delayRecord] = kcDP.value;
+					planData[highSetFN][planAdvSecName][streamType] = id("storageStream").value ? uciPlanAdv.optValue.minor:uciPlanAdv.optValue.main;
+
+					$.modify(planData, function(resp){
+						if (true == errorHandler(resp[ERR_CODE]))
+						{
+							showToast("success");
+						}
+					});
+				}
+				showDetailCon();
+			});
+		}
+		function fetchServerSta()
+		{
+			data = {};
+			data[recPlFN] = {};
+			data[recPlFN][KEY_NAME] = curSecName;
+			data[highSetFN] = {};
+			data[highSetFN][NAME] = planAdvSecName;
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], resp[recPlFN][curSecName][uciDays[i]]);
+					}
+
+					if (resp[recPlFN][curSecName][enabled] == uciRecordPlan.optValue.on)
+					{
+						exSwitch.setState(1);
+						exSwitchHd(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+						exSwitchHd(0);
+					}
+
+					planData = resp[highSetFN][planAdvSecName];
+					kcPP.value = planData[preRecord];
+					kcDP.value = planData[delayRecord];
+
+					if (planData[streamType] == uciPlanAdv.optValue.main)
+					{
+						selectInit("storageStream", [{str:label.mCodeStream, value:0},
+							{str:label.cCodeStream, value:1}
+							], 0);
+					}
+					else
+					{
+						selectInit("storageStream", [{str:label.mCodeStream, value:0},
+							{str:label.cCodeStream, value:1}
+							], 1);
+					}
+				}
+			});
+		}
+
+		function toolArrToString(arr, maxLen)
+		{
+			var res, i, str;
+			if (arr == undefined)
+			{
+				return "";
+			}
+			if (maxLen == undefined)
+			{
+				maxLen = 6;
+			}
+			res = "[";
+			if (arr.length < 1)
+			{
+				res += "\"0000-0000:0\"";
+			}
+			else
+			{
+				for (i = 0; i < arr.length && i < maxLen; i++)
+				{
+					str = arr[i].toString();
+					if (i > 0)
+					{
+						res += ",";
+					}
+					res += ("\"" + str + "\"");
+				}
+			}
+			res += "]";
+			return res;
+		}
+
+		/* 绑定各个按钮的响应事件 */
+		function bindEvent()
+		{
+			id("clearAll").onclick = function(event){
+				recPlanGrid.reset();
+			};
+
+			id("cancel").onclick = onCancel;
+
+			id("save").onclick = onSave;
+		}
+
+		function exSwitchHd(state)
+		{
+			exSwitchState = state;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				$("div.tableDiv").css({"z-index":"-1"}); /* IE6/7兼容 */
+				var saveHeight = getoffset(id("save")).top - getoffset(id("timingRadio")).top;
+
+				if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+				{
+					hideobj.style.height = saveHeight + "px";
+				}
+				else
+				{
+					var peConHeight = getoffset(id("peCon")).top - getoffset(id("timingRadio")).top + id("peCon").offsetHeight;
+					hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+				}
+			}
+			else
+			{
+				hideobj.style.display = "none";
+				$("div.tableDiv").css({"z-index":"0"});
+			}
+		}
+
+		function kcPPNumberCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (!checkNum(con.value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (value > 30 || value < 5)
+			{
+				var str = errStr.preRecordTimeErr;
+				showNote(idStr, str);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function kcDPNumberCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (!checkNum(con.value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (value > 600 || value < 5)
+			{
+				var str = errStr.delayRecordTimeErr;
+				showNote(idStr, str);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function onBlur()
+		{
+			kcPPNumberCheck("kcPP");
+			kcDPNumberCheck("kcDP");
+		}
+
+		function pageInit()
+		{
+			recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+			exSwitch = new Switch("exSwitch", 0, exSwitchHd);
+
+			data = {};
+			data[recPlFN] = {};
+			data[recPlFN][KEY_NAME] = curSecName;
+			data[highSetFN] = {};
+			data[highSetFN][NAME] = planAdvSecName;
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						selectInit("storageStream", [{str:label.mCodeStream, value:0},
+								{str:label.cCodeStream, value:1}], 0);
+						kcPP.value = 5;
+						kcDP.value = 5;
+						return;
+					}
+
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], resp[recPlFN][curSecName][uciDays[i]]);
+					}
+
+					if (resp[recPlFN][curSecName]["enabled"] == "on")
+					{
+						exSwitch.setState(1);
+						exSwitchHd(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+						exSwitchHd(0);
+					}
+
+					planData = resp[highSetFN][planAdvSecName];
+					kcPP.value = planData[preRecord];
+					kcDP.value = planData[delayRecord];
+
+					if (planData[streamType] == uciPlanAdv.optValue.main)
+					{
+						selectInit("storageStream", [{str:label.mCodeStream, value:0},
+							{str:label.cCodeStream, value:1}
+							], 0);
+					}
+					else
+					{
+						selectInit("storageStream", [{str:label.mCodeStream, value:0},
+							{str:label.cCodeStream, value:1}
+							], 1);
+					}
+				}
+				showDetailCon();
+			});
+
+			initRadioInput("ipFilterCheck", typeSelCbk);
+			typeSelCbk();
+
+			id("kcPP").onblur = onBlur;
+			id("kcDP").onblur = onBlur;
+			id("kcPP").onfocus = closeNoteAll;
+			id("kcDP").onfocus = closeNoteAll;
+		}
+
+		pageInit();
+		bindEvent();
+	}
+	init();
+</script>
+<style type="text/css">
+	label.desECEE{
+		font-size:13px;
+		color:#666666;
+		height:40px;
+		line-height:40px;
+		margin-right:4px;
+		width:70px;
+	}
+	ul.line li.lineD{
+		margin-bottom:20px;
+	}
+	div.actionTitleDiv{
+		margin-top:40px;
+	}
+	input.textA1{
+		width:98px;
+	}
+	span.select span.hsValueA{
+		width:52px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD" style="display: none">
+			<label class="des desJ">{%label.channel%}</label>
+			<span class="selCon">
+				<span id="selChannel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD">
+			<label id="exSwitchDes" class="des desA">{%menuStr.videoEnabled%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+		<div style="position:relative;*z-index:1;">
+			<div id="hidebg"></div>
+		</div>
+		<li class="line linePlan">
+			<span class="clearAll" id="clearAll">{%label.clear%}</span>
+			<i name="ipFilterCheck" id="timingRadio" value="1" class="peTypeRd timeSeled" checked="true"></i>
+			<label id="timingLabel" class="des typeSeled">{%label.timeVedio%}</label>
+
+			<i name="ipFilterCheck" id="motDetRadio" value="2" class="peTypeRd mdtUnSeled" checked="false"></i>
+			<label id="mdtLabel" class="des">{%label.eventVedio%}</label>
+		</li>
+	</ul>
+	<div class="armingSchedule" id="armingSchedule">
+		<div id="recPlanGrid"></div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%menuStr.videoParameter%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="line lineA">
+					<label class="des desECEE">{%label.storageStream%}</label>
+					<span class="selCon">
+						<span id="storageStream" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</li>
+				<li class="line lineA">
+					<label class="des desECEE">{%label.kinescopePrePerid%}</label>
+					<input id="kcPP" type="text" class="text textA1" maxlength="2" />
+					<span class="tip">{%label.second%}</span><span class="tip">(5-30)</span>
+				</li>
+				<li class="line lineA">
+					<label class="des desECEE" for="kcDP">{%label.kinescopeDelayPeriod%}</label>
+					<input id="kcDP" type="text" class="text textA1" maxlength="3" />
+					<span class="tip">{%label.second%}</span><span class="tip">(5-600)</span>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="cancel" type="button" value="{%btn.gridCancel%}" class="subBtnB btnA"/>
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>
+<style type="text/css">
+/* ----------------plan edit -------- */
+	div.peCon{
+		width:700px;
+	}
+	div.peCon label.peTitle{
+		margin-right:476px;
+	}
+	div.peCon label.peLabel{
+		margin-right:32px;
+	}
+	label.peInvalidNameLabel{
+		margin-right:32px;
+	}
+	div.peCol span.select{
+		font-size:0px !important;
+	}
+	span.peSelect{
+		width:76px !important;
+		_width:66px !important;
+		font-size:14px !important;
+	}
+
+/* ----------------plan set---------- */
+
+	#orgDC{
+		width:662px;
+	}
+	.displayNone{
+		display:none !important;
+	}
+
+
+/* ----------------类型选择---------- */
+	i.peTypeRd
+	{
+		margin-right:4px;
+	}
+	i.timeSeled
+	{
+		background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+	}
+	i.timeUnSeled
+	{
+		background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+	}
+	i.mdtUnSeled
+	{
+		background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+	}
+	i.mdtSeled
+	{
+		background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+	}
+	#timingLabel{
+		margin-right:35px;
+		display: inline-block;
+		*display: inline;
+		*zoom:1;
+	}
+	label.typeSeled{
+		color:#000 !important;
+	}
+
+/* ----------------plan cpy---------- */
+	#pcSelAll{
+		margin-left:209px;
+	}
+	#pcCancel{
+		margin-left:115px;
+	}
+	#pcSave{
+		margin-left: 12px;
+	}
+
+/* ----------------通道-------------- */
+	ul.line label.desJ{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		width:55px;
+	}
+</style>

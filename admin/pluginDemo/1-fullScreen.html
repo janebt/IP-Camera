@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>motion detection</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> Motion Detection </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="start play and MD" id="playAndMD" onclick="pluginObj.play(); pluginObj.MDStart();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>   
+		<p>
+			<input type="button" value="full screen" id="fullScreen" onclick="pluginObj.fullScreen();">
+			
+			<input type="button" value="start MD" id="startMD" onclick="pluginObj.MDStart();">
+			<input type="button" value="end MD" id="endMD" onclick="pluginObj.MDEnd();">
+			<input type="button" value="MD clear all" id="clearAll" onclick="pluginObj.MDCleanAll();">
+		</p>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480,
+			
+			fullScreenStatus: 0,
+			MDStatus: 0,
+			MDRegionData: (function(){     //用来保存motion detection功能选中区域信息的数组，实际使用时应该用JSON从服务器获得取值并保存，这里简化之全部初始为0
+				var arr = [];
+				for(var i=0; i<25; i++)   arr[i] = 0;
+				return arr;
+			})()
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	//在视频正常播放以前很多参数和方法是无法正常调用的，故增加ready函数
+	//以 fullScreen 为例，如果是在PlayVideo之后马上调用这个函数则应使用Ready方法: pluginObj.Ready(pluginObj.fullScreen);
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	pluginObj.fullScreen = function(){    //full screen, OSD, ROI, motion detection, 视频遮挡, 区域覆盖, 电子放大 这几个功能是不能同时开启的
+		obj.SetFullScreen();    //全屏播放的插件接口方法；也可通过双击进入全屏；双击和Esc键可以退出全屏
+	};
+	
+	pluginObj.MDStart = function(){    
+		obj.MotionDetection(1);  //参数1为 1，开启motion detection功能
+		
+		for (var i = 1; i <= 25; i++) {			
+			obj.SetMotionDetectionRegionnew(i, 0);     //将保存选中区块信息的数组一一传递给插件，这样插件才知道哪些区块该初始化为蓝色覆盖块  
+		}	
+	};
+	
+	pluginObj.MDEnd = function(){    //关闭motion detection功能
+		for( var i=0; i<25; i++){
+			pluginObj.param.MDRegionData[i] = obj.GetMotionArea(i);    //开启motion detection后，鼠标点击和滑动会选中新的区域，这些信息一开始只保存在插件对象中，必须用GetMotionArea()方法一一取出，才能上传给服务器并保存
+		}
+		console.log(pluginObj.param.MDRegionData);
+		
+		obj.MotionDetection(0); 	//参数1为 0，关闭motion detection功能		
+	};
+	
+	pluginObj.MDCleanAll = function(){
+		obj.MotionAreaCleanAll();   //清除所有MD选中区域
+	}
+</script>
+
+<div>
+<h2>插件的其它功能 - 全屏 和 motion detection</h2>
+<p>说明：Motion Detection功能后台还未实现，可能会有大的变动。这里介绍这个功能主要是为了说明开启插件特殊功能的一些问题。</p>
+
+<h5>MotionDetection(status, val)</h5>
+<p>
+	开启/关闭motion detection功能的接口方法<br>
+	参数1: 1-开启/0-关闭；参数2 - 设置灵敏度（灵敏度值的设置其实不影响插件的显示）<br>
+	该功能开启后，会用虚线将屏幕分成16 * 12的小区域，当鼠标点击并拖动时会选定一定的区块，并用浅蓝色标记；如果鼠标点击或划过已经选中的区块，则默认为反选，既取消选中该区块
+</p>
+<h5>SetMotionDetectionRegionnew(index, val)</h5>
+<p>
+	向插件设置选中的区块的接口方法<br>
+	参数1：1- 数组下标， 2 - 数组值<br>
+	每个小区域是否被选中的信息并不是以bool值保存在数组中的，而是数组数据的一个bit。计算方式只要服务器端和插件内部统一即可，JS仅需要调用该方法把从服务器端获取到的数组交给插件即可。
+</p>
+<h5>GetMotionArea(index)</h5>
+<p>
+	从插件中读取选中区块信息的接口方法<br>
+	参数1：1- 数组下标；返回：数组值<br>
+	开启motion detection功能后，鼠标在视频区域点击或拖动会更新保存在插件中的选中区域的数组，所以保存时需要将其从插件中取出，通过JSON发送给服务器。
+</p>
+<h5>MotionAreaCleanAll()</h5>
+<p>
+	清除所有motion detection选中区块的接口方法<br>
+	无参数<br>
+</p>
+<h5>SetFullScreen()</h5>
+<p>
+	开启全屏播放的接口方法<br>
+	无参数<br>
+	也可通过双击进入全屏；双击和Esc键可以退出全屏
+</p>
+<h5>isVideoPlaying</h5>
+<p>
+	读取视频是否已完成初始化开始播放的属性<br>
+	数据类型 - Number<br>
+	0 - 视频播放初始化还未完成； 1 - 视频播放初始化已完成。<br>
+	这个参数比较重要，因为播放初始化还未完成前很多功能是无法正常使用的，
+	包括为属性赋值和调用接口函数，不会生效，或者更糟糕 - 导致状态混乱（可改，但牵扯很多，暂时没办法一一改掉）。
+	这个例子给出了一个Ready方法做参考，如果在Start PlayVideo后紧接着开启某个功能，就可以调用Ready方法（如“start play and MD”）。还可以试试看不使用Ready方法直接调用MDStart()会发生什么，嗯，总之最好不好这样	
+</p>
+
+<p>
+	补充说明：这个例子把full screen和motion detecion放在一起还为了说明，这2个功能是无法同时开启的。可以试试先点击"start MD"再全屏，会发现全屏无法生效，反之亦然。<br>
+	除了这2个功能，之后我还会把 电子放大、OSD、区域覆盖、ROI 和 视频遮挡 这些功能都设为互斥，只能开启1项。
+</p>
+</div>
+
+</body>

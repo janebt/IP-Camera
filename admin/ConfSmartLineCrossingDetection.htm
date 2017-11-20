@@ -1,0 +1,740 @@
+<script type="text/javascript">
+	function init()
+	{
+		function errorHandle(code, objOrId)
+		{
+			var showStr = "";
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCSMDENABLEERR:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case EINVARG:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCSMDSENSITIVITYERR:
+				showStr = errStr.ipcImInfsErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCNOTIFYEMAILENERR:
+			case IPCNOTIFYALARMENERR:
+			case IPCNOTIFYRECORDENERR:
+			case IPCNOTIFYFTPENERR:
+				showStr = errStr.IPCHandleInalid;
+				break;
+			case IPCLINECROSSINGDIRERR:
+				showStr = errStr.lineCrossingDirectionErr;
+				break;
+			case IPCSMDREGIONEILLEGAL:
+				showStr = errStr.regionIllegal;
+				break;
+			case IPCSMDREGIONNUMERR:
+				showStr = errStr.regionNumErr;
+				break;
+			case IPCARMINGSCHEDULEEOVERFLOW:
+				showStr = errStr.armingScheduleOverflow;
+				break;
+			case IPCARMINGSCHEDULEMIX:
+				showStr = errStr.armingScheduleMix;
+				break;
+			case IPCARMINGSCHEDULEILLEGAL:
+				showStr = errStr.armingScheduleIllegal;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function toolArrToString(arr, maxLen)
+		{
+			var res, i, str;
+			var	tvArr;
+			var bt;
+			var et;
+			if (arr == undefined)
+			{
+				return "";
+			}
+			if (maxLen == undefined)
+			{
+				maxLen = 6;
+			}
+			res = "[";
+			if (arr.length < 1)
+			{
+				res += "\"0000-0000\"";
+			}
+			else
+			{
+				for (i = 0; i < arr.length && i < maxLen; i++)
+				{
+					str = arr[i].toString();
+					tvArr = str.split(/[-,:]/, 3);
+					bt = parseInt(tvArr[0], 10);
+					et = parseInt(tvArr[1], 10);
+					str = recPlanGrid._getStringWithoutType(bt, et);
+					if (i > 0)
+					{
+						res += ",";
+					}
+					res += ("\"" + str + "\"");
+				}
+			}
+			res += "]";
+			return res;
+		}
+
+		function addType(strTimeVal) {
+			var curTV;
+			var res = new Array();
+
+			if (strTimeVal == undefined)
+			{
+				curTV = "\"0000-0000:0\"";
+				res.push(curTV);
+
+				return res;
+			}
+
+			if (!(strTimeVal instanceof Array))
+			{
+				strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+			}
+
+			for (var i = 0; i < strTimeVal.length; i++)
+			{
+				curTV = strTimeVal[i];
+				var	tvArr = curTV.split(/[-]/, 2);
+				var bt = parseInt(tvArr[0], 10);
+				var et = parseInt(tvArr[1], 10);
+				if(0 == bt && 0 == et)
+				{
+					res.push(recPlanGrid._getString(bt, et, 0));
+				}
+				else
+				{
+					res.push(recPlanGrid._getString(bt, et, 1));
+				}
+			}
+
+			return res;
+		}
+
+		function saveArmingSchedule()
+		{
+			var i;
+			var res = recPlanGrid.getTimeVal();
+
+			var data = {};
+			for (i = 0; i < weekArray.length; i++)
+			{
+				data[uciDays[i]] = toolArrToString(res[weekArray[i]]);
+			}
+
+			return data;
+		}
+
+		function setLineCrossingRange(secObj)
+		{
+			var lineArray = formatTableData(secObj);
+
+			for (var index in lineArray)
+			{
+				var item = lineArray[index];
+				plugin.showLineCrossingInfo({pt1_x:item[PT1_X], pt1_y:item[PT1_Y], pt2_x:item[PT2_X], pt2_y:item[PT2_Y],direction:item[DIRECTION]});
+			}
+		}
+
+		function getLineCrossingRange()
+		{
+			var lineArray = [];
+			var i = 0, item, tmpObj;
+			var len = 0;
+
+			for (; i < 4; i++)
+			{
+				item = plugin.getLineCrossingInfo(i);
+				if (item.pt1_x >= 0)
+				{
+					tmpObj = {};
+					tmpObj[PT1_X] = item.pt1_x;
+					tmpObj[PT1_Y] = item.pt1_y;
+					tmpObj[PT2_X] = item.pt2_x;
+					tmpObj[PT2_Y] = item.pt2_y;
+					tmpObj[DIRECTION] = directionValue[i];
+					tmpObj[SENSITIVITY] = sensitivityValue[i];
+					lineArray[len++] = tmpObj;
+				}
+			}
+
+			return lineArray;
+		}
+
+		function registerCallback()
+		{
+			plugin.intelligentCallback(function(result){
+				if(false == delAll)
+				{
+					onBlurHd();
+					if(sensitivityErr)
+					{
+						if(false == del){
+							plugin.showHighlight(num, 1);
+							return;
+						}
+						else{
+							closeNoteAll();
+							sensitivityErr = false;
+							del = false;
+						}
+					}
+					else
+					{
+						del = false;
+						plugin.showHighlight(parseInt(result), 0);
+					}
+				}
+				else
+				{
+					delAll = false;
+				}
+
+				switch(parseInt(result))
+				{
+				case 0:
+					num = 0;
+					id("lineName").innerHTML = label.lineOne;
+					break;
+				case 1:
+					num = 1;
+					id("lineName").innerHTML = label.lineTwo;
+					break;
+				case 2:
+					num = 2;
+					id("lineName").innerHTML = label.lineThree;
+					break;
+				case 3:
+					num = 3;
+					id("lineName").innerHTML = label.lineFour;
+					break;
+				}
+
+				sensitivityValue[num] = (sensitivityValue[num] == null) ? id("sensitivityDragLineDragLineInput").value : sensitivityValue[num];
+				directionValue[num] = (directionValue[num] == null) ? $("#directionSel"+" span.value")[0].value : directionValue[num];
+				sensitivityDragLine.setValue(sensitivityValue[num]);
+				$("#directionSel")[0].resetSel(directionValue[num]);
+			});
+		}
+
+		function saveHandle()
+		{
+			if(sensitivityErr)
+			{
+				return false;
+			}
+			var reqData = {};
+			var lineData = {};
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][DETECTION] = {};
+			reqData[FILE_NAME][NOTIFY_LIST] = {};
+
+			reqData[FILE_NAME][DETECTION][ENABLED] = switchState;
+			reqData[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] = emailCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][FTP_ENABLED] = ftpCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] = alarmCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] = recordCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][ARMING_SCHEDULE] = saveArmingSchedule();
+
+			showToast();
+			$.modify(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					lineData[FILE_NAME] = {};
+					lineData[FILE_NAME][ADD_REGIONS] = {};
+					lineData[FILE_NAME][ADD_REGIONS][REGION_INFO] = getLineCrossingRange();
+					$.action(lineData, function(result){
+						if (true == errorHandle(result[ERR_CODE])){
+							showToast("success");
+						}
+					});
+				}
+			});
+		}
+
+		function onBlurHd()
+		{
+			closeNoteAll();
+			/*灵敏度输入框失焦回调函数*/
+			if ((true == checkNum(id("sensitivityDragLineDragLineInput").value)) &&
+					(true == checkNumRange(parseInt(id("sensitivityDragLineDragLineInput").value), 100, 1)))
+			{
+				sensitivityValue[num] = id("sensitivityDragLineDragLineInput").value;
+				sensitivityDragLine.setValue(id("sensitivityDragLineDragLineInput").value);
+				sensitivityErr = false;
+			}
+			else
+			{
+				showNote("sensitivityDragLineDragLineInput", errStr.sensitivityErr);
+				sensitivityErr = true;
+			}
+		}
+		function sensitivityChange(val) {
+			closeNote("sensitivityDragLineDragLineInput");
+			sensitivityValue[num] = val;
+		}
+
+		function selDirection(val)
+		{
+			switch (val)
+			{
+			case "right":
+				directionValue[num] = "right";
+				break;
+			case "left":
+				directionValue[num] = "left";
+				break;
+			case "both":
+				directionValue[num] = "both";
+				break;
+			default:
+				break;
+			}
+			plugin.changeDetectDirect(num,directionValue[num]);
+		}
+
+		/* 删除当前选中界线 */
+		function delLineCrossingRange()
+		{
+			del = true;
+			sensitivityValue[num] = null;
+			directionValue[num] = null;
+
+			if(null == sensitivityValue[0] && null == sensitivityValue[1] && null == sensitivityValue[2] && null == sensitivityValue[3]){
+				id("sensitivityDragLineDragLineInput").value = sensitivityDefault;
+				$("#directionSel"+" span.value")[0].value = directionDefault;
+				plugin.changeDetectDirect(0, "both");
+			}
+			else{
+				id("sensitivityDragLineDragLineInput").value = null;
+			}
+
+			plugin.delLineCrossingInfo(PLUGIN_STATE_ON);
+		}
+
+		/* 删除所有界线 */
+		function clearLineCrossingRange()
+		{
+			delAll = true;
+			sensitivityValue = [null, null, null, null];
+			directionValue = [null, null, null, null];
+			id("sensitivityDragLineDragLineInput").value = sensitivityDefault;
+			$("#directionSel"+" span.value")[0].value = directionDefault;
+			plugin.changeDetectDirect(0, "both");
+			plugin.delLineCrossingInfo(PLUGIN_STATE_MINUS);
+		}
+
+		function intelligentDetectionSwitchHd(state)
+		{
+			intelligentDetectionSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+			switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				plugin.setOSDStatus(0);
+				hideobj.style.display = "block";
+				var saveHeight = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top;
+
+				if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+				{
+					hideobj.style.height = saveHeight + "px";
+				}
+				else
+				{
+					var peConHeight = getoffset(id("peCon")).top - getoffset(id("videoPluginCon")).top + id("peCon").offsetHeight;
+					hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+				}
+			}
+			else
+			{
+				plugin.setOSDStatus(1);
+				hideobj.style.display = "none";
+			}
+		}
+
+		function showArmingSchedule()
+		{
+			var i;
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][NAME] = ARMING_SCHEDULE;
+			$.query(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], addType(resp[FILE_NAME][ARMING_SCHEDULE][uciDays[i]]));
+					}
+				}
+			});
+		}
+
+		function hideArmingSchedule(event) {
+			if (!bArmingScheduleShow)
+			{
+				id("armingScheduleArrow").className ="arrowUp";
+				timeSchedule.style.display = "";
+				bArmingScheduleShow = true;
+			}
+			else
+			{
+				id("armingScheduleArrow").className ="arrowDown";
+				timeSchedule.style.display = "none";
+				bArmingScheduleShow = false;
+			}
+		}
+
+		function hideHandleWay(event) {
+			if (!bHandleWayShow)
+			{
+				id("handleArrow").className ="arrowUp";
+				handleWay.style.display = "";
+				bHandleWayShow = true;
+			}
+			else
+			{
+				id("handleArrow").className ="arrowDown";
+				handleWay.style.display = "none";
+				bHandleWayShow = false;
+			}
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			enable = 0;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [DETECTION, NOTIFY_LIST];
+			reqData[FILE_NAME][KEY_TABLE] = [REGION_INFO];
+
+			plugin = new Plugin({id:"videoPluginCon", className:"vedioActiveX", readyHd:function(arg){
+				if (PLUGIN_STATE_ON == arg && true == bFirstReady)
+				{
+					bFirstReady = false;
+					plugin.setLineCrossingState(1);
+					plugin.setOSDSpecialStatus(1);
+					setLineCrossingRange(secObj);
+					plugin.setOSDStatus(intelligentDetectionSwitch.state);
+				}
+			}});
+
+			sensitivityDragLine = new DragLine({id:"sensitivityDragLine", name:label.sensitivity, cb:sensitivityChange, lowerBound:1});
+			recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+			showArmingSchedule();
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", 0, intelligentDetectionSwitchHd);
+						/* 方向 */
+						selectInit("directionSel", [{str:label.toRight, value:'right'},
+							{str:label.toLeft, value:'left'},
+							{str:label.bothWay, value:'both'}], "both", selDirection);
+						return;
+					}
+
+					switchState = result[FILE_NAME][DETECTION][ENABLED];
+					enable = (switchState == ENABLED_ON) ? 1 : 0;
+					intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", enable, intelligentDetectionSwitchHd);
+
+					secObj = result[FILE_NAME][REGION_INFO];
+
+					var regionArray = formatTableData(secObj);
+
+					for (var index in regionArray)
+					{
+						var item = regionArray[index];
+						sensitivityValue[index] = item[SENSITIVITY];
+						directionValue[index] = item[DIRECTION];
+					}
+					sensitivityValue[0] = (sensitivityValue[0]== null) ? sensitivityDefault : sensitivityValue[0];
+					directionValue[0] = (directionValue[0]== null) ? directionDefault : directionValue[0];
+					sensitivityDragLine.setValue(sensitivityValue[0]);
+					/* 方向 */
+					selectInit("directionSel", [{str:label.toRight, value:'right'},
+						{str:label.toLeft, value:'left'},
+						{str:label.bothWay, value:'both'}], directionValue[0], selDirection);
+
+					enable = (result[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] == ENABLED_ON);
+					changeCheckInput(emailCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][FTP_ENABLED] == ENABLED_ON);
+					changeCheckInput(ftpCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] == ENABLED_ON);
+					changeCheckInput(alarmCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] == ENABLED_ON);
+					changeCheckInput(recordCheck, enable);
+					plugin.playVideo();
+
+					showDetailCon();
+				}
+			});
+
+			id("save").onclick = saveHandle;
+			id("clear").onclick = clearLineCrossingRange;
+			id("del").onclick = delLineCrossingRange;
+			id("clearAll").onclick = function(event){
+				recPlanGrid.reset();
+			};
+			id("armingScheduleArrow").onclick = hideArmingSchedule;
+			id("handleArrow").onclick = hideHandleWay;
+
+			id("sensitivityDragLineDragLineInput").onblur = onBlurHd;
+			window.onscroll = function(){
+				if(id("selOptsUleventSel") && (id("selOptsUleventSel").style.top == "0px"))
+				{
+					document.body.click();
+				}
+			}
+		}
+
+		var FILE_NAME = uciLineCrossingDetection.fileName;
+		var DETECTION = uciLineCrossingDetection.secName.detection;
+		var NOTIFY_LIST = uciLineCrossingDetection.secName.notifyList;
+		var ARMING_SCHEDULE = uciLineCrossingDetection.secName.armingSchedule;
+		var REGION_INFO = uciLineCrossingDetection.secType.regionInfo;
+		var ENABLED = uciLineCrossingDetection.optName.enabled;
+		var SENSITIVITY = uciLineCrossingDetection.optName.sensitivity;
+		var DIRECTION = uciLineCrossingDetection.optName.direction;
+		var PT1_X = uciLineCrossingDetection.optName.pt1x;
+		var PT1_Y = uciLineCrossingDetection.optName.pt1y;
+		var PT2_X = uciLineCrossingDetection.optName.pt2x;
+		var PT2_Y = uciLineCrossingDetection.optName.pt2y;
+		var EMAIL_ENABLED = uciLineCrossingDetection.optName.emailEnabled;
+		var ALARM_ENABLED = uciLineCrossingDetection.optName.alarmEnabled;
+		var RECORD_ENABLED = uciLineCrossingDetection.optName.recordEnabled;
+		var FTP_ENABLED = uciLineCrossingDetection.optName.ftpEnabled;
+		var ENABLED_ON = uciLineCrossingDetection.optValue.enableVal.on;
+		var ENABLED_OFF = uciLineCrossingDetection.optValue.enableVal.off;
+		var ADD_REGIONS = uciLineCrossingDetection.actionName.addRegions;
+
+		var bFirstReady = true;
+		var enable, secObj;
+		var intelligentDetectionSwitch;
+		var switchState;
+		var intelligentDetectionSwitchDes = id("intelligentDetectionSwitchDes");
+		var plugin;
+		var num = 0;//警戒线编号
+		var sensitivityValue = [];
+		var directionValue = [];
+		var sensitivityDefault = 50;
+		var directionDefault = "both";
+		var emailCheck = id("emailCheck");
+		var ftpCheck = id("ftpCheck");
+		var alarmCheck = id("alarmCheck");
+		var recordCheck = id("recordCheck");
+		var bArmingScheduleShow = false;
+		var bHandleWayShow = false;
+		var timeSchedule = id("timeSchedule");
+		var handleWay = id("handleWay");
+		var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+		var uciDays = [uciLineCrossingDetection.optName.mon, uciLineCrossingDetection.optName.tue, uciLineCrossingDetection.optName.wed, uciLineCrossingDetection.optName.thu, uciLineCrossingDetection.optName.fri, uciLineCrossingDetection.optName.sat, uciLineCrossingDetection.optName.sun];
+		var recPlanGrid;
+		var sensitivityErr = false;
+		var del = false;
+		var delAll = false;
+		var sensitivityDragLine;
+		var sensitivityDragLineDragLineInput = id("sensitivityDragLineDragLineInput");
+
+		pageInit();
+		initCheckInput("showInfo", null);
+		registerCallback();
+	}
+	init();
+</script>
+<style type="text/css">
+	div.configDiv li.direction{
+		display:inline-block;
+		font-size:0px;
+		vertical-align:middle;
+		height:30px;
+		margin-left:60px;
+		padding:5px 0;
+	}
+	/* ----------------plan edit -------- */
+	div.peCol span.select{
+		font-size:0px !important;
+	}
+	span.peSelect{
+		width:124px !important;
+		_width:116px !important;
+		font-size:14px !important;
+	}
+
+	/* ----------------plan set---------- */
+	#orgDC{
+		width:662px;
+	}
+	.displayNone{
+		display:none !important;
+	}
+
+	/* ----------------类型选择---------- */
+	i.peTypeRd
+	{
+		width:25px !important;
+		height:25px !important;
+	}
+	i.timeSeled
+	{
+		background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+	}
+	i.timeUnSeled
+	{
+		background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+	}
+	i.mdtUnSeled
+	{
+		background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+	}
+	i.mdtSeled
+	{
+		background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+	}
+	#timingLabel{
+		margin-right:35px;
+		display: inline-block;
+		*display: inline;
+		*zoom:1;
+	}
+	#mdtLabel{
+		margin-right:347px;
+		*margin-right:340px;
+		display: inline-block;
+		*display: inline;
+		*zoom:1;
+	}
+	label.typeSeled{
+		color:#fff !important;
+	}
+	/* ----------------plan cpy---------- */
+	div.peCon{
+		left:136px;
+		top:560px;
+		_left:-30px;
+		_top:-10px;
+	}
+	div.peCon div.peConDetail div.peCol4{
+		display: none;
+	}
+	ul.line li.lineR{
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+		height:100%;
+		font-size:0px;
+		vertical-align:middle;
+		float: right;
+	}
+</style>
+<div class="detailCon">
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div id="videoPluginCon"></div>
+	<ul class="line lineB">
+		<li class="line">
+			<input id="del" type="button" class="subBtnB btnA delIcon" value="{%btn.del%}" />
+		</li>
+		<li class="line ml">
+			<input id="clear" type="button" class="subBtnB btnA clearIcon" value="{%btn.clean%}" />
+		</li>
+	</ul>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle" id="lineName">{%label.lineOne%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line lineL1">
+				<li class="dragLine">
+					<div id="sensitivityDragLine" class="ipcDragLineDiv"></div>
+				</li>
+			</ul>
+			<!-- 方向 -->
+			<ul class="line lineR">
+				<li class="direction">
+					<label class="des desA">{%label.direction%}</label>
+						<span class="selCon">
+							<span id="directionSel" class="select">
+								<span class="value hsValueA"></span>
+								<i class="arrow"></i>
+							</span>
+						</span>
+				</li>
+			</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.defenceTime%}</label>
+			<i class="arrowDown" id="armingScheduleArrow"></i>
+		</div>
+		<div id="timeSchedule" style="display: none">
+			<ul class="line">
+				<li class="line linePlan">
+					<span class="clearAll" id="clearAll">{%label.clear%}</span>
+					<label class="tips">{%label.lineCrossingTips%}</label>
+				</li>
+			</ul>
+			<div class="armingSchedule" id="armingSchedule">
+				<div id="recPlanGrid" class="test"></div>
+			</div>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+			<i class="arrowDown" id="handleArrow"></i>
+		</div>
+		<div class="handleWay" id="handleWay" style="display: none">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="recordCheck" class="chObj" value="1"></i>
+					<label class="des desA">{%label.triggerRecord%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="emailCheck" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="alarmCheck" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="ftpCheck" class="chObj" value="2"></i>
+					<label class="des desA">{%label.sendFtp%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

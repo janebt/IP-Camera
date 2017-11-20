@@ -1,0 +1,525 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		// obj
+		var recPlanGrid;
+
+		// uci
+		var fileName = uciPicturePlan.fileName;
+		var schedule = uciPicturePlan.secName.schedule;
+		var timingConfig = uciPicturePlan.secName.timingConfig;
+		var enabled = uciPicturePlan.optName.enabled;
+		//var codecType = uciPicturePlan.optName.codecType;
+		//var resolution = uciPicturePlan.optName.resolution;
+		//var quality = uciPicturePlan.optName.quality;
+		var captureInterval = uciPicturePlan.optName.captureInterval;
+
+		// static data
+		var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+		var uciDays = [uciRecordPlan.optName.mon, uciRecordPlan.optName.tue, uciRecordPlan.optName.wed, uciRecordPlan.optName.thu, uciRecordPlan.optName.fri, uciRecordPlan.optName.sat, uciRecordPlan.optName.sun];
+
+		// tmp
+		var data;
+		var tmp, tmpStr, i;
+		var intervalTypeValue;
+		var second = 1000;
+		var minute = 1000*60;
+		var hour = 1000*60*60;
+		var day = 1000*60*60*24;
+
+		// switch
+		var exSwitch = null;
+		var exSwitchState = 0;
+
+		var pictureInterval = id("pictureInterval");
+
+		function errorHandler(code)
+		{
+			var str = "";
+
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case EINVARG:
+				str = errStr.IPCParamInvalid;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function onCancel()
+		{
+			fetchServerSta();
+		}
+
+		function onSave()
+		{
+			var i;
+			var res = recPlanGrid.getTimeVal();
+
+			data = {};
+			data[fileName] = {};
+			data[fileName][schedule] = {};
+			data[fileName][timingConfig] = {};
+			for (i = 0; i < weekArray.length; i++)
+			{
+				data[fileName][schedule][uciDays[i]] = toolArrToString(res[weekArray[i]]);
+			}
+			data[fileName][timingConfig][enabled] = exSwitch.state ? uciPicturePlan.optValue.on:uciPicturePlan.optValue.off;
+			//data[fileName][timingConfig][quality] = id("pictureQuality").value;
+
+			if (pictureIntervalCheck("pictureInterval") == false)
+			{
+				return;
+			}
+			data[fileName][timingConfig][captureInterval] = pictureInterval.value * intervalTypeValue;
+
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				showDetailCon();
+			});
+		}
+		function fetchServerSta()
+		{
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [schedule, timingConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], addType(resp[fileName][schedule][uciDays[i]]));
+					}
+
+					if (resp[fileName][timingConfig][enabled] == "on")
+					{
+						exSwitch.setState(1);
+						exSwitchHd(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+						exSwitchHd(0);
+					}
+
+					/*selectInit("pictureType", [{str:"JPEG", value:0}], 0);
+					selectInit("pictureQuality", [{str:"高", value:"high"},
+												{str:"中", value:"medium"},
+												{str:"低", value:"low"}], resp[fileName][timingConfig][quality]);
+					id("resolution").innerHTML = resp[fileName][timingConfig][resolution];*/
+					selectInit("intervalType", [{str:label.second, value:second},
+												{str:label.minuteT, value:minute},
+												{str:label.lHour, value:hour},
+												{str:label.dayT, value:day}], second, intervalTypeChange);
+					setInterval(resp[fileName][timingConfig][captureInterval], second);
+					intervalTypeValue = second;
+				}
+			});
+		}
+
+		function addType(strTimeVal) {
+			var curTV;
+			var res = new Array();
+
+			if (strTimeVal == undefined)
+			{
+				curTV = "\"0000-0000:0\"";
+				res.push(curTV);
+
+				return res;
+			}
+
+			if (!(strTimeVal instanceof Array))
+			{
+				strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+			}
+
+			for (var i = 0; i < strTimeVal.length; i++)
+			{
+				curTV = strTimeVal[i];
+				var	tvArr = curTV.split(/[-]/, 2);
+				var bt = parseInt(tvArr[0], 10);
+				var et = parseInt(tvArr[1], 10);
+				if(0 == bt && 0 == et)
+				{
+					res.push(recPlanGrid._getString(bt, et, 0));
+				}
+				else
+				{
+					res.push(recPlanGrid._getString(bt, et, 1));
+				}
+			}
+
+			return res;
+		}
+
+		function toolArrToString(arr, maxLen)
+		{
+			var res, i, str;
+			var	tvArr;
+			var bt;
+			var et;
+			if (arr == undefined)
+			{
+				return "";
+			}
+			if (maxLen == undefined)
+			{
+				maxLen = 6;
+			}
+			res = "[";
+			if (arr.length < 1)
+			{
+				res += "\"0000-0000\"";
+			}
+			else
+			{
+				for (i = 0; i < arr.length && i < maxLen; i++)
+				{
+					str = arr[i].toString();
+					tvArr = str.split(/[-,:]/, 3);
+					bt = parseInt(tvArr[0], 10);
+					et = parseInt(tvArr[1], 10);
+					str = recPlanGrid._getStringWithoutType(bt, et);
+					if (i > 0)
+					{
+						res += ",";
+					}
+					res += ("\"" + str + "\"");
+				}
+			}
+			res += "]";
+			return res;
+		}
+
+		/* 绑定各个按钮的响应事件 */
+		function bindEvent()
+		{
+			id("clearAll").onclick = function(event){
+				recPlanGrid.reset();
+			};
+
+			id("cancel").onclick = onCancel;
+
+			id("save").onclick = onSave;
+		}
+
+		function exSwitchHd(state)
+		{
+			exSwitchState = state;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				$("div.tableDiv").css({"z-index":"-1"}); /* IE6/7兼容 */
+				$('#clearAll').attr("disabled","disabled");
+				var saveHeight = getoffset(id("save")).top - getoffset(id("recPlanGrid")).top;
+
+				if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+				{
+					hideobj.style.height = saveHeight + "px";
+				}
+				else
+				{
+					var peConHeight = getoffset(id("peCon")).top - getoffset(id("recPlanGrid")).top + id("peCon").offsetHeight;
+					hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+				}
+			}
+			else
+			{
+				hideobj.style.display = "none";
+				$("div.tableDiv").css({"z-index":"0"});
+				$('#clearAll').attr("disabled",false);
+			}
+		}
+
+		function setInterval(value, type)
+		{
+			pictureInterval.value = Math.ceil(value / type);
+		}
+
+		function intervalTypeChange(state)
+		{
+			console.log(pictureInterval.value);
+			console.log(intervalTypeValue);
+			console.log(state);
+			setInterval(pictureInterval.value * intervalTypeValue, state);
+			intervalTypeValue = state;
+		}
+
+		function chkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+
+		function pictureIntervalCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value * intervalTypeValue;
+			var result = true;
+
+			if (!checkNum(con.value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (value > day*7 || value < 1000)
+			{
+				var str;
+				switch (intervalTypeValue)
+				{
+				case second:
+					str = errStr.picParaRangeSec1;
+					break;
+				case minute:
+					str = errStr.picParaRangeMin;
+					break;
+				case hour:
+					str = errStr.picParaRangeHou;
+					break;
+				case day:
+					str = errStr.picParaRangeDay;
+					break;
+				default:
+					str = errStr.picParaOutOfRange;
+					break;
+				}
+				showNote(idStr, str);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function pageInit()
+		{
+			recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+			exSwitch = new Switch("exSwitch", 0, exSwitchHd);
+
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [schedule, timingConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						pictureInterval.value = 5;
+						intervalTypeValue = second;
+						selectInit("intervalType",
+							[{str:label.second, value:second},
+							{str:label.minuteT, value:minute},
+							{str:label.lHour, value:hour},
+							{str:label.dayT, value:day}], second, intervalTypeChange);
+						return;
+					}
+
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], addType(resp[fileName][schedule][uciDays[i]]));
+					}
+
+					if (resp[fileName][timingConfig]["enabled"] == "on")
+					{
+						exSwitch.setState(1);
+						exSwitchHd(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+						exSwitchHd(0);
+					}
+
+					/*selectInit("pictureType", [{str:"JPEG", value:0}], 0);
+					selectInit("pictureQuality", [{str:"高", value:"high"},
+												{str:"中", value:"medium"},
+												{str:"低", value:"low"}], resp[fileName][timingConfig][quality]);
+					id("resolution").innerHTML = resp[fileName][timingConfig][resolution];*/
+					selectInit("intervalType",
+						[{str:label.second, value:second},
+						{str:label.minuteT, value:minute},
+						{str:label.lHour, value:hour},
+						{str:label.dayT, value:day}], second, intervalTypeChange);
+					setInterval(resp[fileName][timingConfig][captureInterval], second);
+					intervalTypeValue = second;
+				}
+				showDetailCon();
+			});
+
+			id("pictureInterval").onblur = function(){
+				pictureIntervalCheck("pictureInterval");
+			};
+			id("pictureInterval").onfocus = closeNoteAll;
+		}
+
+		pageInit();
+		initCheckInput("showInfo", null);
+		bindEvent();
+	}
+	init();
+</script>
+<style type="text/css">
+	label.desECEE{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 40px;
+		margin-right: 16px;
+		vertical-align:middle;
+	}
+	label.desECEF{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 40px;
+		margin-left: 60px;
+		vertical-align:middle;
+		margin-right: 45px;
+	}
+	label.regionName{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		margin-left:430px;
+	}
+	div.peCon div.peConDetail div.peCol4{
+		display: none;
+	}
+	input.textTime{
+		border:1px solid #2e2e2e;
+		height:24px;
+		line-height:24px;
+		margin-right:12px;
+		width:200px;
+	}
+	ul.line span.textRes{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:40px;
+		margin-left: 20px;
+		margin-right: 174px;
+	}
+	ul.line li.marginTop{
+		margin-top:40px;
+	}
+	span.selCon{
+		margin-left:10px;
+	}
+	input.textA{
+		width:98px;
+	}
+</style>
+
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label id="exSwitchDes" class="des desA">{%menuStr.timingPicture%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+		<div style="position:relative;*z-index:1;">
+			<div id="hidebg"></div>
+		</div>
+		<li class="line linePlan">
+			<span class="clearAll" id="clearAll">{%label.clear%}</span>
+		</li>
+	</ul>
+	<div class="armingSchedule" id="armingSchedule">
+		<div id="recPlanGrid"></div>
+	</div>
+
+	<ul class="line">
+		<li class="line lineF2 marginTop">
+			<label class="des desF">{%label.pictureInterval%}</label>
+			<input class="text textA" id="pictureInterval" maxlength="6" />
+			<span class="selCon">
+				<span id="intervalType" class="select">
+					<span class="value hsValueB"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="cancel" type="button" value="{%btn.gridCancel%}" class="subBtnB btnA"/>
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>
+
+<style type="text/css">
+/* ----------------plan edit -------- */
+	div.peCol span.select{
+		font-size:0px !important;
+	}
+	span.peSelect{
+		width:124px !important;
+		_width:116px !important;
+		font-size:14px !important;
+	}
+
+/* ----------------plan set---------- */
+	#orgDC{
+		width:662px;
+	}
+	.displayNone{
+		display:none !important;
+	}
+
+
+/* ----------------类型选择---------- */
+	i.peTypeRd
+	{
+		width:25px !important;
+		height:25px !important;
+	}
+
+	label.typeSeled{
+		color:#fff !important;
+	}
+
+/* ----------------plan cpy---------- */
+	#pcSelAll{
+		margin-left:209px;
+	}
+	#pcCancel{
+		margin-left:115px;
+	}
+	#pcSave{
+		margin-left: 12px;
+	}
+
+/* ----------------通道-------------- */
+	ul.line label.desJ{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		width:55px;
+	}
+</style>

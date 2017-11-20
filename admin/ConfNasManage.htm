@@ -1,0 +1,745 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var list = [];
+		var listAdmin, listGuest, listDisk;
+		var dataGridLs = new DataGrid();
+		var tableEditCon = id("tableEditCon");
+		var nasConfH4;
+		var ADD = "add";
+		var EDIT = "edit";
+		var detailCon = $("div.detailCon");
+		var table = id("nasTbl");
+		var detailConCFUM = id("detailConCFUM");
+		var DISK_MANAGE = uciDiskManage.fileName;
+		var DISK_ID = uciDiskManage.optName.disk_id;
+		var SERVER_ADDR = uciDiskManage.optName.addr;
+		var PATH = uciDiskManage.optName.path;
+		var TYPE = uciDiskManage.optName.type;
+		var DISK_NAME = uciDiskManage.secType.disk;
+		var USERNAME = uciDiskManage.optName.username;
+		var PASSWORD = uciDiskManage.optName.password;
+		var TESTNAS = uciDiskManage.actionName.test_nas;
+		var GETTESTSTATUS = uciDiskManage.actionName.get_test_status;
+		var SEQ_NUM = uciDiskManage.optName.seq_num;
+		var DISPLAYTYPE = "displayType";
+		var typeOption = [{str:"NFS", value:uciDiskManage.optValue.nfs}, {str:"SMB/CIFS", value:uciDiskManage.optValue.cifs}];
+		var userName, password, serverAddr, nasType, path;
+		var nasIndexStart = 9;
+		var pwdChgFlg = 0;
+		var querySeqHandle;
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCUMUSREXIST:
+				showStr = errStr.invUserNameExist;
+				break;
+			case IPCUMUSRNAUTH:
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCUMOLDPWDERR:
+				showStr = errStr.invOldPwdErr;
+				break;
+			case IPCUMUSRNAMEINV:
+				showStr = errStr.invUserNameValid;
+				break;
+			case IPCUMUSRBLANK:
+			case IPCUMUSRNAMELTM:
+			case IPCUMUSRNAMEGTM:
+				showStr = errStr.invUserNameLen;
+				break;
+			case IPCUMTABFULL:
+				showStr = errStr.invUserMgtGroupFull;
+				break;
+			case ETABLEFULL:
+				showStr = errStr.invUserMgtChgGroupFull;
+				break;
+			case EENTRYEXIST:
+				showStr = errStr.entryExistErr;
+				break;
+			case EPATHNOTEXIST:
+				showStr = errStr.invNasPathNotExist;
+				break;
+			case EACCESS:
+				showStr = errStr.invNasAccess;
+				break;
+			case ESERVERDOWN:
+				showStr = errStr.invNasServerDown;
+				break;
+			case EEXPIRED:
+				showStr = errStr.invNasExpired;
+				break;
+			case EUNKNOWN:
+				showStr = errStr.invNasUnknown;
+				break;
+			case IPCUMINFOERR:
+			case IPCUMGUESTGERR:
+			case IPCUMSECERR:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function typeSelHandle(value)
+		{
+			if (value == "nfs")
+			{
+				id("userNameDisplay").style.display = "none";
+				id("passwordDisplay").style.display = "none";
+			}
+
+			if (value == "cifs")
+			{
+				id("userNameDisplay").style.display = "block";
+				id("passwordDisplay").style.display = "block";
+			}
+		}
+
+		/* 检查域名是否含有非法字符 */
+		function checkDomain(value)
+		{
+			var ipInfo = hideLeadingZeros(value);
+			if (ENONE != checkIp(ipInfo))
+			{
+				var str = errStr.ipAddrFmtErr;
+				showNote("serverAddr", str);
+				return false;
+			}
+
+			return true;
+		};
+
+		/* 显示编辑框 */
+		function showUserConf(type, index, paraObj)
+		{
+			var gp, comment;
+
+			pwdChgFlg = 0;
+
+			if (undefined == nasConfH4)
+			{
+				authorityListCon = $("div.authorityListCon")[0];
+				nasConfH4 = $(tableEditCon).find("h4")[0];
+				pwdSetConUls = $("#pwdSetCon li");
+				userName = id("userName");
+				password = id("password");
+				serverAddr = id("serverAddr");
+				path = id("path");
+				nasType = id("nasType");
+			}
+
+			closeNoteAll();
+
+			if (ADD == type)
+			{
+				nasConfH4.innerHTML = label.addNas;
+				selectInit("nasType", typeOption, uciDiskManage.optValue.cifs, typeSelHandle);
+				typeSelHandle(uciDiskManage.optValue.cifs);
+
+				serverAddr.value = "";
+				path.value = "";
+				userName.value = "";
+				password.value = "";
+				pwdChg();
+			}
+			else
+			{
+				nasConfH4.innerHTML = label.editNas;
+
+				nasType.value = paraObj[TYPE];
+				serverAddr.value = paraObj[SERVER_ADDR];
+				path.value = paraObj[PATH];
+				userName.value = paraObj[USERNAME] || "";
+				password.value = paraObj[PASSWORD] || "";
+
+				if (true == $.local)
+				{
+					nasType.value = uciDiskManage.optValue.cifs;
+				}
+
+				/* 由于前端无法获取密码，因此每次编辑都要重新输入密码 */
+				pwdChg();
+
+				selectInit("nasType", typeOption, nasType.value, typeSelHandle);
+				typeSelHandle(nasType.value);
+			}
+
+			nasConfH4.type = type;
+			nasConfH4.index = index;
+			tableEditCon.style.top = "0px";
+		}
+
+		function calcNextNasIndex(array)
+		{
+			if (array == null || !(array instanceof Array))
+			{
+				return -1;
+			}
+
+			var indexArr = [];
+			for (var i in array)
+			{
+				var name = array[i][".name"];
+				if (typeof name == "undefined" || typeof name != "string")
+				{
+					continue;
+				}
+
+				var index = name.replace(/^.*_(\d+)$/g, '$1');
+				indexArr[index] = true;
+			}
+
+			var len = indexArr.length;
+
+			for (var i = nasIndexStart; i <= len; i++)
+			{
+				if (typeof indexArr[i] == "undefined")
+				{
+					return i;
+				}
+			}
+
+			if (len < nasIndexStart)
+			{
+				return nasIndexStart;
+			}
+			else
+			{
+				return (len + 1);
+			}
+		};
+
+		/* 添加条目 */
+		function addItem(serverAddr, path, type, userName, pwd, callBack)
+		{
+			var data = {}, para = {};
+			var index;
+
+			index = calcNextNasIndex(listDisk)
+
+			data[DISK_MANAGE] = {};
+
+			data[DISK_MANAGE][KEY_TABLE] = DISK_NAME;
+			data[DISK_MANAGE][KEY_NAME] = DISK_NAME + "_" + index;
+			data[DISK_MANAGE][KEY_PARA] = para;
+			para[SERVER_ADDR] = serverAddr;
+			para[PATH] = path;
+			para[TYPE] = type;
+
+			if (type == uciDiskManage.optValue.cifs)
+			{
+				para[USERNAME] = userName;
+				para[PASSWORD] = pwd;
+			}
+
+			$.add(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					requestData(reloadTable);
+					callBack(true, para);
+				}
+				else
+				{
+					callBack(false);
+				}
+			});
+		}
+
+		function testNas()
+		{
+			var data = {};
+			var para = {};
+			var seq_num = 0;
+
+			if (!itemCheck(serverAddr.value, path.value, nasType.value, userName.value, password.value))
+			{
+				return;
+			}
+
+			para[SERVER_ADDR] = serverAddr.value;
+			para[PATH] = path.value;
+			para[TYPE] = nasType.value;
+
+			if (nasType.value == uciDiskManage.optValue.cifs)
+			{
+				para[USERNAME] = userName.value;
+				if (pwdChgFlg)
+				{
+					para[PASSWORD] = password.value;
+				}
+			}
+
+			data[DISK_MANAGE] = {};
+			data[DISK_MANAGE][TESTNAS] = para;
+
+			showToast();
+
+			$.action(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+					if("waiting" == result["result"])
+					{
+						seq_num = result[SEQ_NUM];
+						queryTestResult(seq_num);
+					}
+					else
+					{
+						closeToast();
+						showAlert(label.nasTesting);
+					}
+				}
+			});
+
+			function queryTestResult(seq_num)
+			{
+				var data = {};
+				var para = {};
+
+				para[SEQ_NUM] = seq_num;
+				data[DISK_MANAGE] = {};
+				data[DISK_MANAGE][GETTESTSTATUS] = para;
+
+				$.action(data, function(result){
+					if (errHandle(result[ERR_CODE]))
+					{
+						if("success" == result["result"])
+						{
+							closeToast();
+							showAlert(label.nasSuccess);
+						}
+						else if("waiting" == result["result"])
+						{
+							$.setTimeout(function(){queryTestResult(seq_num);}, 1000);
+						}
+					}
+				});
+			}
+		}
+
+		function itemCheck(serverAddr, path, nasType, userName, password)
+		{
+			if (!checkDomain(serverAddr))
+			{
+				return false;
+			}
+
+			if (path.length == 0)
+			{
+				showAlert(errStr.fileRouteEmpty);
+				return false;
+			}
+
+			if (nasType == uciDiskManage.optValue.cifs)
+			{
+				if (userName.length == 0)
+				{
+					showAlert(errStr.invUserNameNull);
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		function saveItem(type, index, callBack)
+		{
+			var data = {}, para = {};
+			var ret;
+
+			if (!itemCheck(serverAddr.value, path.value, nasType.value, userName.value, password.value))
+			{
+				callBack(false);
+				return;
+			}
+
+			showToast();
+
+			/* 添加 */
+			if (ADD == type)
+			{
+				addItem(serverAddr.value, path.value, nasType.value, userName.value, password.value, function(result, para){
+					if (true == result)
+					{
+						showToast("success");
+						callBack(true, para);
+						externHd();
+					}
+					else
+					{
+						callBack(false);
+					}
+				});
+			}
+			else
+			{
+				data[DISK_MANAGE] = {};
+
+				data[DISK_MANAGE][list[index][".name"]] = para;
+				para[SERVER_ADDR] = serverAddr.value;
+				para[PATH] = path.value;
+				para[TYPE] = nasType.value;
+
+				if (nasType.value == uciDiskManage.optValue.cifs)
+				{
+					para[USERNAME] = userName.value;
+					if (pwdChgFlg)
+					{
+						para[PASSWORD] = password.value;
+					}
+				}
+
+				$.modify(data, function(result){
+					if (true == errHandle(result[ERR_CODE]))
+					{
+						requestData(reloadTable);
+						callBack(true, para);
+					}
+					else
+					{
+						callBack(false);
+					}
+				})
+			}
+		}
+
+		/* 删除所选 */
+		function delItem(index, callBack)
+		{
+			var indexArry = index.toString().split("-");
+			var delList = [], data = {};
+			var secName;
+
+			//排除list数组中的空元素
+			for (var i in indexArry)
+			{
+				secName = list[indexArry[i]][SEC_NAME];
+				if (!secName)
+				{
+					continue;
+				}
+
+				delList.push(secName);
+			}
+
+			data[DISK_MANAGE] = {};
+			data[DISK_MANAGE][KEY_NAME] = delList;
+			$.del(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					/* 删除子串中的内容 */
+					for (var i in delList)
+					{
+						for (var j in listDisk)
+						{
+							if (delList[i] == listDisk[j][SEC_NAME])
+							{
+								listDisk.splice(j, 1);
+								break;
+							}
+						}
+					}
+
+					showToast("success");
+					callBack(true);
+					externHd();
+				}
+				else
+				{
+					callBack(false);
+					externHd();
+				}
+			});
+		}
+
+		function popUpHd(type, index, para)
+		{
+			if (detailConCFUM.offsetHeight < 700)
+			{
+				detailConCFUM.style.height = "700px";
+				basicPHAutoFit();
+			}
+
+			showUserConf(type, index, para);
+		}
+
+		function requestData(callBack)
+		{
+			var data = {};
+
+			data[DISK_MANAGE] = {};
+			data[DISK_MANAGE][KEY_TABLE] = [DISK_NAME];
+
+			$.query(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+
+					callBack(result);
+				}
+			});
+		}
+
+		function displayNasType(value)
+		{
+			switch (value)
+			{
+			case uciDiskManage.optValue.nfs:
+				return label.nfs;
+			case uciDiskManage.optValue.cifs:
+				return label.cifs;
+			default:
+				return value;
+			}
+		}
+
+		function sortDiskListById(name)
+		{
+			return function(o, p)
+			{
+				var a, b;
+
+				if (typeof o === "object" && typeof p === "object" && o && p)
+				{
+					a = o[name];
+					b = p[name];
+
+					if (a === b)
+					{
+						return 0;
+					}
+
+					if (typeof a === typeof b)
+					{
+						return a < b ? -1 : 1;
+					}
+
+					return typeof a < typeof b ? -1 : 1;
+				}
+				else
+				{
+					showAlert(errStr.diskAndNetErr);
+				}
+			}
+		}
+
+		function reloadTable(result)
+		{
+			var rootData;
+			var listLength;
+			var indexName;
+
+			if (true == $.local)
+			{
+				list = [{"id":"9",
+						"addr":"192.168.1.34",
+						"path":"share",
+						"displayType":"SMB/CIFS"},
+						{"id":"10",
+						"addr":"192.168.1.34",
+						"path":"share1",
+						"displayType":"SMB/CIFS"}];
+				dataGridLs.setDataSource(list);
+				dataGridLs.refresh();
+				return;
+			}
+			else
+			{
+				rootData = result[DISK_MANAGE][DISK_NAME];
+
+				/* 组装root用户数据 */
+				listDisk = formatTableData(result[DISK_MANAGE][DISK_NAME]);
+
+				listLength = 0;
+				for (var i = 0, len = listDisk.length; i < len; i++)
+				{
+					if (listDisk[i][TYPE] == uciDiskManage.optValue.nfs || listDisk[i][TYPE] == uciDiskManage.optValue.cifs)
+					{
+						list[listLength] = listDisk[i];
+						list[listLength][DISPLAYTYPE] = displayNasType(list[listLength][TYPE]);
+						indexName = listDisk[i][SEC_NAME];
+						list[listLength][DISK_ID] = parseInt(indexName.replace(/^.*_(\d+)$/g, '$1'), 10);
+						listLength++;
+					}
+				}
+			}
+
+			list.sort(sortDiskListById(DISK_ID));
+			dataGridLs.setDataSource(list);
+			dataGridLs.refresh();
+		}
+
+		function pwdChg()
+		{
+			id("passwordTipStr").style.display = "none";
+			pwdChgFlg = 1;
+		};
+
+		function tableInit()
+		{
+			var list = {};
+
+			dataGridLs.init({
+				id:"nasTbl",										// table ID
+				data:list,											// 数据源
+				hasID:false,
+				edit:true,
+				head:[{field:label.diskId, width:40},
+					  {field:label.srvAddr, width:80},
+					  {field:label.path, width:100},
+					  {field:label.nasType, width:80}],
+				list:[{name:DISK_ID},
+					  {name:SERVER_ADDR},
+					  {name:PATH},
+					  {name:DISPLAYTYPE}],
+				popUpBar:{id:"tableEditCon", save:saveItem, cancel:function(type, index, handle){
+					detailConCFUM.style.height = "";
+					basicPHAutoFit();
+					handle(true);
+				}},
+				toolBar:{id:"nasMgtUl", delSel:delItem, popUp:popUpHd, asyn:true}
+			});
+
+			id("password").onclick = pwdChg;
+
+			showDetailCon();
+		}
+
+		function pageInit()
+		{
+			initCheckInput("showInfo");
+			tableInit();
+			requestData(reloadTable);
+		}
+
+		id("testBtn").onclick = testNas;
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	div.authorityListCon{
+		color:#A0A0A0;
+		font-size:14px;
+		border:2px solid #404040;
+		padding:14px 14px 14px  14px;
+		margin:0 0 0 85px;
+		overflow:hidden;
+		*zoom:1;
+	}
+	div.authorityListCon h5{
+		margin-bottom:10px;
+	}
+	div.authorityListCon span{
+		float:left;
+		height:17px;
+		line-height:17px;
+		text-indent:26px;
+		width:70px;
+	}
+	div.authorityListCon input.text{
+		background:#404040 !important;
+	}
+	input.addItem{
+		position:absolute;
+		bottom:0px;
+	}
+	span.depSpan{
+		font-size:14px;
+		color:#A0A0A0;
+		display:none;
+		vertical-align:middle;
+		margin-left:20px;
+	}
+	#passwordTipStr{
+		color:#707070;
+		font-size:14px;
+		left:138px;
+		line-height:30px !important;
+		position:absolute;
+		top:275px;
+	}
+	ul.line label.desA{
+		font-size:13px;
+		line-height:32px;
+		width:128px;
+		text-align: right;
+		margin-right: 20px;
+	}
+	span.select span.hsValueA{
+		width:174px;
+	}
+	ul.line li.lineF{
+		margin-top: 5px;
+		margin-bottom: 5px;
+	}
+	ul.line li.lineF3{
+		text-align:left !important;
+	}
+	div.tablePopUpToolBarA{
+		display:inline-block;
+		*display:inline;
+		margin-left:16px;
+	}
+	#testBtn{
+		display:inline-block;
+		margin-left:80px;
+	}
+</style>
+<div id="detailConCFUM" class="detailCon">
+	<div class="tableCon">
+		<div class="tableBorderCon"><table id="nasTbl" class="dataGrid"></table></div>
+		<ul id="nasMgtUl" class="gridToolBar">
+			<li gridType="popUp">{%btn.add%}</li>
+			<li gridType="delSel">{%btn.deleteSel%}</li>
+		</ul>
+		<div id="tableEditCon" class="tableEditLyCon">
+			<div class="tableEditCon tableEditConA">
+				<div class="innerCon">
+					<h4 class="title">{%label.addNas%}</h4>
+					<i id="closeTip"></i>
+					<ul class="line">
+						<li class="line lineF">
+							<label class="des desA" for="serverAddr">{%label.srvAddr%}</label>
+							<input id="serverAddr" class="text textA3" maxLength="64" />
+						</li>
+						<li class="line lineF lineF2">
+							<label class="des desA" for="path">{%label.path%}</label>
+							<input id="path" class="text textA3" maxLength="128" />
+						</li>
+						<li class="line lineF lineF3">
+							<label class="des desA" for="nasType">{%label.nasType%}</label>
+							<span class="selCon">
+								<span id="nasType" class="select">
+									<span class="value hsValueA"></span>
+									<i class="arrow"></i>
+								</span>
+							</span>
+						</li>
+						<li id="userNameDisplay" class="line lineF" style="display: none;">
+							<label class="des desA" for="userName">{%label.userName%}</label>
+							<input id="userName" class="text textA3" maxLength="32" />
+						</li>
+						<li id="passwordDisplay" class="line lineF" style="display: none;">
+							<label class="des desA" for="password">{%label.password%}</label>
+							<input id="password" type="password" class="text textA3" maxLength="16" />
+							<label id="passwordTipStr" for="password">●●●●●●</label>
+						</li>
+					</ul>
+					<input class="btnA subBtnB" type="button" value={%btn.test%} id="testBtn"/>
+					<div class="tablePopUpToolBar tablePopUpToolBarA"/>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

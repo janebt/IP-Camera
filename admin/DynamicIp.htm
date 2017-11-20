@@ -1,0 +1,615 @@
+<script type="text/javascript">
+	function init()
+	{
+		var uciFile = uciProto.fileName;
+		var uciTypeIface = uciProto.secType.iface;
+		var uciTypeProto = uciProto.secType.proto;
+		var uciWan = uciProto.secName.wan;
+		var uciDynIp = uciProto.secName.dhcp;
+		var uciDnsMode = uciProto.optName.dnsMode;
+		var uciPriDns = uciProto.optName.priDns;
+		var uciSndDns = uciProto.optName.sndDns;
+		var uciMtu = uciProto.optName.mtu;
+		var uciHostname = uciProto.optName.hostName;
+		var uciBroadcastEn = uciProto.optName.broadcast_en;
+		var uciSpeed = uciProto.optName.speed;
+		var uciWanType = uciProto.optName.type;
+		var connectStat = id("connectStat");
+
+		var DNS_MODE_DYNAMIC = uciProto.optValue.dnsMode.dynamic;
+		var DNS_MODE_MANUAL = uciProto.optValue.dnsMode.manual;
+		var updateTimerHandle;
+		var fetchNewAddrHandle;
+		var wanSelHandle;
+
+		var uhttpdFN = uciUhttpd.fileName;
+		var uhttpdSN = uciUhttpd.secName;
+		var uhttpdON = uciUhttpd.optName;
+		var proV = uciProto.optValue;
+		var dynIp = DEF_WAN_T = proV.proto.dynIp;
+		var staticIp = proV.proto.staticIp;
+		var pppoe = proV.proto.pppoe;
+		var urlArr = {dynIp:"DynamicIp.htm",
+			staticIp:"StaticIp.htm",
+			pppoe:"PPPoE.htm"
+			};
+
+		var dhcpFlag = false;
+		var ipInUse;
+		var gMaxRetryTime = 60;
+		
+		//记录最多收到几条包含waiting状态的消息，时间约1分钟,每次间隔约4s，从初始点击到第0次约7s，总计为13*4+7s
+		var gMaxTimeOutTime = 13;
+		
+		var REDIRECTION_INTERVAL = 1000;
+
+		var gDhcpReply = false;
+		var gIpVal, gOrgIpVal, gOrgMask, gOrgWanType;
+		var GET_IP_NO_REP_INTERVAL = 4000;
+		var GET_IP_WAITING_INTERVAL = 4000;
+		var FAIL_INTERVAL = 4000;
+		var SUCCESS_INTERVAL = 4000;
+		var GET_STATUS_INTERVAL = 4000;
+		var DO_GET_IP_DELAY = 6000;
+		var retryCount = 0;
+		
+		//记录收到几条包含waiting状态的消息
+		var timeoutCount = 0;
+		
+		var sucFlag = false;
+		var gPort = DEF_PORT = 80;
+
+		function errHandle(errNo, objOrId)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return false;
+			case IPCNETGDIPERR:
+				str = errStr.ipcNetGdipErr;
+				break;
+			case IPCNETDIPFNEXI:
+				str = errStr.ipcNetDipfNexi;
+				break;
+			case IPCNETADIPERR:
+				str = errStr.ipcNetAdipErr;
+				break;
+			case IPCNETDCMDNEXI:
+				str = errStr.ipcNetDcmdNexi;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+			//closeToast();
+			//showAlert(str);
+			return true;
+		}
+
+		function errHandleBeforeSave(errNo, objOrId)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return false;
+			case EINVMTU:
+				str = errStr.dhcpcMtuErr;
+				break;
+			case EINVFDNSVR:
+				str = errStr.primDnsErr;
+				break;
+			case EINVSDNSVR:
+				str = errStr.seDnsErr;
+				break;
+			case EHOSTNAME:
+				str = errStr.hostNameErr;
+				break;
+			case ENOLINK:
+				str = errStr.wanLinkDown;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showNote(objOrId, str);
+			closeToast();
+			return true;
+		}
+
+		function setDynIpCfg(ALL_DATA)
+		{
+			if (true == errHandle(ALL_DATA[ERR_CODE]))
+			{
+				return;
+			}
+			var data = ALL_DATA[uciFile];
+			var wanCfg = data[uciWan];
+			var dhcpCfg = data[uciDynIp];
+
+			id("mtu").value = dhcpCfg[uciMtu];
+			gOrgWanType = ALL_DATA[uciNetwork.fileName][uciNetwork.dynData.wanStatus][uciNetwork.optName.proto];
+			ipInUse = ALL_DATA[uciNetwork.fileName][uciNetwork.dynData.wanStatus][uciNetwork.optName.ip];
+			gPort = ALL_DATA[uhttpdFN][uhttpdSN.main][uhttpdON.listenHttpPort];
+
+			if (statusStr.disconcted == connectStat.innerHTML)
+			{
+				$(connectStat).css("color", "#FF5500");
+			}
+			else
+			{
+				$(connectStat).css("color", "#325FE0");
+			}
+			//设置WAN口状态
+			setDynIpWanStatus(ALL_DATA);
+
+			showDetailCon();
+		}
+
+		function getDynIpData()
+		{
+			var data = {};
+			data[uciFile] = {};
+			data[uciFile][KEY_NAME] = [uciWan, uciDynIp];
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+			data[uhttpdFN] = {};
+			data[uhttpdFN][NAME] = [uhttpdSN.main];
+			$.query(data, setDynIpCfg);
+		}
+
+		function setDynIpWanStatus(data)
+		{
+			var wanStatus = data[uciNetwork.fileName][uciNetwork.dynData.wanStatus];
+
+			if (wanStatus[uciNetwork.optName.proto] != uciProto.optValue.proto.dynIp)
+			{
+				//在动态获取IP中，如果proto状态是静态，表示获取失败
+				connectStat.innerHTML = statusStr.disconcted;
+				$(connectStat).css("color", "#FF5500");
+				clearTimeout(updateTimerHandle);
+				return;
+			}
+
+			var code = wanStatus[ERR_CODE];
+			if (parseInt(wanStatus[uciNetwork.optName.phyStatus]) == LINK_UP)
+			{
+				switch(parseInt(wanStatus[uciNetwork.optName.linkStatus]))
+				{
+				case LINK_DOWN:
+					id("ip").innerHTML = "0.0.0.0";
+					id("mask").innerHTML = "0.0.0.0";
+					id("gateway").innerHTML = "0.0.0.0";
+					id("dns").innerHTML = "0.0.0.0 , 0.0.0.0";
+					GET_STATUS_INTERVAL = FAIL_INTERVAL;
+					connectStat.innerHTML = statusStr.disconcted;
+					$(connectStat).css("color", "#FF5500");
+
+					/* 异常断开连接的，加注错误提示 */
+					if ((LINK_CODE_MANUAL != wanStatus[ERR_CODE]) && (LINK_CODE_NORMAL != wanStatus[ERR_CODE]))
+					{
+					}
+					else
+					{
+					}
+
+					break;
+				case LINK_UP:
+					id("ip").innerHTML = wanStatus["ipaddr"] || "0.0.0.0";
+					id("gateway").innerHTML = wanStatus["gateway"] || "0.0.0.0";
+					id("mask").innerHTML = wanStatus["netmask"] || "0.0.0.0";
+					GET_STATUS_INTERVAL = SUCCESS_INTERVAL;
+					connectStat.innerHTML = statusStr.concted;
+					$(connectStat).css("color", "#325FE0");
+
+					var priDns = wanStatus["pri_dns"] || "0.0.0.0";
+					var sndDns = wanStatus["snd_dns"] || "0.0.0.0";
+					if ("0.0.0.0" == priDns && "0.0.0.0" == sndDns)
+					{
+						id("dns").innerHTML = (" " + label.dnsException);
+					}
+					else
+					{
+						id("dns").innerHTML = priDns + " , " + sndDns;
+					}
+
+					break;
+				case LINKING_DOWN:
+					id("ip").innerHTML = "0.0.0.0";
+					id("mask").innerHTML = "0.0.0.0";
+					id("gateway").innerHTML = "0.0.0.0";
+					id("dns").innerHTML = "0.0.0.0 , 0.0.0.0";
+					GET_STATUS_INTERVAL = FAIL_INTERVAL;
+					connectStat.innerHTML = statusStr.disconcting;
+					$(connectStat).css("color", "#325FE0");
+					break;
+				case LINKING_UP:
+					id("ip").innerHTML = "0.0.0.0";
+					id("mask").innerHTML = "0.0.0.0";
+					id("gateway").innerHTML = "0.0.0.0";
+					id("dns").innerHTML = "0.0.0.0 , 0.0.0.0";
+					GET_STATUS_INTERVAL = FAIL_INTERVAL;
+					connectStat.innerHTML = statusStr.connting;
+					$(connectStat).css("color", "#325FE0");
+					break;
+				default:
+					break;
+				}
+			}
+			else
+			{
+				id("ip").innerHTML = "0.0.0.0";
+				id("mask").innerHTML = "0.0.0.0";
+				id("gateway").innerHTML = "0.0.0.0";
+				id("dns").innerHTML = "0.0.0.0 , 0.0.0.0";
+				GET_STATUS_INTERVAL = FAIL_INTERVAL;
+			}
+		}
+
+		function refreshWanStatus()
+		{
+			var data = {};
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+
+			clearTimeout(updateTimerHandle);
+			$.queryP(data, function(data){
+				setDynIpWanStatus(data);
+				updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+			});
+		}
+
+		function dhcpOnFailed()
+		{
+			showToast("other", {noteStr:label.dhcpFailed});
+			if (gOrgWanType == staticIp)
+			{
+				rollBackToStaticIp();
+			}
+			closeToast();
+		}
+
+		function rollBackToStaticIp()
+		{
+			var cfg = {}, cfgProto = {}, cfgStaic = {}, cfgWan = {};
+			cfg[uciProto.fileName] = {};
+			cfg[uciProto.fileName][uciProto.secName.wan]= {};
+			cfg[uciProto.fileName][uciProto.secName.wan][uciProto.optName.type] = uciProto.optValue.proto.staticIp;
+
+			showToast("other", {noteStr:label.backToStaticIp});
+			$.modify(cfg, function(resp){
+				if (false == errHandle(resp))
+				{
+					wanSel(staticIp);
+					closeToast();
+				}
+				else
+				{
+					// TODO, onfailed
+					var str = errStr.ipcNetGdipBackToStaticIp;
+
+					clearTimeout(wanSelHandle);
+
+					$.setTimeout(function(){
+						showConfirm(str, function(result){
+							if (true == result)
+							{
+								timeoutCount = 0;
+								onSave();
+							}
+							else
+							{
+								/* IPC现在处于正在连接的状态，不管是成功、超时或等待 */
+								connectStat.innerHTML = statusStr.disconcted;
+								$(connectStat).css("color", "#FF5500");
+								showDetailCon();
+
+								wanSel(staticIp);
+								closeToast();
+							}
+						});
+					}, FAIL_INTERVAL);
+				}
+			});
+		}
+
+		function navigateToIp()
+		{
+			var port = "";
+			if (gPort != DEF_PORT)
+			{
+				port = ":" + gPort;
+			}
+			window.location.href = "http://" + gIpVal + port;
+			
+			clearTimeout(updateTimerHandle);
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		function fetchNewAddr()
+		{
+			var data = {};
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][uciNetwork.action.getDhcpIp] = null;
+			retryCount++;
+			console.log("timeoutCount: " + timeoutCount);
+			$.action(data, function(resp){
+				gDhcpReply = true;
+				retryCount = 0;
+				if (false == errHandle(resp[ERR_CODE]))
+				{
+					if (resp[uciNetwork.optName.result] == uciNetwork.optValue.success)
+					{
+						// release_static_ip
+						var releaseData = {};
+						releaseData[uciNetwork.fileName] = {};
+						releaseData[uciNetwork.fileName][uciNetwork.action.releaseStaticIp] = null;
+						$.action(releaseData, function(releaseResp){
+							if (false == errHandle(releaseResp[ERR_CODE]))
+							{
+								gIpVal = resp[uciNetwork.optName.ipv4];
+								clearTimeout(fetchNewAddrHandle);
+								showToast("other", {noteStr:label.navigateToIp});
+								sucFlag = true;
+								$.setTimeout(function(){
+									$.changeDomain(gIpVal + ":" + gPort);
+									 lanDetecting(navigateToIp);
+								}, 2000);
+							}
+							else
+							{
+								dhcpOnFailed();
+							}
+						});
+					}
+					else if (resp[uciNetwork.optName.result] == uciNetwork.optValue.timeout || timeoutCount >= gMaxTimeOutTime)
+					{
+						clearTimeout(fetchNewAddrHandle);
+						if (!sucFlag)
+						{
+							dhcpOnFailed();
+						}
+						clearTimeout(updateTimerHandle);
+						updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+					}
+					else if (resp[uciNetwork.optName.result] == uciNetwork.optValue.waiting)
+					{
+						clearTimeout(fetchNewAddrHandle);
+
+						if (timeoutCount < gMaxTimeOutTime)
+						{	
+							timeoutCount++;
+							fetchNewAddrHandle = $.setTimeout(fetchNewAddr, GET_IP_WAITING_INTERVAL);
+						}
+
+					}
+				}
+				else
+				{
+					clearTimeout(fetchNewAddrHandle);
+					if (!sucFlag)
+					{
+						dhcpOnFailed();
+					}
+					clearTimeout(updateTimerHandle);
+					updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+				}
+			});
+
+			if (!gDhcpReply)
+			{
+				clearTimeout(fetchNewAddrHandle);
+				if (retryCount <= gMaxRetryTime)
+				{
+					fetchNewAddrHandle = $.setTimeout(fetchNewAddr, GET_IP_NO_REP_INTERVAL);
+				}
+				else
+				{
+					showToast("other", {noteStr:label.dhcpFailed});
+					$.setTimeout(closeToast, 1000);
+					clearTimeout(updateTimerHandle);
+					updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+				}
+			}
+		}
+
+		function onSave()
+		{
+			var i;
+			var maxRetry = 3;
+			var cfg = {}, cfgProto = {}, cfgDhcp = {}, cfgWan = {};
+			cfg[uciFile] = cfgProto;
+			cfgProto[uciWan] = cfgWan;
+			cfgProto[uciDynIp] = cfgDhcp;
+
+			var mtuVal = id("mtu").value;
+
+			retryCount = 0;
+			sucFlag = false;
+
+			/* 检查合法性 */
+			if (errHandleBeforeSave(checkMtu(mtuVal, 1500, 576), "mtu"))
+			{
+				return;
+			}
+
+			/* 去掉前导0 */
+			mtuVal = hideLeadingZeros(mtuVal);
+			id("mtu").value = mtuVal;
+
+			cfgDhcp[uciMtu] = mtuVal;
+
+			cfgWan[uciWanType] = uciProto.optValue.proto.dynIp;
+
+			showToast("loading");
+
+			$.modify(cfg, function(result){
+				if (false == errHandle(result[ERR_CODE]))
+				{
+					/* IPC现在处于正在连接的状态，不管是成功、超时或等待 */
+					connectStat.innerHTML = statusStr.connting;
+					$(connectStat).css("color", "#325FE0");
+					showDetailCon();
+
+					showToast("success");
+					showToast("other", {noteStr:label.dhcpGettingIp});
+
+					$.setTimeout(fetchNewAddr, DO_GET_IP_DELAY);
+					clearTimeout(updateTimerHandle);
+				}
+				else
+				{
+					//刷新WAN口状态
+					clearTimeout(updateTimerHandle);
+					updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+				}
+			});
+		}
+
+
+		function wanSel(val)
+		{
+			if (val == dynIp)
+			{
+				loadPage(urlArr.dynIp, "wanCon");
+			}
+			else if (val == staticIp)
+			{
+				loadPage(urlArr.staticIp, "wanCon");
+			}
+		}
+
+		function pageInit()
+		{
+			selectInit("wanMode", [{str:label.smartIp, value:proV.proto.dynIp},
+				{str:label.staticIp, value:proV.proto.staticIp}
+				], proV.proto.dynIp, wanSel);
+
+			id("save").onclick = onSave;
+			getDynIpData();
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	li.line label.infoLabel{
+		display:inline-block;
+		font-size:13px;
+		vertical-align:middle;
+		color:#666666;
+		width:190px;
+		height:32px;
+		line-height:32px;
+	}
+	input.textInput{
+		width:190px;
+	}
+	ul.line li.lineD, ul.line li.lineC{
+		display:block;
+	}
+</style>
+<div class="detailCon">
+	<div class="hsHelp"></div>
+	<div class="stateDiv">
+		<label class="statLabel">{%label.phState%}{%label.colon%}</label>
+		<label id="connectStat" class="statLabel">{%statusStr.disconcted%}</label>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.basicSet%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+
+				<!-- 模式选择 -->
+				<li class="line lineD">
+					<label class="des desA">{%label.mode%}</label>
+					<span class="selCon">
+						<span id="wanMode" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</li>
+
+				<!-- ip addr -->
+				<li class="line lineD">
+					<label class="des desA">{%label.ipAddr%}</label>
+					<label id="ip" class="infoLabel">0.0.0.0</label>
+				</li>
+				<!-- ip mask -->
+				<li class="line lineD">
+					<label class="des desA">{%label.mask%}</label>
+					<label id="mask" class="infoLabel">0.0.0.0</label>
+				</li>
+				<!-- ip gateway -->
+				<li class="line lineD">
+					<label class="des desA">{%label.gateway%}</label>
+					<label id="gateway" class="infoLabel">0.0.0.0</label>
+				</li>
+				<!-- dns -->
+				<li class="line lineD">
+					<label class="des desA">{%label.dns%}</label>
+					<label id="dns" class="infoLabel">0.0.0.0 , 0.0.0.0</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<!-- MTU -->
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.highSet%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+				<li class="line lineC">
+					<label class="des desA">{%label.mtu%}</label>
+					<input id="mtu" class="text textA1" maxLength="4" />
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

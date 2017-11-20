@@ -1,0 +1,712 @@
+<style type="text/css">
+    li.dragLine{
+        display:inline-block;
+        font-size:0px;
+        vertical-align:middle;
+        height:40px;
+        margin-left:24px;
+        width:300px;
+    }
+    /* ----------------plan edit -------- */
+    div.peCol span.select{
+        font-size:0px !important;
+    }
+    span.peSelect{
+        width:124px !important;
+        _width:116px !important;
+        font-size:14px !important;
+    }
+
+    /* ----------------plan set---------- */
+    #orgDC{
+        width:662px;
+    }
+    .displayNone{
+        display:none !important;
+    }
+
+    /* ----------------类型选择---------- */
+    i.peTypeRd
+    {
+        width:25px !important;
+        height:25px !important;
+    }
+    i.timeSeled
+    {
+        background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+    }
+    i.timeUnSeled
+    {
+        background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+    }
+    i.mdtUnSeled
+    {
+        background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+    }
+    i.mdtSeled
+    {
+        background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+    }
+    #timingLabel{
+        margin-right:35px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    #mdtLabel{
+        margin-right:347px;
+        *margin-right:340px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    label.typeSeled{
+        color:#fff !important;
+    }
+    /* ----------------plan cpy---------- */
+    div.peCon{
+        left:136px;
+		top:490px;
+		_left:-30px;
+		_top:-10px;
+    }
+    div.peCon div.peConDetail div.peCol4{
+        display: none;
+    }
+
+    label.desLogType{
+        margin-left: 16px;
+        line-height:28px;
+        font-size:12px;
+        color:#7A8599;
+        width:200px;
+        vertical-align: top !important;
+    }
+
+    label.subTitle{
+        margin-left: 8px;
+        font-color:#333333;
+    }
+
+    div.ipcDragLineLogDiv{
+        margin-left: 24px;
+        display: inline-block;
+        *display: inline;
+    }
+
+    #threshDragLineDragLineLabel{
+        width:106px;
+        margin-left: 24px;
+        *margin-left: 31px;
+    }
+    #hideVoiceUp,#hideVoiceDown{
+        position:absolute;
+        background-color:#F5F6FA;
+        left:0px;
+        width:100%;
+        filter:alpha(opacity=50);  /*设置透明度为70%*/
+        opacity:0.5;  /*非IE浏览器下设置透明度为70%*/
+        display:none;
+        z-index:1000;
+        *z-index: 1;
+    }
+    ul.line li.lineD{
+        width: 100%;
+    }
+    ul.line label.desA{
+        width: 78px;
+        margin-right: 0px;
+    }
+    div.ipcDragLineDiv{
+        width:auto;
+        margin-left: 7px;
+    }
+    div.ipcDragLineDiv label{
+        width: 106px;
+    }
+    ul.lineH{
+        margin-bottom: 17px;
+    }
+</style>
+
+<script type="text/javascript">
+   function init()
+    {
+        function errorHandle(code, objOrId)
+        {
+            var showStr = "";
+
+            switch(parseInt(code))
+            {
+                case ENONE:
+                    return true;
+                case IPCSMDENABLEERR:
+                    showStr = errStr.IPCParamInvalid;
+                    break;
+                case IPCSMDSENSITIVITYERR:
+                showStr = errStr.ipcImInfsErr;
+                    break;
+                case IPCUMGUESTNAUTH:
+                    showStr = errStr.invPermissionDenied;
+                    break;
+                case IPCNOTIFYEMAILENERR:
+                case IPCNOTIFYALARMENERR:
+                case IPCNOTIFYRECORDENERR:
+                    showStr = errStr.IPCHandleInalid;
+                    break;
+                case IPCARMINGSCHEDULEEOVERFLOW:
+                    showStr = errStr.armingScheduleOverflow;
+                    break;
+                case IPCARMINGSCHEDULEMIX:
+                    showStr = errStr.armingScheduleMix;
+                    break;
+                case IPCARMINGSCHEDULEILLEGAL:
+                    showStr = errStr.armingScheduleIllegal;
+                    break;
+                default:
+                    showStr = errStr.invRequestFail;
+                    break;
+            }
+
+            closeToast();
+            showAlert(showStr, objOrId);
+            return false;
+        }
+
+        /* 设置选中状态 */
+        function setChecked(checkId, checkValue)
+        {
+            var chkVal = ENABLED_ON == checkValue ? true : false;
+            changeCheckInput(checkId, chkVal);
+        }
+
+        /* 获取选中状态 */
+        function getChecked(idObj)
+        {
+            if (null != id(idObj).getAttribute("checked") &&
+                "true" == id(idObj).getAttribute("checked").toString())
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleShow()
+        {
+            if(0 == switchState)
+            {
+                return;
+            }
+
+            var hideVoiceUpObj = document.getElementById("hideVoiceUp");
+            var hideVoiceDownObj = document.getElementById("hideVoiceDown");
+
+            if (getChecked("voiceupEnabled"))
+            {
+                hideVoiceUpObj.style.display = "none";
+            }
+            else
+            {
+                hideVoiceUpObj.style.display = "block";
+                hideVoiceUpObj.style.height = getoffset(id("voicedownEnabled")).top - getoffset(id("sensitivityDragLine1")).top + "px";
+                hideVoiceUpObj.style.top = getoffset(id("sensitivityDragLine1")).top - getoffset(id("confCon")).top + "px";
+            }
+
+            if (getChecked("voicedownEnabled"))
+            {
+                hideVoiceDownObj.style.display = "none";
+
+            }
+            else
+            {
+                hideVoiceDownObj.style.display = "block";
+
+                hideVoiceDownObj.style.height = getoffset(id("armingScheduleArrow")).top - getoffset(id("sensitivityDragLine2")).top + "px";
+                hideVoiceDownObj.style.top = getoffset(id("sensitivityDragLine2")).top - getoffset(id("confCon")).top + "px";
+            }
+        }
+
+        function toolArrToString(arr, maxLen)
+        {
+            var res, i, str;
+            var tvArr;
+            var bt;
+            var et;
+
+            if (arr == undefined)
+            {
+                return "";
+            }
+            if (maxLen == undefined)
+            {
+                maxLen = 6;
+            }
+            res = "[";
+            if (arr.length < 1)
+            {
+                res += "\"0000-0000:0\"";
+            }
+            else
+            {
+                for (i = 0; i < arr.length && i < maxLen; i++)
+                {
+                    str = arr[i].toString();
+                    tvArr = str.split(/[-,:]/, 3);
+                    bt = parseInt(tvArr[0], 10);
+                    et = parseInt(tvArr[1], 10);
+                    str = recPlanGrid._getStringWithoutType(bt, et);
+
+                    if (i > 0)
+                    {
+                        res += ",";
+                    }
+                    res += ("\"" + str + "\"");
+                }
+            }
+            res += "]";
+            return res;
+        }
+
+        function addType(strTimeVal) {
+            var curTV;
+            var res = new Array();
+
+            if (strTimeVal == undefined)
+            {
+                curTV = "\"0000-0000:0\"";
+                res.push(curTV);
+
+                return res;
+            }
+
+            if (!(strTimeVal instanceof Array))
+            {
+                strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+            }
+
+            for (var i = 0; i < strTimeVal.length; i++)
+            {
+                curTV = strTimeVal[i];
+                var tvArr = curTV.split(/[-]/, 2);
+                var bt = parseInt(tvArr[0], 10);
+                var et = parseInt(tvArr[1], 10);
+                if(0 == bt && 0 == et)
+				{
+					res.push(recPlanGrid._getString(bt, et, 0));
+				}
+				else
+				{
+					res.push(recPlanGrid._getString(bt, et, 1));
+				}
+            }
+
+            return res;
+        }
+
+        function saveArmingSchedule()
+        {
+            var i;
+            var res = recPlanGrid.getTimeVal();
+
+            var data = {};
+            for (i = 0; i < weekArray.length; i++)
+            {
+                data[uciDays[i]] = toolArrToString(res[weekArray[i]]);
+            }
+
+            return data;
+        }
+
+        function sensitivityChange1(val) {
+            sensitivityValue1 = val;
+            sensitivityDragLine1.setValue(val);
+            if ((true == checkNum(val)) &&
+                    (true == checkNumRange(parseInt(val), 100, 1)))
+            {
+                sensitivityErr = false;
+            }
+            else
+            {
+                showNote("sensitivityDragLine1DragLineInput", errStr.sensitivityErr);
+                sensitivityErr = true;
+            }
+        }
+
+        function sensitivityChange2(val) {
+            sensitivityValue2 = val;
+            sensitivityDragLine2.setValue(val);
+            if ((true == checkNum(val)) &&
+                    (true == checkNumRange(parseInt(val), 100, 1)))
+            {
+                sensitivityErr = false;
+            }
+            else
+            {
+                showNote("sensitivityDragLine2DragLineInput", errStr.sensitivityErr);
+                sensitivityErr = true;
+            }
+        }
+
+        function saveHandle()
+        {
+            if(percentageErr)
+            {
+                return false;
+            }
+
+            var reqData = {};
+            var i;
+            var res = recPlanGrid.getTimeVal();
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][DETECTION] = {};
+            reqData[FILE_NAME][INPUT_ABNORMAL_DET] = {};
+            reqData[FILE_NAME][VOICERISE] = {};
+            reqData[FILE_NAME][VOICEDOWN] = {};
+            reqData[FILE_NAME][ARMING_SCHEDULE] = {};
+            reqData[FILE_NAME][NOTIFY_LIST] = {};
+            reqData[FILE_NAME][DETECTION][ENABLED] = switchState;
+
+            gInputAbnormalEnabled =  getChecked("aaInputEnabled")?ENABLED_ON:ENABLED_OFF;
+            reqData[FILE_NAME][INPUT_ABNORMAL_DET][INPUT_ABNORMAL_ENABLED] = gInputAbnormalEnabled;
+            gVoiceupEnabled = getChecked("voiceupEnabled")?ENABLED_ON:ENABLED_OFF;
+            reqData[FILE_NAME][VOICERISE][VOICEUP_ENABLED] = gVoiceupEnabled;
+            gVoicedownEnabled = getChecked("voicedownEnabled")?ENABLED_ON:ENABLED_OFF;
+            reqData[FILE_NAME][VOICEDOWN][VOICEDOWN_ENABLED] = gVoicedownEnabled;
+
+            reqData[FILE_NAME][VOICERISE][THRESH] = thresh;
+
+            reqData[FILE_NAME][VOICERISE][VOICEUP_SENS] = sensitivityValue1;
+            reqData[FILE_NAME][VOICEDOWN][VOICEDOWN_SENS] = sensitivityValue2;
+
+            reqData[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] = emailCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+            reqData[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] = deviceCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+            reqData[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] = recordCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+
+            reqData[FILE_NAME][ARMING_SCHEDULE] = saveArmingSchedule();
+
+            showToast();
+            $.modify(reqData, function(result){
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    showToast("success");
+                }
+            });
+        }
+
+        function showArmingSchedule()
+        {
+            var i;
+            var data = {};
+
+            data[FILE_NAME] = {};
+            data[FILE_NAME][NAME] = ARMING_SCHEDULE;
+
+            $.query(data, function(resp){
+                if (true == errorHandle(resp[ERR_CODE]))
+                {
+                    recPlanGrid.reset();
+                    for (i = 0; i < weekArray.length; i++)
+                    {
+                        recPlanGrid.setTimeVal(weekArray[i], addType(resp[FILE_NAME][ARMING_SCHEDULE][uciDays[i]]));
+                    }
+                }
+            });
+        }
+
+        function hideArmingSchedule()
+        {
+            if (!bRecordPlanShow)
+            {
+                id("armingScheduleArrow").className ="arrowUp";
+                timeSchedule.style.display = "";
+                bRecordPlanShow = true;
+            }
+            else
+            {
+                id("armingScheduleArrow").className ="arrowDown";
+                timeSchedule.style.display = "none";
+                bRecordPlanShow = false;
+            }
+        }
+
+        //隐藏打开处理方式
+        function hideHandleWay()
+        {
+            if (!bHandleWayShow)
+            {
+                id("handleArrow").className ="arrowUp";
+                handleWay.style.display = "";
+                bHandleWayShow = true;
+            }
+            else
+            {
+                id("handleArrow").className ="arrowDown";
+                handleWay.style.display = "none";
+                bHandleWayShow = false;
+            }
+        }
+
+        function intelligentDetectionSwitchHd(state)
+        {
+            intelligentDetectionSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+            switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+            var hideobj = document.getElementById("hidebg");
+
+            if(0 == state)
+            {
+                hideobj.style.display = "block";
+
+                var saveHeight = getoffset(id("save")).top - getoffset(id("aaInputEnabled")).top;
+
+                if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+                {
+                    hideobj.style.height = saveHeight + "px";
+                }
+                else
+                {
+                    var peConHeight = getoffset(id("peCon")).top - getoffset(id("aaInputEnabled")).top + id("peCon").offsetHeight;
+                    hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+                }
+            }
+            else
+            {
+                hideobj.style.display = "none";
+            }
+        }
+
+        function threshChange(val)
+        {
+            threshDragLine.setValue(val);
+            thresh = val;
+
+            if ((true == checkNum(val)) && (true == checkNumRange(parseInt(val), 100, 1)))
+            {
+                percentageErr = false;
+            }
+            else
+            {
+                showNote("threshDragLineDragLineInput", errStr.ipcAbEnErr);
+                percentageErr = true;
+            }
+        }
+
+        function getConfig()
+        {
+            enable = 0;
+            var reqData = {};
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][NAME] = [DETECTION, INPUT_ABNORMAL_DET, VOICERISE, VOICEDOWN, NOTIFY_LIST];
+
+            $.query(reqData, function(result){
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    if (true == $.local)
+                    {
+                        intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", 0, intelligentDetectionSwitchHd);
+
+                        return;
+                    }
+
+                    /* 使能按钮 */
+                    switchState = result[FILE_NAME][DETECTION][ENABLED];
+                    enable = (switchState == ENABLED_ON) ? 1 : 0;
+                    intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", enable, intelligentDetectionSwitchHd);
+
+                    gInputAbnormalEnabled = result[FILE_NAME][INPUT_ABNORMAL_DET][INPUT_ABNORMAL_ENABLED];
+                    setChecked(aaInputEnabled, gInputAbnormalEnabled);
+
+                    gVoiceupEnabled = result[FILE_NAME][VOICERISE][VOICEUP_ENABLED];
+                    setChecked(voiceupEnabled, gVoiceupEnabled);
+
+                    gVoicedownEnabled = result[FILE_NAME][VOICEDOWN][VOICEDOWN_ENABLED];
+                    setChecked(voicedownEnabled, gVoicedownEnabled);
+
+                    thresh = result[FILE_NAME][VOICERISE][THRESH];
+                    threshDragLine.setValue(thresh);
+
+                    handleShow();
+
+                    /* 灵敏度 */
+                    sensitivityValue1 = (result[FILE_NAME][VOICERISE][VOICEUP_SENS] == null) ? 50 : result[FILE_NAME][VOICERISE][VOICEUP_SENS];
+                    sensitivityValue2 = (result[FILE_NAME][VOICEDOWN][VOICEDOWN_SENS] == null) ? 50 : result[FILE_NAME][VOICEDOWN][VOICEDOWN_SENS];
+                    sensitivityDragLine1.setValue(sensitivityValue1);
+                    sensitivityDragLine2.setValue(sensitivityValue2);
+
+                    /* 联动方式 */
+                    enable = (result[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] == ENABLED_ON);
+                    changeCheckInput(emailCheck, enable);
+                    enable = (result[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] == ENABLED_ON);
+                    changeCheckInput(deviceCheck, enable);
+                    enable = (result[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] == ENABLED_ON);
+                    changeCheckInput(recordCheck, enable);
+
+                    showDetailCon();
+                }
+            });
+        }
+
+        function pageInit()
+        {
+            sensitivityDragLine1 = new DragLine({id:"sensitivityDragLine1", name:label.sensitivity, cb:sensitivityChange1, lowerBound:1});
+            sensitivityDragLine2 = new DragLine({id:"sensitivityDragLine2", name:label.sensitivity, cb:sensitivityChange2, lowerBound:1});
+            threshDragLine = new DragLine({id:"threshDragLine", name:label.thresh, cb:threshChange, lowerBound:1});
+
+            initCheckInput("Enabled", function(checked, index){
+                            handleShow();
+            });
+            handleShow();
+
+            /* 计划任务初始化 */
+            recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+            showArmingSchedule();
+
+            getConfig();
+        }
+
+        var FILE_NAME = uciAudioException.fileName;
+        var DETECTION = uciAudioException.secName.detection;
+        var INPUT_ABNORMAL_DET = uciAudioException.secName.inputAbnormal;
+        var VOICERISE = uciAudioException.secName.voiceRise;
+        var VOICEDOWN = uciAudioException.secName.voiceDown;
+        var ARMING_SCHEDULE = uciAudioException.secName.armingSchedule;
+        var NOTIFY_LIST = uciAudioException.secName.notifyList;
+
+        var ENABLED = uciAudioException.optName.enabled;
+        var INPUT_ABNORMAL_ENABLED = uciAudioException.optName.inputAbnormalEnabled;
+        var VOICEUP_ENABLED = uciAudioException.optName.voiceupEnabled;
+        var VOICEUP_SENS = uciAudioException.optName.voiceupSens;
+        var THRESH = uciAudioException.optName.thresh;
+        var VOICEDOWN_ENABLED = uciAudioException.optName.voicedownEnabled;
+        var VOICEDOWN_SENS = uciAudioException.optName.voicedownSens;
+        var EMAIL_ENABLED = uciAudioException.optName.emailEnabled;
+        var ALARM_ENABLED = uciAudioException.optName.alarmEnabled;
+        var RECORD_ENABLED = uciAudioException.optName.recordEnabled;
+        var ENABLED_ON = uciAudioException.optValue.enableVal.on;
+        var ENABLED_OFF = uciAudioException.optValue.enableVal.off;
+
+
+        var DEF_AA_Input_ENABLED = ENABLED_OFF;
+        var gAAInputEnabled = DEF_AA_Input_ENABLED;
+
+        var switchState;
+        var enable;
+        var gInputAbnormalEnabled;
+        var gVoiceupEnabled;
+        var thresh;
+        var threshDragLine;
+        var gVoicedownEnabled;
+        var sensitivityDragLine1,sensitivityDragLine2;
+        var sensitivityValue1, sensitivityValue2;
+
+        var bRecordPlanShow = false;
+        var bHandleWayShow = false;
+        var intelligentDetectionSwitch;
+        var percentageErr = false;
+
+        var intelligentDetectionSwitchDes = id("intelligentDetectionSwitchDes");
+        var aaInputEnabled = id("aaInputEnabled");
+        var voiceupEnabled = id("voiceupEnabled");
+        var voicedownEnabled = id("voicedownEnabled");
+        var emailCheck = id("emailCheck");
+        var deviceCheck = id("deviceCheck");
+        var recordCheck = id("recordCheck");
+		var timeSchedule = id("timeSchedule");
+        var handleWay = id("handleWay");
+
+        var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+        var uciDays = [uciAudioException.optName.mon, uciAudioException.optName.tue, uciAudioException.optName.wed, uciAudioException.optName.thu, uciAudioException.optName.fri, uciAudioException.optName.sat, uciAudioException.optName.sun];
+        var recPlanGrid;
+        var sensitivityErr = false;
+
+        pageInit();
+
+        id("save").onclick = saveHandle;
+        id("armingScheduleArrow").onclick = hideArmingSchedule;
+        id("handleArrow").onclick = hideHandleWay;
+        id("clearAll").onclick = function(event){
+            recPlanGrid.reset();
+        }
+    }
+    init();
+</script>
+
+<div class="detailCon">
+    <div style="position:relative;*z-index:1;">
+        <div id="hidebg"></div>
+    </div>
+    <div id="hideVoiceUp"></div>
+    <div id="hideVoiceDown"></div>
+    <ul class="line lineH">
+        <li class="line lineD">
+            <i name="Enabled" id="aaInputEnabled" value="0"></i>
+            <label class="des desA subTitle">{%label.audioAbnormal%}</label>
+            <label class="des desLogType">{%label.audioAbnormalInputTip%}</label>
+        </li>
+        <li class="line lineD">
+            <i name="Enabled" id="voiceupEnabled" value="1"></i>
+            <label class="des desA subTitle">{%label.voiceRise%}</label>
+        </li>
+        <li class="dragLine lineD">
+            <div id="sensitivityDragLine1" class="ipcDragLineDiv"></div>
+        </li>
+        <ul>
+            <li class="line lineD ">
+                <div id="threshDragLine" class="ipcDragLineDiv ipcDragLineLogDiv"></div>
+                <label class="des desLogType">{%label.threshTip%}</label>
+            </li>
+        </ul>
+        <li class="line lineD">
+            <i name="Enabled" id="voicedownEnabled" value="2"></i>
+            <label class="des desA subTitle">{%label.voiceDown%}</label>
+        </li>
+        <li class="dragLine lineD">
+            <div id="sensitivityDragLine2" class="ipcDragLineDiv"></div>
+        </li>
+    </ul>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.defenceTime%}</label>
+			<i class="arrowDown" id="armingScheduleArrow"></i>
+		</div>
+		<div id="timeSchedule" style="display: none">
+			<ul class="line">
+				<li class="line linePlan">
+					<span class="clearAll" id="clearAll">{%label.clear%}</span>
+					<label class="tips">{%label.audioAbnormalTips%}</label>
+				</li>
+			</ul>
+			<div class="armingSchedule" id="armingSchedule">
+				<div id="recPlanGrid" class="test"></div>
+			</div>
+			<div class="height"></div>
+		</div>
+	</div>
+    <div class="actionBarDiv">
+        <div class="actionTitleDiv">
+            <label class="actionTitle">{%label.handleWay%}</label>
+            <i class="arrowDown" id="handleArrow"></i>
+        </div>
+        <div class="handleWay" id="handleWay" style="display: none">
+            <ul class="Line">
+                <li class="Line lineFirst">
+                    <i name="Enabled" id="recordCheck" class="chObj" value="1"></i>
+                    <label class="des desA">{%label.triggerRecord%}</label>
+                </li>
+                <li class="Line lineE">
+                    <i name="Enabled" id="emailCheck" class="chObj" value="-1"></i>
+                    <label class="des desA">{%label.sendEmail%}</label>
+                </li>
+                <li class="Line lineLast">
+                    <i name="Enabled" id="deviceCheck" class="chObj" value="0"></i>
+                    <label class="des desA">{%label.triggerAlarmDevice%}</label>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="funcBtnCon">
+        <input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+    </div>
+</div>

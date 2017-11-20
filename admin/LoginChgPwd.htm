@@ -1,0 +1,414 @@
+﻿<style type="text/css">
+	body{
+		background-color:#E6E8EB;
+	}
+	div.lgHead{
+		background-color:#E6E8EB;
+		height:44px;
+		width:100%;
+	}
+	div.logo{
+		background:url(../web-static/images/logoBlue.png) no-repeat 40px 12px;
+		height:100%;
+		margin:0 auto;
+	}
+	div.lgCon{
+		background-color:#FFFFFF;
+		border:1px solid #C8CDD9;
+		border-radius:4px;
+		height:358px;
+		margin:150px auto 0;
+		width:518px;
+		box-shadow:0px 0px 8px rgba(0,0,0,0.1);
+	}
+	h1.hello{
+		color:#333333;
+		font-size:24px;
+		padding-top:32px;
+		text-align:center;
+		margin-bottom:20px;
+	}
+	h1.helloLk{
+		color:#A0A0A0;
+		font-size:14px;
+		margin-bottom:37px;
+	}
+	h2{
+		color:#707070;
+		font-size:16px;
+		text-align:center;
+		margin-bottom: 20px
+	}
+	ul.line{
+		width:260px;
+		margin:0 auto;
+	}
+	ul.line li.lgLine{
+		position:relative;
+		text-align:center;
+		*zoom:1;
+	}
+	ul.line li.tipLine{
+		position:relative;
+		text-align:left;
+		*zoom:1;
+	}
+	ul.line li.tipLine span{
+		color:#333333;
+		font-size:12px;
+		display:inline-block;
+		margin-bottom:8px;
+		margin-top:16px;
+	}
+	#userName, #lgPwd{
+		background-color:#FFFFFF;
+		border:none !important;
+		color:#707070;
+		font-size:14px;
+		height:32px;
+		line-height:32px;
+		padding:0;
+		width:214px;
+		margin-left:44px;
+	}
+	ul.line li.lgLine div.lgBdBg{
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+		border:1px solid #CED7E0;
+		border-radius:2px;
+		height:32px;
+		line-height:32px;
+		width:258px;
+		text-align:left;
+	}
+	@media screen and (-webkit-min-device-pixel-ratio:0)
+	{
+		ul.line li.lgLine input{
+			line-height:0px !important;
+		}
+	}
+	ul.line li.lgLine div.username{
+		background:url(../web-static/images/user.png) no-repeat 8px 6px;
+	}
+	ul.line li.lgLine div.password{
+		background:url(../web-static/images/unlock.png) no-repeat 8px 6px;
+	}
+	#pwdTipStr, #userTipStr{
+		color:#666666;
+		font-size:14px;
+		left:44px;
+		line-height:32px !important;
+		position:absolute;
+		top:0px;
+	}
+	div.lgFunc{
+		margin-top:40px;
+		text-align:center;
+	}
+	div.lgFunc input.login{
+		background-color:#578FFF;
+		border:1px solid #356AFF;
+		border-radius:2px;
+		color:#ffffff;
+		cursor:pointer;
+		font-size:14px;
+		height:32px;
+		padding:6px 115px;
+		*padding:7px 74px;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		var LOCL_TIME = 1800;
+		var lgObj = {max:LOCL_TIME, minTipCnt:3, timeout:1000};
+		var lgUser = id("userName");
+		var lgPwd = id("lgPwd");
+		var loginSub = id("loginSub");
+		var userTipStr = id("userTipStr");
+		var pwdTipStr = id("pwdTipStr");
+		var helloStr =id("helloStr");
+		var lckHd, lgUserDiv, lgPwdDiv;
+
+		function lgTimerCheck()
+		{
+			lgObj.max--;
+			if (lgObj.max == 0)
+			{
+				showNormalLgTip();
+				return;
+			}
+
+			lckHd = $.setTimeout(arguments.callee, lgObj.timeout);
+		}
+
+		/* 显示非锁定的登录页面的头部提示语 */
+		function showNormalLgTip()
+		{
+			clearTimeout(lckHd);
+			lgObj.max = LOCL_TIME;
+			helloStr.innerHTML = label.hello;
+			helloStr.className = "hello";
+		}
+
+		function showLgError(code, username)
+		{
+			var errcount = $.authRltObj["time"];
+			var maxTime = $.authRltObj["max_time"];
+			var bPwdErr = true;
+
+			switch(code)
+			{
+			case ESYSLOCKED:
+				closeLgNote();
+				helloStr.innerHTML = label.lockTip.replace("%s", username);
+				helloStr.className = "helloLk hello";
+				$.setTimeout(lgTimerCheck, lgObj.timeout);
+				break;
+			case EUNAUTH:
+				if (lgObj.cnt == errcount)
+				{
+					break;
+				}
+
+				if (errcount <= lgObj.minTipCnt && errcount != maxTime)
+				{
+					showNote("lgPwdBdg", label.loginErrorTipH + errcount +label.loginErrorTipT);
+				}
+				else
+				{
+					showNote("lgPwdBdg", label.loginPwdErr);
+				}
+
+				showNormalLgTip();
+				break;
+			case ESYSCLIENTNORMAL:
+				break;
+			case IPCUMUSRBLANK:
+				showNote("lgUsernameBdg", errStr.loginUserNameNull);
+				bPwdErr = false;
+				showNormalLgTip();
+				break;
+			case IPCUMUSRNEXIST:
+				showNote("lgUsernameBdg", errStr.invCloudAccountNotExist);
+				bPwdErr = false;
+				showNormalLgTip();
+				break;
+			case IPCUMUSRNAMEINV:
+			default:
+				showAlert(errStr.invRequestFail);
+				showNormalLgTip();
+				break;
+			}
+
+			if (lgPwd.value.length > 0 && bPwdErr == true)
+			{
+				setDomCursorPos(lgPwd, lgPwd.value.length);
+			}
+			else if (lgUser.value.length > 0)
+			{
+				setDomCursorPos(lgUser, lgUser.value.length);
+			}
+		}
+
+		function lgPageResize()
+		{
+			var minHeight = 400;
+			var pageHeight = document.documentElement.clientHeight;
+			var lgCon = $("div.lgCon");
+
+			pageHeight = pageHeight > minHeight ? pageHeight : minHeight;
+			pageHeight = parseInt(pageHeight * 0.235);
+			lgCon.css("marginTop", pageHeight);
+			$("#Cover p").css("marginTop", pageHeight - 10 + parseInt(lgCon.css("height")));
+		}
+		function showLoginHelp()
+		{
+			var loginFeg = id("loginFeg");
+			if (loginFeg.style.visibility == "visible")
+			{
+				loginFeg.style.visibility = "hidden";
+			}
+			else
+			{
+				loginFeg.style.visibility = "visible";
+			}
+		}
+		function closeLgNote()
+		{
+			closeNote("lgPwdBdg");
+			closeNote("lgUsernameBdg");
+		}
+		function lgDoSub()
+		{
+			var lgUser = id("userName");
+			var lgPwd = id("lgPwd");
+			var userVal = lgUser.value;
+			var value = lgPwd.value;
+
+			closeLgNote();
+
+			/* check user account */
+			/*if (userVal.length == 0)
+			{
+				showLgError(IPCUMUSRBLANK);
+				return;
+			}*/
+
+			/* 检查密码 */
+			/*if (value.length == 0)
+			{
+				showNote("lgPwdBdg", errStr.loginUserPwdNull);
+				return;
+			}*/
+
+			$.auth(userVal, orgAuthPwd(value), function(errCode){
+				if (errCode == ENONE)
+				{
+					lgPwd.value = "";
+					unloadLogin();
+				}
+				else
+				{
+					showLgError(parseInt($.authRltObj["code"]), userVal);
+				}
+			});
+
+			return;
+		}
+		function userNClickBdShow(input, tag)
+		{
+			if (undefined == lgUserDiv)
+			{
+				lgUserDiv = $("div.username")[0];
+			}
+
+			if (true == tag)
+			{
+				setStyle(lgUserDiv, {"border":"1px solid #5A92FF", height:"32px", width:"258px", "backgroundImage":"url(../web-static/images/user_active.png)"});
+				setStyle(input, {height:"32px"});
+			}
+			else
+			{
+				setStyle(lgUserDiv, {"border":"1px solid #CED7E0", height:"32px", width:"258px", "backgroundImage":"url(../web-static/images/user.png)"});
+				setStyle(input, {height:"32px"});
+			}
+		}
+		function pwdClickBdShow(input, tag)
+		{
+			if (undefined == lgPwdDiv)
+			{
+				lgPwdDiv = $("div.password")[0];
+			}
+
+			if (true == tag)
+			{
+				setStyle(lgPwdDiv, {"border":"1px solid #5A92FF", height:"32px", width:"258px", "backgroundImage":"url(../web-static/images/unlock_active.png)"});
+				setStyle(input, {height:"32px"});
+			}
+			else
+			{
+				setStyle(lgPwdDiv, {"border":"1px solid #CED7E0", height:"32px", width:"258px", "backgroundImage":"url(../web-static/images/unlock.png)"});
+				setStyle(input, {height:"32px"});
+			}
+		}
+		function pageSet()
+		{
+			var userName = id("userName");
+			userName.value = "admin";
+			disableInput(userName, true);
+			userTipStr.style.display = "none";
+
+			lgPageResize();
+			loginSub.onclick = lgDoSub;	/* 设置提交按钮响应事件 */
+			lgUser.onfocus = function(){
+				userTipStr.style.display = "none";
+				userNClickBdShow(this, true);
+			};
+			lgUser.onblur = function(){
+				if (this.value.length == 0)
+				{
+					userTipStr.style.display = "inline";
+				}
+
+				userNClickBdShow(this, false);
+			};
+			lgPwd.onfocus = function(){
+				pwdTipStr.style.display = "none";
+				pwdClickBdShow(this, true);
+			};
+			lgPwd.onblur = function(){
+				if (this.value.length == 0)
+				{
+					pwdTipStr.style.display = "inline";
+				}
+
+				pwdClickBdShow(this, false);
+			};
+			lgPwd.value = "";
+			lgPwd.onkeyup = function(event)
+			{
+				event = event || window.event;
+				if (event.keyCode == 13)	// enter handle
+				{
+					return lgDoSub();
+				}
+			};
+
+			lgPwd.onclick = function(event)
+			{
+				closeLgNote();
+				pwdClickBdShow(this, true);
+				pwdTipStr.style.display = "none";
+				stopProp(event);
+			};
+
+			lgUser.onclick = function(event)
+			{
+				closeLgNote();
+				userNClickBdShow(this, true);
+				userTipStr.style.display = "none";
+				stopProp(event);
+			};
+
+			window.onresize = function(){
+				lgPageResize();
+			};
+
+			document.body.style.height = "100%";
+		}
+
+		pageSet();
+	}
+	init();
+</script>
+<div class="lgHead">
+	<div class="logo"></div>
+</div>
+<div class="lgCon">
+	<h1 id="helloStr" class="hello">{%label.hello%}</h1>
+	<ul class="line userpwd">
+		<li class="tipLine">
+			<span>{%label.userName%}</span>
+		</li>
+		<li class="lgLine">
+			<div id="lgUsernameBdg" class="lgBdBg username">
+				<input class="username" id="userName" maxLength="32" />
+				<label id="userTipStr" for="userName">{%label.loginUserNameKey%}</label>
+			</div>
+		</li>
+		<li class="tipLine">
+			<span>{%label.password%}</span>
+		</li>
+		<li class="lgLine lgPwd">
+			<div id="lgPwdBdg" class="lgBdBg password">
+				<input class="password" id="lgPwd" type="password" maxLength="32" />
+				<label id="pwdTipStr" for="lgPwd">{%label.loginUserPwdRan%}</label>
+			</div>
+		</li>
+	</ul>
+	<div class="lgFunc">
+		<input class="login subBtn" type="button" id="loginSub" value="{%btn.login%}" />
+	</div>
+</div>

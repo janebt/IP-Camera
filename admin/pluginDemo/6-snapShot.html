@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>snap shot</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+		#savePath, #recordTime {
+			display: inline-block;
+			width: 30em;    height: 1.5em;
+			border: 1px solid gray;
+			margin-right: 2em;
+		}
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> snap shot </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>  
+		<p>			
+			<input type="button" value="snap shot" id="snapShot" onclick="pluginObj.snapshot();">
+		</p>
+		<p>
+			<input type="button" value="start record" id="startRecord" onclick="pluginObj.StartRecord();">
+			<input type="button" value="stop record" id="stopRecord" onclick="pluginObj.StopRecord();">
+			<span id="recordTime"></span>
+        </p>  	
+
+		<p>			
+			<span id="savePath"></span><input type="button" value="浏览" id="browseDlg" onclick="pluginObj.browseDlg();">
+		</p>
+		<p>
+			<input type="button" value="打开" id="openFileDlg" onclick="pluginObj.openFileDlg();">
+        </p> 		
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480,
+			bRecord: 0
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	pluginObj.snapshot = function(){
+		obj.Snapshot("snapshot");              //点击，开始抓图
+	};
+	
+
+	function getTimeArr(timeStr){
+	
+		if(typeof timeStr != "string")
+			return;
+	
+		var time = [0,0,0,0,0,0]; 
+		var start = 0;  var end = 0;
+		for(var i=0; i<6; i++)
+		{
+			start = (end == 0 ? 0 : end+1); 
+			end = timeStr.indexOf("-", start);
+			if(end > -1)
+			{
+				time[i] = timeStr.substring(start, end);
+			}
+			else if(start > 0)
+			{
+				end = timeStr.length;
+				time[i] = timeStr.substring(start, end);
+			}			
+		}
+	//	var tmp = time.join(",");   console.log(tmp);
+		return time;
+	}
+	
+	
+	pluginObj.StartRecord= function(){        //Record() - 开始录像
+		var result = obj.Record();
+		if(result == 1)		 //Record() 方法返回值 1 表示成功开始录像，0 表示未成功
+		{               
+			pluginObj.param.bRecord = 1;                   //开始录像成功后开始计算录像时长！
+			console.log("start record success!");  
+			var recStartTime = obj.GetCameraTime();           //该接口方法可以得到当前视频的时间，格式为“1970-01-01-15-02-36”
+			var startTimeArr = getTimeArr(recStartTime);
+
+			var func = function(){       //每隔1s获取一次当前视频的时间，并计算差值，就可以显示视频录制的时长了~
+				var recCurTime = obj.GetCameraTime();  			 									    
+				var curTimeArr = getTimeArr(recCurTime);
+
+				var tmpSec = curTimeArr[5]-startTimeArr[5];
+				var sec = tmpSec >= 0 ? tmpSec : tmpSec+60;
+				
+				var tmpMin = tmpSec >= 0 ? curTimeArr[4]-startTimeArr[4] : curTimeArr[4]-1-startTimeArr[4];
+				var min = tmpMin >= 0 ? tmpMin : tmpMin+60;
+				
+				var tmpHour = tmpMin >= 0 ? curTimeArr[3]-startTimeArr[3] : curTimeArr[3]-1-startTimeArr[3];
+				var hour = tmpHour >= 0 ? tmpHour : tmpHour+24;
+				
+				document.getElementById("recordTime").innerHTML = hour+":"+min+":"+sec;
+				//这里还需要计算年月日的差值，我随便写了一下，不知道有没有简洁点的写法。
+				
+				if(pluginObj.param.bRecord == 1){
+					setTimeout(func, 1000);
+				}
+				else{
+					document.getElementById("recordTime").innerHTML = "";
+				}
+			};
+			setTimeout(func, 1000);
+		}			
+		else if(result == 0){
+			console.log("start record failed!");
+		}
+			
+	};
+	pluginObj.StopRecord= function(){                //StopRecord() - 结束录像
+		var result = obj.StopRecord();
+		pluginObj.param.bRecord = 0;
+	};
+	
+	pluginObj.browseDlg = function(){
+		var path = obj.setStoragePath();            //setStoragePath()，选择抓图和录像的保存路径（这是放在 设置>存储 里那个按钮）； 方法的返回值为用户所选择的文件夹路径，不含“vediofiles”或者“picfiles”的部分
+		console.log("browseDlg: "+path);              //取消或者出错时返回空字符串
+		
+		document.getElementById("savePath").innerHTML = path;         //选择存储路径后更新显示，也可以通过obj.storageDir获取路径信息。
+	};
+	
+	pluginObj.openFileDlg = function(){
+		var result = obj.openStoragePath();
+		console.log("openFileDlg result:" + result);     //返回值0表成功；返回值-1表示ini不存在、或者无权限读、或者用户选择的保存路径不存在
+	};
+	
+	(function(){
+		obj.snapshotcallback(function(arg){                      //snapshotcallback() - 注册抓图完成的回调函数！ 方法的参数是回调函数，抓图完成后会执行该JS函数
+				console.log("snapshot callback: "+arg);	         //这个回调函数可以需要带一个参数，在该函数被回调时，在函数内部可以读取这个参数的值
+				                                                 //该参数值为 0 时，表示抓图成功； 值为 1 表示用户选择的保存路径不存在或者没有写权限，抓图保存失败。
+																//该值为 2 时表示视频资源未准备好； 该值为 3 时表示磁盘空间不足，抓图保存失败。
+			});
+			
+		obj.recordcbinvoke(function(arg){
+			pluginObj.param.bRecord = 0;
+			console.log("record callback: "+arg);           //recordcbinvoke（） - 注册录像完成的回调函数。该方法的参数是回调函数，录像完成后会指向该JS函数
+															//这个回调函数需要带一个参数，在该函数被回调时，在函数内部可以读取这个参数的值
+				                                                 //该参数值为 0 时，表示录像保存成功； 值为 1 表示未得到视频数据（如网络未连接）。
+																//该值为 3 时表示磁盘空间不足。
+																//该值为 5 时表示用户选择的保存路径不存在或者没有写权限，保存失败
+																//这里有个问题，当返回值1和3时表示录像被打断，但被打断后还是会将已经录到的内容进行保存，所以会再次触发回调函数，这次的参数应该是1或者5，表示是否保存成功。
+		});
+		
+		
+		document.getElementById("savePath").innerHTML = obj.storageDir;      //storageDir 属性，用户选择的存储路径。    第一次使用时（从未选择过存储路径的情况），该值为空字符串
+		
+	})();
+</script>
+
+<div>
+
+<h2>预览（抓图和录像） - 设置&gt;存储</h2>
+<p>该例子演示预览中的抓图和录像功能。另外与其相关的是设置中的存储，该存储路径仅给预览中的抓图和录像功能使用；而设置&gt;摄像头&gt;码流&gt;图片 中的设置与预览中的抓图录像完全无关，只用于配制NVR。</p>
+
+<h5>Snapshot("snapshot")</h5>
+<p>
+	接口方法：开始抓图。<br>
+	参数1： 字符串。 这个参数没什么用，是以前代码的冗余，我还没时间删除，先保留。
+</p>
+
+<h5>snapshotcallback(function)</h5>
+<p>
+	接口方法：注册抓图完成的回调函数。<br>
+	参数1： JS函数，当抓图完成插件会调用该函数。这个回调函数带一个参数，当它被调用时，可以读取这个参数判断抓图结果。<br>
+	回调函数参数值为 0 时，表示抓图成功； 值为 1 表示用户选择的保存路径不存在或者没有写权限，抓图保存失败。<br>
+	该值为 2 时表示视频资源未准备好； 该值为 3 时表示磁盘空间不足，抓图保存失败。<br>
+	UE中标明抓图完成后需在图标上方进行提示，就可以用该回调函数完成。
+</p>
+
+<h5>Record()</h5>
+<p>
+	接口方法：开始录像。<br>
+	无参数。<br>
+	返回值 1 表示成功开始录像，0 表示未成功。
+</p>
+
+<h5>StopRecord()</h5>
+<p>
+	接口方法：结束录像。<br>
+	无参数。无返回值。
+</p>
+
+<h5>recordcbinvoke(function)</h5>
+<p>
+	接口方法：注册录像完成的回调函数。<br>
+	参数1： JS函数，当录像完成插件会调用该函数。这个回调函数带一个参数，当它被调用时，可以读取这个参数判断录像结果。<br>
+	回调函数参数值为 0 时，表示录像保存成功； 值为 1 表示未得到视频数据（如网络未连接）；<br>
+	该值为 3 时表示磁盘空间不足；该值为 5 时表示用户选择的保存路径不存在或者没有写权限，保存失败。<br>
+	这里有个问题，当参数值1和3时表示录像被打断，但被打断后还是会将已经录到的内容进行保存；而后，保存会再次触发回调函数，这次的参数应该是1或者5，表示是否保存成功。<br>
+	也就是说，如果第一次触发回调函数时参数为1或3，会导致回调函数第二次触发，此次的参数值为1或者5。<br>
+</p>
+
+
+<h5>setStoragePath()</h5>
+<p>
+	接口方法：浏览并选择存储文件夹。这个功能是UE中设置&gt;存储的部分。如果产品部执意将存储单独放一个页面，就在该页面隐藏的放一个插件，将宽高都置0，且不开始播放即可。<br>
+	无参数。<br>
+	返回值为用户选择的文件夹路径。
+</p>
+
+<h5>openStoragePath()</h5>
+<p>
+	接口方法：打开用户选择存储文件夹。对应UE - 浏览 - 文件夹，打开录像和截图所存根目录。<br>
+	无参数。<br>
+	返回值0表成功；返回值-1表示失败，可能是用户没有设置过保存路径，或者保存用户配置的ini文件被删除了、或者没有读写权限、或者用户选择的保存路径不存在等导致的。这时需要提示用户去重新设置存储路径。<br>
+	同样的，如果无法打开用户存储文件夹，那么抓图和录像也会因同样的原因失败，回调函数的参数会给出一些反馈。
+</p>
+
+<h5>storageDir</h5>
+<p>
+	属性：得到用户选择的存根目录<br>
+	属性类型为String。<br>
+	用户没有设置过保存路径，或者由于保存用户配置的ini文件被删除了、没有读写权限、用户选择的保存路径不存在等原因，该值无法正确获取，就会得到一个空字符串。
+</p>
+
+<h5>GetCameraTime()</h5>
+<p>
+	接口方法：得到视频当前帧的时间。<br>
+	无参数，返回值类型为string，时间格式为“YYYY-MM-DD-HH-MM-SS”<br>
+	该接口可用于录像时反馈录像时长。
+</p>
+
+
+</div>
+
+</body>

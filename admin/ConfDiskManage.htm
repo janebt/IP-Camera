@@ -1,0 +1,709 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case ESYSTEM:
+				showStr = errStr.systemErr;
+				break;
+			case ENVRHDDISKMGFMTERR:
+				showStr = errStr.diskFmtErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function cycleUseSwitchHd(state)
+		{
+			cycleUseState = state;
+		}
+
+		function onSave()
+		{
+			var data = {};
+
+			if (!checkNum(id("videoRatio").value))
+			{
+				return;
+			}
+			if (!checkNum(id("pictureRatio").value))
+			{
+				return;
+			}
+
+			showToast();
+			data[FILE_NAME] = {};
+			data[FILE_NAME][STORAGE] = {};
+			data[FILE_NAME][STORAGE][LOOP] = ipSwitch.state == 0 ? SWITCH_OFF: SWITCH_ON;
+
+			data[FILE_NAME][VIDEO] = {};
+			data[FILE_NAME][VIDEO][RATIO] = id("videoRatio").value;
+
+			data[FILE_NAME][PICTURE] = {};
+			data[FILE_NAME][PICTURE][RATIO] = id("pictureRatio").value;
+
+			$.modify(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function popUpHd(type, index, paraObj)
+		{
+			var item = diskList[index];
+			var groupOpt = [], i, hdItem;
+
+			for(i = 0; i < hdNum; i++)
+			{
+				hdItem = {str:i+1, value:i};
+				groupOpt.push(hdItem);
+			}
+
+			if (false == bPopUpInit)
+			{
+				bPopUpInit = true;
+				rwAttrSel = id("rwAttrSel");
+				groupSel = id("groupSel");
+				diskNum = id("diskNum");
+				selectInit("rwAttrSel", rwAttrOpt, READ_WRITE);
+				selectInit("groupSel", groupOpt, 0);
+			}
+
+			rwAttrSel.changeSel(item[PROPERTY]);
+			groupSel.changeSel(item[OPT_NAME.group]);
+			diskNum.innerHTML = item[DISK_ID];
+			tableEditCon.style.top = "0px";
+		}
+
+		function diskSave(type, index, callBack)
+		{
+			var data = {}, para = {};
+
+			showToast();
+			data[FILE_NAME] = {};
+			para = diskList[index];
+			data[FILE_NAME][para[SEC_NAME]] = para;
+			para[PROPERTY] = rwAttrSel.value;
+			para[OPT_NAME.group] = groupSel.value;
+			$.modify(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					para[RW_ATTR] = (para[PROPERTY] == READ_ONLY ? label.readOnly : label.diskRWAble);
+					callBack(true, para);
+					showToast("success");
+				}
+			});
+		}
+
+		function initSwitch(result)
+		{
+			var switchValue;
+
+			if (result[FILE_NAME][STORAGE][LOOP] == SWITCH_ON)
+			{
+				switchValue = 1;
+			}
+			else
+			{
+				switchValue = 0;
+			}
+
+			ipSwitch = new Switch("ipFltrSwitch", switchValue, cycleUseSwitchHd);
+		}
+
+		function videoRatioHd()
+		{
+			var value = id("videoRatio").value;
+
+			if (!checkNum(value))
+			{
+				showNote("videoRatio", errStr.inputNumFormatErr);
+				return;
+			}
+
+			if (value > 100)
+			{
+				value = 100;
+				id("videoRatio").value = 100;
+			}
+
+			id("pictureRatio").value = 100 - value;
+		}
+
+		function pictureRatioHd()
+		{
+			var value = id("pictureRatio").value;
+
+			if (!checkNum(value))
+			{
+				showNote("pictureRatio", errStr.inputNumFormatErr);
+				return;
+			}
+
+			if (value > 100)
+			{
+				value = 100;
+				id("pictureRatio").value = 100;
+			}
+
+			id("videoRatio").value = 100 - value;
+		}
+
+		function displayDiskStatus(value)
+		{
+			switch (value)
+			{
+			case uciDiskManage.optValue.normal:
+				return label.normal2;
+			case uciDiskManage.optValue.insufficient:
+				return label.insufficient;
+			case uciDiskManage.optValue.unformatted:
+				return label.unformatted;
+			case uciDiskManage.optValue.offline:
+				return label.offline;
+			case uciDiskManage.optValue.formatting:
+				return label.formatting;
+			case uciDiskManage.optValue.abnormal:
+				return label.abnormal;
+			case uciDiskManage.optValue.none:
+				return label.diskNone;
+			default:
+				return value;
+			}
+		}
+
+		function displayDiskRw(value)
+		{
+			switch (value)
+			{
+			case uciDiskManage.optValue.r:
+				return label.readOnly;
+			case uciDiskManage.optValue.rw:
+				return label.diskRWAble;
+			default:
+				return value;
+			}
+		}
+
+		function displayDiskType(value)
+		{
+			switch (value)
+			{
+			case uciDiskManage.optValue.local:
+				return label.local;
+			case uciDiskManage.optValue.remote:
+				return label.remote;
+			default:
+				return value;
+			}
+		}
+
+		/* 转换文件大小 */
+		function tranFileSize(fileSize)
+		{
+			var kSize = 1024;
+			var mSize = kSize * 1024;
+			var gSize = mSize * 1024;
+
+			fileSize = parseInt(fileSize, 10);
+
+			if (fileSize >= gSize)
+			{
+				fileSize = (fileSize/gSize).toFixed(0) + "GB";
+			}
+			else if (fileSize >= mSize)
+			{
+				fileSize = (fileSize/mSize).toFixed(0) + "MB";
+			}
+			else if (fileSize >= kSize)
+			{
+				fileSize = (fileSize/kSize).toFixed(0) + "KB";
+			}
+			else
+			{
+				fileSize = fileSize.toFixed(0) + "B";
+			}
+
+			return fileSize.toString();
+		}
+
+		function sortDiskListById(name)
+		{
+			return function(o, p)
+			{
+				var a, b;
+
+				if (typeof o === "object" && typeof p === "object" && o && p)
+				{
+					a = o[name];
+					b = p[name];
+
+					if (a === b)
+					{
+						return 0;
+					}
+
+					if (typeof a === typeof b)
+					{
+						return a < b ? -1 : 1;
+					}
+
+					return typeof a < typeof b ? -1 : 1;
+				}
+				else
+				{
+					showAlert(errStr.diskAndNetErr);
+				}
+			}
+		}
+
+		function initDiskData(callBack)
+		{
+			var reqData = {};
+			var module = {};
+			var videoTotalSpace = 0;
+			var videoFreeSpace = 0;
+			var pictureTotalSpace = 0;
+			var pictureFreeSpace = 0;
+			var listLength = 0;
+			var diskNum = 0;
+
+			id("videoRatio").onblur = videoRatioHd;
+			id("pictureRatio").onblur = pictureRatioHd;
+
+			reqData[FILE_NAME] = module;
+			module[KEY_NAME] = [STORAGE, VIDEO, PICTURE];
+			module[KEY_TABLE] = [DISK_INFO];
+			$.query(reqData, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						diskList = [{"id":"0",
+									 "space":"16GB/16GB",
+									 "status":"正常",
+									 "rw_attr":"可读写",
+									 "type":"本地"},
+									 {"id":"9",
+									 "space":"128GB/256GB",
+									 "status":"正常",
+									 "rw_attr":"只读",
+									 "type":"远程"},
+									 {"id":"10",
+									 "space":"0B/0B",
+									 "status":"不在线",
+									 "rw_attr":"只读",
+									 "type":"远程"}];
+						diskTable.setDataSource(diskList);
+						diskTable.refresh();
+						disFormat();
+						$(".formatLink").unbind("click");
+						ipSwitch = new Switch("ipFltrSwitch", 0, cycleUseSwitchHd);
+						id("videoRatio").value = 75;
+						id("pictureRatio").value = 25;
+						id("videoSpace").innerHTML = "11GB/11GB";
+						id("pictureSpace").innerHTML = "4GB/4GB";
+						return;
+					}
+
+					var infoList = formatTableData(result[FILE_NAME][DISK_INFO]);
+
+					id("videoRatio").value = result[FILE_NAME][VIDEO][RATIO];
+					id("pictureRatio").value = result[FILE_NAME][PICTURE][RATIO];
+
+					id("videoSpace").innerHTML = result[FILE_NAME][VIDEO][TOTAL_SPACE] + "/" + result[FILE_NAME][VIDEO][FREE_SPACE];
+					id("pictureSpace").innerHTML = result[FILE_NAME][PICTURE][TOTAL_SPACE] + "/" + result[FILE_NAME][PICTURE][FREE_SPACE];
+
+					diskNum = infoList.length;
+					diskList = [];
+
+					for (var i = 0, len = diskNum; i < len; i++)
+					{
+						itemInfo = infoList[i];
+
+						if (itemInfo[TYPE] != uciDiskManage.optValue.local || itemInfo[STATUS] != uciDiskManage.optValue.offline)
+						{
+							diskList[listLength] = {};
+							itemDisk = diskList[listLength];
+							listLength++;
+
+							if (itemInfo == null)
+							{
+								break;
+							}
+
+							videoTotalSpace = videoTotalSpace + itemInfo[VIDEO_TOTAL_SPACE];
+							videoFreeSpace += itemInfo[VIDEO_FREE_SPACE];
+							pictureTotalSpace += itemInfo[PICTURE_TOTAL_SPACE];
+							pictureFreeSpace += itemInfo[PICTURE_FREE_SPACE];
+
+							itemDisk[DISK_ID] = itemInfo[DISK_ID];
+							itemDisk[SPACE] = tranFileSize(itemInfo[TOTAL_SPACE]) + "/" + tranFileSize(itemInfo[FREE_SPACE]);
+							itemDisk[STATUS] = displayDiskStatus(itemInfo[STATUS]);
+							//打开读写属性，分为只读和可读写两种
+							itemDisk[RW_ATTR] = displayDiskRw(itemInfo[RW_ATTR]);
+							itemDisk[TYPE] = displayDiskType(itemInfo[TYPE]);
+						}
+					}
+
+					diskList.sort(sortDiskListById(DISK_ID));
+
+					id("videoSpace").innerHTML = tranFileSize(videoTotalSpace) + "/" + tranFileSize(videoFreeSpace);
+					id("pictureSpace").innerHTML = tranFileSize(pictureTotalSpace) + "/" + tranFileSize(pictureFreeSpace);
+					diskTable.setDataSource(diskList);
+					diskTable.refresh();
+					disFormat();
+					callBack(result);
+				}
+			});
+		}
+
+		function formatDisk(index){
+			function getFormatStatus(){
+				var data = {};
+				var formatBarCon = $("div p.formatProgressBar");
+				var formatTextCon = $("div input.formatText");
+				var formatBgWidthStr = $("div div.formatProgressBg").css('width');
+				var formatBgConWidth = formatBgWidthStr.substr(0, formatBgWidthStr.length - 2);
+
+				data[FILE_NAME] = {};
+				data[FILE_NAME][uciDiskManage.actionName.get_format_status] = diskList[index][DISK_ID];
+				showToast();
+
+				$.action(data, function(result){
+					if (errHandle(result[ERR_CODE]))
+					{
+						if (result[RESULT] == "success")
+						{
+							percent = 100;
+							initDiskData(function(result){
+								formatTextCon.val("100%");
+								formatBarCon.css("width", parseInt(percent)*formatBgConWidth / 100);
+
+								showToast("success");
+								$.setTimeout(function(){
+									diskTable.setDataSource(diskList);
+									diskTable.refresh();
+									disFormat();
+								}, 1000);
+							});
+						}
+						else if (result[RESULT] == "waiting")
+						{
+							$.setTimeout(getFormatStatus, 1000);
+
+							percent = result[PERCENT];
+
+							formatBarCon.css("width", parseInt(percent)*formatBgConWidth / 100);
+							formatTextCon.val(parseInt(percent) + "%");
+						}
+						else if (result[RESULT] == "failed")
+						{
+							closeToast();
+							showAlert(errStr.diskFormatErr);
+							diskTable.setDataSource(diskList);
+							diskTable.refresh();
+							disFormat();
+						}
+					}
+				});
+			}
+
+			if (diskList[index][STATUS] == label.offline)
+			{
+				showAlert(label.offlineTip);
+				return;
+			}
+
+			showConfirmC(label.formatTitle ,label.formatTip, function(rel){
+				if (true == rel)
+				{
+					//add progress animation
+					var formatTd = $("#diskTable tbody tr:eq('"+(index+1)+"') td:last-child");
+					var formatBgCon = document.createElement("div");
+					var formatProgressBarCon = document.createElement("p");
+					var formatTextCon = document.createElement("input");
+					formatBgCon.className = "formatProgressBg";
+					formatProgressBarCon.className = "formatProgressBar";
+					formatTextCon.className = "formatText";
+					formatTextCon.value = "0%";
+					formatTd.children().css("display","none");
+					formatBgCon.appendChild(formatProgressBarCon);
+					formatTd.append(formatBgCon);
+					formatTd.append(formatTextCon);
+
+					var data = {};
+
+					showToast();
+					data[FILE_NAME] = {};
+					data[FILE_NAME][uciDiskManage.actionName.format_disk] = diskList[index][DISK_ID];
+					$.action(data, function(result){
+						if (errHandle(result[ERR_CODE]))
+						{
+							getFormatStatus();
+						}
+					});
+				}
+			});
+
+			/* UI要求格式化页面确认取消颜色相反 */
+			$("#hsConf input")[0].className = "subBtn btnA";
+			$("#hsConf input")[1].className = "subBtnB btnA";
+		}
+
+		function disFormat()
+		{
+			/* 如果硬盘不在线或格式化中，无法进行格式化操作 */
+			$.setTimeout(function(){
+				$("td:contains('"+label.offline+"')").next().children().css("display","none");
+				$("td:contains('"+label.formatting+"')").next().children().css("display","none");
+			}, 0);
+		}
+
+		function diskInit()
+		{
+			diskTable = new DataGrid();
+			diskTable.init({
+				max:32,
+				id:"diskTable",
+				data:diskList,
+				hasID:false,
+				hasSelBox:false,
+				edit:false,
+				head:[{field:label.diskId, width:120, className:"TAC"},
+					  {field:label.diskType, width:100},
+					  {field:label.diskProperty, width:150},
+					  {field:label.diskSpace, width:275},
+					  {field:label.diskStatus, width:150},
+					  {field:"", width:250}],
+				list:[{name:DISK_ID, maxSize:30, className:"TAC"},
+					  {name:TYPE, maxSize:30},
+					  {name:RW_ATTR},
+					  {name:SPACE},
+					  {name:STATUS},
+					  {type:"btn", value:label.format, className:"formatLink", click:formatDisk}]
+				});
+		}
+
+		var FILE_NAME = uciDiskManage.fileName;
+		var LOOP = uciDiskManage.optName.loop;
+		var TOTAL_SPACE = uciDiskManage.optName.total_space;
+		var FREE_SPACE = uciDiskManage.optName.free_space;
+		var VIDEO_TOTAL_SPACE = uciDiskManage.optName.video_total_space;
+		var VIDEO_FREE_SPACE = uciDiskManage.optName.video_free_space;
+		var PICTURE_TOTAL_SPACE = uciDiskManage.optName.picture_total_space;
+		var PICTURE_FREE_SPACE = uciDiskManage.optName.picture_free_space;
+		var STATUS = uciDiskManage.optName.status;
+		var RW_ATTR = uciDiskManage.optName.rw_attr;
+		var DISK_ID = uciDiskManage.optName.disk_id;
+		var TYPE = uciDiskManage.optName.type;
+		var RATIO = uciDiskManage.optName.ratio;
+		var RESULT = uciDiskManage.optName.result;
+		var PERCENT = uciDiskManage.optName.percent;
+		var SWITCH_ON = uciDiskManage.optValue.on;
+		var SWITCH_OFF = uciDiskManage.optValue.off;
+		var VIDEO = uciDiskManage.secName.video;
+		var PICTURE = uciDiskManage.secName.picture;
+		var STORAGE = uciDiskManage.secName.storage;
+		var DISK_INFO = uciDiskManage.secType.disk_info;
+		var SPACE = "space"
+		var diskList;
+		var bPopUpInit = false;
+		var diskTable;
+		var formatStatusHd = null;
+
+		diskInit();
+		initDiskData(function(result){
+			initSwitch(result);
+			showDetailCon();
+		});
+		id("save").onclick = onSave;
+	}
+	init();
+</script>
+<style type="text/css">
+	div.authorityListFunCon{
+		margin:15px 0 0 80px;
+	}
+	div.authorityListFunCon input{
+		background:#404040 !important;
+		margin-right:10px;
+	}
+	div.authorityListFunCon input{
+		*padding-left:18px;
+		*padding-right:18px;
+	}
+	div.tableEditConA{
+		width:400px;
+	}
+	label.mlR{
+		margin-right:4px !important;
+		width:90px !important;
+	}
+	input.formatLink{
+		background:transparent;
+		color:#325FE0;
+		cursor:pointer;
+		font-size:13px;
+		border:none;
+		padding:0px;
+	}
+	input.textTime{
+		height:24px;
+		line-height:24px;
+		margin-right:12px;
+		width:40px;
+	}
+	label.desECED{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		margin-right:16px;
+	}
+	label.desFCED{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height: 32px;
+		width:70px;
+	}
+	ul.lineX1{
+		font-size:0px;
+		width:720px;
+	}
+	ul.line label.desC2{
+		font-size:16px;
+		color:#7A8599;
+		margin-top:32px;
+	}
+	ul.lineCon{
+		background:url(../../web-static/images/line.png) repeat-x 0px 10px;
+		clear:both;
+		padding-top:42px;
+		font-size:0px;
+	}
+	div div.formatProgressBg{
+		border-radius:10px;
+		overflow:hidden;
+		height:8px;
+		margin:15px auto;
+		border:1px solid #C8CDD9;
+		background:#D3DDE6;
+		*zoom:1;
+		display:inline-block;
+		*display:inline;
+		vertical-align:middle;
+		width:60%;
+		margin:0px;
+	}
+	div p.formatProgressBar{
+		width:0px;
+		height:10px;
+		position:relative;
+		top:-1px;
+		font-size:0px;
+		border-radius:10px;
+		background:#5A92FF;
+	}
+	div input.formatText{
+		*zoom:1;
+		width:25%;
+		display:inline;
+		background-color:transparent;
+		border:0px;
+		text-align:left;
+		vertical-align:middle;
+		margin-left: 10px;
+	}
+</style>
+<div class="ipFltObj detailCon">
+	<div class="tableCon">
+		<div class="tableBorderCon"><table id="diskTable" class="dataGrid"></table></div>
+		<div id="editDiskMgt" class="tableEditLyCon">
+			<div class="tableEditCon tableEditConA">
+				<div class="innerCon">
+					<h4 class="title">{%label.diskSetting%}</h4>
+					<ul class="line">
+						<li class="line lineF">
+							<label class="des desA" for="diskId">{%label.diskId%}</label>
+							<span id="diskNum" class="text textA"></span>
+						</li>
+						<li class="line lineF">
+							<label class="des desA" for="rwAttrSel">{%label.diskProperty%}</label>
+							<span class="selCon">
+								<span id="rwAttrSel" class="select">
+									<span class="value hsValueA"></span>
+									<i class="arrow"></i>
+								</span>
+							</span>
+						</li>
+						<li class="line lineF">
+							<label class="des desA" for="groupSel">{%label.group%}</label>
+							<span class="selCon">
+								<span id="groupSel" class="select">
+									<span class="value hsValueA"></span>
+									<i class="arrow"></i>
+								</span>
+							</span>
+						</li>
+					</ul>
+					<div class="tablePopUpToolBar tablePopUpToolBarA"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<ul class="line">
+		<li class="line">
+			<label class="des desC2">{%menuStr.diskManage%}</label>
+		</li>
+	</ul>
+	<ul class="line lineCon"></ul>
+	<ul class="line lineX1">
+		<li class="line lineX">
+			<label class="des desA mlR">{%label.cycleUse%}</label>
+			<div id="ipFltrSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+	</ul>
+	<ul class="line">
+		<li class="line lineX">
+			<label class="des desA mlR">{%label.videoRatio%}</label>
+			<input class="text textTime" id="videoRatio" maxlength="3" />
+			<label class="des desC">%</label>
+			<label class="des desC mlR">{%label.videoSpace%}</label>
+			<span id="videoSpace" class="text textA"></span>
+		</li>
+	</ul>
+	<ul class="line">
+		<li class="line lineX">
+			<label class="des desA mlR">{%label.pictureRatio%}</label>
+			<input class="text textTime" id="pictureRatio" maxlength="3" />
+			<label class="des desC">%</label>
+			<label class="des desC mlR">{%label.pictureSpace%}</label>
+			<span id="pictureSpace" class="text textA"></span>
+		</li>
+	</ul>
+	<div class="funcBtnCon">
+		<!--<input class="subBtn btnA" type="button" id="resetDefault" value="{%btn.resetDefault%}" />-->
+		<input class="subBtn btnA" type="button" id="save" value="{%btn.save%}" />
+	</div>
+</div>

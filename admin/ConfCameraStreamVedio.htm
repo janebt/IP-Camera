@@ -1,0 +1,925 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var STREAM_MAIN = "main";
+		var STREAM_MINOR = "minor";
+		var STREAM_THIRD = "third";
+		var mainDiv = $(".mainStream");
+		var minorDiv = $(".minorStream");
+		var thirdDiv = $(".thirdStream");
+		var streamType = $("#streamType")[0];
+		var maEncT = $("#mainEncodeType")[0];
+		var maReso = $("#mainResolution")[0];
+		var maFR = $("#mainFrameRate")[0];
+		var maBrT = $("#mainBitRateType")[0];
+		var maBr = $("#mainBitrate")[0];
+		var miEncT = $("#minorEncodeType")[0];
+		var miReso = $("#minorResolution")[0];
+		var miFR = $("#minorFrameRate")[0];
+		var miBrT = $("#minorBitRateType")[0];
+		var miBr = $("#minorBitrate")[0];
+		var thdEncT = $("#thirdEncodeType")[0];
+		var thdReso = $("#thirdResolution")[0];
+		var thdFR = $("#thirdFrameRate")[0];
+		var thdBrT = $("#thirdBitRateType")[0];
+		var thdBr = $("#thirdBitrate")[0];
+		var $mainVbrSet = $(".mainVbrSet");
+		var $minorVbrSet = $(".minorVbrSet");
+		var $thirdVbrSet = $(".thirdVbrSet");
+		var btnReset = id("reset");
+		var btnSave = id("save");
+		var mainQuaDL;
+		var minorQuaDL;
+		var thirdQuaDL;
+		var vedioFN = uciVideo.fileName;
+		var secN = uciVideo.secName;
+		var optN = uciVideo.optName;
+		var optV = uciVideo.optValue;
+
+		var valToQua = [optV.quaL, optV.quaM, optV.quaH];
+		var quaToVal = [0, 0, 1, 1, 2, 2];
+		var defStreamType = STREAM_MAIN;
+		var defEncodeType = optV.h264;
+		var mainDefReso = optV.reso1920_1080;
+		var mainDefBRT = optV.cbr;
+		var mainDefQua = optV.quaH;
+		var mainDefBR = 4096;
+		var minorDefReso = optV.reso640_480;
+		var minorDefBRT = optV.cbr;
+		var minorDefQua = optV.quaH;
+		var minorDefBR = 512;
+		var thirdDefReso = optV.reso1920_1080;
+		var thirdDefBRT = optV.cbr;
+		var thirdDefQua = optV.quaH;
+		var thirdDefBR = 512;
+		var sysFile = uciSystem.fileName;
+		var RESETCONFIG = uciSystem.actionName.configReset;
+		var CONFIGNAME = uciSystem.optName.configName;
+
+		var MAXBR = 4096;
+		var MINBR = 64;
+
+		function errorHandle(code, objOrId)
+		{
+			var str = "";
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCVISTMTERR:
+				str = errStr.ipcViStmtErr;
+				break;
+			case IPCVIRESERR:
+				str = errStr.ipcViResErr;
+				break;
+			case IPCVIBRTERR:
+				str = errStr.ipcViBrtErr;
+				break;
+			case IPCVIFRERR:
+				str = errStr.ipcViFrErr;
+				break;
+			case IPCVIQUAERR:
+				str = errStr.ipcViQuaErr;
+				break;
+			case IPCVIBRERR:
+				str = errStr.ipcViBrErr;
+				break;
+			case IPCVIMAPERR:
+				str = errStr.ipcViMapErr;
+				break;
+			case IPCVIENCTERR:
+				str = errStr.ipcViEnctErr;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function onReset()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[sysFile] = {};
+					data[sysFile][RESETCONFIG] = {};
+					data[sysFile][RESETCONFIG][CONFIGNAME] = [vedioFN];
+
+					showToast("loading");
+					$.action(data, function(resp){
+						if (true == errorHandle(resp[ERR_CODE]))
+						{
+							showToast("success");
+							id("info_conf_stream_video_rsMenu").onclick();
+						}
+					});
+				}
+			});
+		}
+
+		function checkBitRate(value, max, min, objOrId)
+		{
+			if (value.length < 1)
+			{
+				showNote(objOrId, errStr.bitRateUpBoundEmtpy);
+				return false;
+			}
+			if (false == checkNum(value))
+			{
+				showNote(objOrId, errStr.bitRateUpBoundInvChar);
+				return false;
+			}
+			if (false == checkNumRange(parseInt(value, 10), max, min))
+			{
+				showNote(objOrId, errStr.bitRateUpBoundErr);
+				return false;
+			}
+
+			return true;
+		}
+
+		function onSave()
+		{
+			var data = {};
+			var ma, mi;
+
+			if (false == checkBitRate(maBr.value, MAXBR, MINBR, "mainBitrate") ||
+				false == checkBitRate(miBr.value, MAXBR, MINBR, "minorBitrate") ||
+				false == checkBitRate(thdBr.value, MAXBR, MINBR, "thirdBitrate"))
+			{
+				return;
+			}
+
+			data[vedioFN] = {};
+			ma = data[vedioFN][uciVideo.secName.main] = {};
+			mi = data[vedioFN][uciVideo.secName.minor] = {};
+			thd = data[vedioFN][uciVideo.secName.third] = {};
+
+			/* 主码流 */
+			ma.encode_type = maEncT.value;
+			ma.resolution = maReso.value;
+			ma.bitrate_type = maBrT.value;
+			ma.frame_rate = maFR.value;
+			//供应商暂时不支持，该功能关闭
+			/*
+			if (maBrT.value == optV.vbr)
+			{
+				ma.quality = valToQua[mainQuaDL.getValue()];
+			}
+			*/
+			ma.bitrate = maBr.value;
+
+			/* 子码流 */
+			mi.encode_type = miEncT.value;
+			mi.resolution = miReso.value;
+			mi.bitrate_type = miBrT.value;
+			mi.frame_rate = miFR.value;
+			/*
+			if (miBrT.value == optV.vbr)
+			{
+				mi.quality = valToQua[minorQuaDL.getValue()];
+			}
+			*/
+			mi.bitrate = miBr.value;
+
+			/* 第三码流 */
+			thd.encode_type = thdEncT.value;
+			thd.resolution = thdReso.value;
+			thd.bitrate_type = thdBrT.value;
+			thd.frame_rate = thdFR.value;
+			/*
+			if (thdBrT.value == optV.vbr)
+			{
+				thd.quality = valToQua[thirdQuaDL.getValue()];
+			}
+			*/
+			thd.bitrate = thdBr.value;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+					$.resolutionWidth = parseInt((ma.resolution).split("*")[0]);
+				}
+			});
+		}
+
+		function fillDom(resp)
+		{
+			var maD, miD, thdD;
+
+			if (resp == undefined || resp["error_code"] != ERR_NONE)
+			{
+				return ;
+			}
+
+			maD = resp[vedioFN][uciVideo.secName.main];
+			miD = resp[vedioFN][uciVideo.secName.minor];
+			thdD = resp[vedioFN][uciVideo.secName.third];
+
+			/* 主码流 */
+			maEncT.resetSel(maD.encode_type);
+			maReso.resetSel(maD.resolution);
+			maFR.resetSel(maD.frame_rate);
+			maBrT.resetSel(maD.bitrate_type);
+			mainQuaDL.setValue(quaToVal[maD.quality]);
+			maBr.resetSel(maD.bitrate);
+
+			/* 子码流 */
+			miEncT.resetSel(miD.encode_type);
+			miReso.resetSel(miD.resolution);
+			miFR.resetSel(miD.frame_rate);
+			miBrT.resetSel(miD.bitrate_type);
+			minorQuaDL.setValue(quaToVal[miD.quality]);
+			miBr.resetSel(miD.bitrate);
+
+			/* 第三码流 */
+			thdEncT.resetSel(thdD.encode_type);
+			thdReso.resetSel(thdD.resolution);
+			thdFR.resetSel(thdD.frame_rate);
+			thdBrT.resetSel(thdD.bitrate_type);
+			thirdQuaDL.setValue(quaToVal[thdD.quality]);
+			thdBr.resetSel(thdD.bitrate);
+
+			mainBRTSel(maD.bitrate_type);
+			minorBRTSel(miD.bitrate_type);
+			thirdBRTSel(thdD.bitrate_type);
+
+			onStreamChange(streamType.value);
+
+			showDetailCon();
+		}
+
+		function onStreamChange(value)
+		{
+			switch (value)
+			{
+				case STREAM_MAIN:
+					mainDiv.show();
+					minorDiv.hide();
+					thirdDiv.hide();
+					mainBRTSel(maBrT.value);
+					break;
+				case STREAM_MINOR:
+					mainDiv.hide();
+					minorDiv.show();
+					thirdDiv.hide();
+					minorBRTSel(miBrT.value);
+					break;
+				case STREAM_THIRD:
+					mainDiv.hide();
+					minorDiv.hide();
+					thirdDiv.show();
+					thirdBRTSel(thdBrT.value);
+					break;
+			}
+		}
+
+		function onSelectMain(value)
+		{
+			var bitrate;
+			switch (maReso.value)
+			{
+				case "1920*1080":
+				case "1280*960":
+					bitrate = (maEncT.value == "H264") ? 4096 : 2048;
+					break;
+				case "1280*720":
+					bitrate = (maEncT.value == "H264") ? 2048 : 1024;
+					break;
+				default:
+					bitrate = 4096;
+			}
+			maBr.resetSel(bitrate);
+		}
+
+		function onSelectMinor(value)
+		{
+			var bitrate = 512;
+			miBr.resetSel(bitrate);
+		}
+
+		function onSelectThird(value)
+		{
+			var bitrate = 512;
+			thdBr.resetSel(bitrate);
+		}
+
+		function constructDom()
+		{
+			var MAX_ENCODE_CAPABILITY = 1920 * 1080 * 30 + 640 * 480 * 30;
+			var frameRateOpt = [];
+			var mainBRUpOpt = [];
+			var minorBRUpOpt = [];
+			var thirdBRUpOpt = [];
+			var i, tmp, hex, val;
+			var strVal = "0x00010000";
+			var classObj;
+			var streamOpt = [{str:label.mCodeStream, value:STREAM_MAIN},
+			   {str:label.cCodeStream, value:STREAM_MINOR}/*,
+			   {str:label.thdCodeStream, value:STREAM_THIRD}*/];
+			var encnodeTypeOpt = [{str:label.h264, value:optV.h264},
+				{str:label.h265, value:optV.h265}];
+			var mainResolutionOpt = [{str:label.reso1280_720, value:optV.reso1280_720},
+				{str:label.reso1280_960, value:optV.reso1280_960},
+				{str:label.reso1920_1080, value:optV.reso1920_1080}];
+			var minorResolutionOpt = [{str:label.reso320_240, value:optV.reso320_240},
+				{str:label.reso352_288, value:optV.reso352_288},
+				{str:label.reso640_480, value:optV.reso640_480}/*,
+				{str:label.reso704_576, value:optV.reso704_576}*/];
+			var thirdResolutionOpt = [{str:label.reso320_240, value:optV.reso320_240},
+				{str:label.reso352_288, value:optV.reso352_288},
+				{str:label.reso640_480, value:optV.reso640_480}/*,
+				{str:label.reso704_576, value:optV.reso704_576},
+				{str:label.reso1280_720, value:optV.reso1280_720},
+				{str:label.reso1920_1080, value:optV.reso1920_1080}*/];
+			var mainBitRateUpArr = [256, 512, 1024, 2048, 3072, 4096];
+			var minorBitRateUpArr = [64, 128, 256, 512, 768, 1024];
+			var thirdBitRateUpArr = [64, 128, 256, 512, 768, 1024];
+			var bitrateTypeOpt = [{str:label.cbr, value:optV.cbr},
+				{str:label.vbr, value:optV.vbr}];
+			var frameRateValArr = [1, 5, 10, 15, 20, 25];
+
+			for (i = 0; i < frameRateValArr.length; i++)
+			{
+				tmp = [];
+				tmp["str"] = frameRateValArr[i];
+				hex = frameRateValArr[i].toString(16);
+				val = strVal.substring(0, strVal.length - hex.length);
+				val += hex;
+				tmp["value"] = parseInt(val, 16);
+				frameRateOpt.push(tmp);
+			}
+
+			for (i = 0; i < mainBitRateUpArr.length; i++)
+			{
+				tmp = [];
+				tmp["str"] = mainBitRateUpArr[i].toString();
+				tmp["value"] = mainBitRateUpArr[i];
+				mainBRUpOpt.push(tmp);
+			}
+
+			for (i = 0; i < minorBitRateUpArr.length; i++)
+			{
+				tmp = [];
+				tmp["str"] = minorBitRateUpArr[i].toString();
+				tmp["value"] = minorBitRateUpArr[i];
+				minorBRUpOpt.push(tmp);
+			}
+
+			for (i = 0; i < thirdBitRateUpArr.length; i++)
+			{
+				tmp = [];
+				tmp["str"] = thirdBitRateUpArr[i].toString();
+				tmp["value"] = thirdBitRateUpArr[i];
+				thirdBRUpOpt.push(tmp);
+			}
+
+			function getFrameRate(frameRateHex)
+			{
+				var val = frameRateHex.toString(16);
+				var hex = val.substring(val.length - 4, val.length);
+				var frameRate = parseInt(hex, 16);
+				return frameRate;
+			}
+
+			function checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR)
+			{
+				var curCaps = parseInt(mainReso[0]) * parseInt(mainReso[1]) * getFrameRate(mainFR)
+							+ parseInt(minorReso[0]) * parseInt(minorReso[1]) * getFrameRate(minorFR)
+							+ parseInt(thirdReso[0]) * parseInt(thirdReso[1]) * getFrameRate(thirdFR);
+				if (MAX_ENCODE_CAPABILITY < curCaps)
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+
+			function checkThirdCaps(thirdReso, thirdFR)
+			{
+				var curCaps = 1920 * 1080 * 25
+							+ 704 * 576 * 25
+							+ parseInt(thirdReso[0]) * parseInt(thirdReso[1]) * getFrameRate(thirdFR);
+				if (MAX_ENCODE_CAPABILITY < curCaps)
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+
+			selectInit("streamType", streamOpt, defStreamType, onStreamChange);
+			selectInit("mainEncodeType", encnodeTypeOpt, defEncodeType, onSelectMain);
+			/*
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlmainResolution li").each(function(){
+						mainReso = this.valueStr.split("*");
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("mainResolution", mainResolutionOpt, mainDefReso, onSelectMain, undefined, classObj);
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlmainFrameRate li").each(function(){
+						mainFR = this.valueStr;
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("mainFrameRate", frameRateOpt, frameRateOpt[0]["value"], undefined, undefined, classObj);
+			*/
+			selectInit("mainResolution", mainResolutionOpt, mainDefReso, onSelectMain);
+			selectInit("mainFrameRate", frameRateOpt, frameRateOpt[0]["value"]);
+			selectInit("mainBitRateType", bitrateTypeOpt, mainDefBRT, mainBRTSel);
+			mainQuaDL = new DragLine({id:"mainQuaDL", lowerBound:0, upperBound:2, needLabel:"n", needInput:"n", needScale:"y"});
+			selectUpInit("mainBitrate", mainBRUpOpt, mainBRUpOpt[0]["value"]);
+
+			selectInit("minorEncodeType", encnodeTypeOpt, defEncodeType, onSelectMinor);
+			/*
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlminorResolution li").each(function(){
+						minorReso = this.valueStr.split("*");
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("minorResolution", minorResolutionOpt, minorDefReso, onSelectMinor, undefined, classObj);
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlminorFrameRate li").each(function(){
+						minorFR = this.valueStr;
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("minorFrameRate", frameRateOpt, frameRateOpt[0]["value"], undefined, undefined, classObj);
+			*/
+			selectInit("minorResolution", minorResolutionOpt, minorDefReso, onSelectMinor);
+			selectInit("minorFrameRate", frameRateOpt, frameRateOpt[0]["value"]);
+			selectInit("minorBitRateType", bitrateTypeOpt, minorDefBRT, minorBRTSel);
+			minorQuaDL = new DragLine({id:"minorQuaDL", lowerBound:0, upperBound:2, needLabel:"n", needInput:"n", needScale:"y"});
+			selectUpInit("minorBitrate", minorBRUpOpt, minorBRUpOpt[0]["value"]);
+
+			selectInit("thirdEncodeType", encnodeTypeOpt, defEncodeType, onSelectThird);
+			/*
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlthirdResolution li").each(function(){
+						thirdReso = this.valueStr.split("*");
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("thirdResolution", thirdResolutionOpt, thirdDefReso, onSelectThird, undefined, classObj);
+			classObj = {
+				optShowHd : function(){
+					var mainReso = maReso.value.split("*");
+					var mainFR = maFR.value;
+					var minorReso = miReso.value.split("*");
+					var minorFR = miFR.value;
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlthirdFrameRate li").each(function(){
+						thirdFR = this.valueStr;
+						if (checkCaps(mainReso, mainFR, minorReso, minorFR, thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("thirdFrameRate", frameRateOpt, frameRateOpt[0]["value"], undefined, undefined, classObj);
+			*/
+			classObj = {
+				optShowHd : function(){
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlthirdResolution li").each(function(){
+						thirdReso = this.valueStr.split("*");
+						if (checkThirdCaps(thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("thirdResolution", thirdResolutionOpt, thirdDefReso, onSelectThird, undefined, classObj);
+			classObj = {
+				optShowHd : function(){
+					var thirdReso = thdReso.value.split("*");
+					var thirdFR = thdFR.value;
+					$("#selOptsUlthirdFrameRate li").each(function(){
+						thirdFR = this.valueStr;
+						if (checkThirdCaps(thirdReso, thirdFR))
+						{
+							$(this).css({"opacity":"1"});
+							$(this).attr("disabled", false);
+						}
+						else
+						{
+							$(this).css({"opacity":"0.3"});
+							$(this).attr("disabled", true);
+						}
+					})
+				}
+			};
+			selectInit("thirdFrameRate", frameRateOpt, frameRateOpt[0]["value"], undefined, undefined, classObj);
+			selectInit("thirdBitRateType", bitrateTypeOpt, thirdDefBRT, thirdBRTSel);
+			thirdQuaDL = new DragLine({id:"thirdQuaDL", lowerBound:0, upperBound:2, needLabel:"n", needInput:"n", needScale:"y"});
+			selectUpInit("thirdBitrate", thirdBRUpOpt, thirdBRUpOpt[0]["value"]);
+
+			mainQuaDL.setValue(quaToVal[mainDefQua]);
+			minorQuaDL.setValue(quaToVal[minorDefQua]);
+			thirdQuaDL.setValue(quaToVal[thirdDefQua]);
+			mainBRTSel(mainDefBRT);
+			minorBRTSel(minorDefBRT);
+			thirdBRTSel(thirdDefBRT);
+			onStreamChange(defStreamType);
+		}
+
+		function mainBRTSel(val)
+		{
+			if (val == optV.cbr)
+			{
+				$mainVbrSet.hide();
+			}
+			else
+			{
+				//$mainVbrSet.show();
+				$mainVbrSet.hide();
+			}
+		}
+
+		function minorBRTSel(val)
+		{
+			if (val == optV.cbr)
+			{
+				$minorVbrSet.hide();
+			}
+			else
+			{
+				//$minorVbrSet.show();
+				$minorVbrSet.hide();
+			}
+		}
+
+		function thirdBRTSel(val)
+		{
+			if (val == optV.cbr)
+			{
+				$thirdVbrSet.hide();
+			}
+			else
+			{
+				//$thirdVbrSet.show();
+				$thirdVbrSet.hide();
+			}
+		}
+
+		function pageInit()
+		{
+			var data = {};
+
+			btnReset.onclick = onReset;
+			btnSave.onclick = onSave;
+
+			constructDom();
+
+			data[vedioFN] = {};
+			data[vedioFN][NAME] = [uciVideo.secName.main, uciVideo.secName.minor, uciVideo.secName.third];
+			$.query(data, fillDom);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+
+<div class="detailCon detailConMorePad">
+	<ul class="line lineL">
+		<li class="line lineD">
+			<label class="des desA">{%label.codeStreamType%}</label>
+			<span class="selCon">
+				<span id="streamType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.encodeType%}</label>
+			<span class="selCon">
+				<span id="mainEncodeType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.resolution%}</label>
+			<span class="selCon">
+				<span id="mainResolution" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.vedioFrameRate%}</label>
+			<span class="selCon IEPZD">
+				<span id="mainFrameRate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD lineNoMarginBtm mainStream">
+			<label class="des desA">{%label.bitRateType%}</label>
+			<span class="selCon IEPZD">
+				<span id="mainBitRateType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line mainVbrSet mainStream">
+			<div class="lineSub lineSubL">
+				<label class="title">{%label.imageQuality%}</label>
+				<div id="mainQuaDL" class="ipcDragLineDiv DragLineSimple"></div>
+			</div>
+		</li>
+
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.bitRateUpBound%}</label>
+			<span class="selCon IEPZD">
+				<span id="mainBitrate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.encodeType%}</label>
+			<span class="selCon">
+				<span id="minorEncodeType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.resolution%}</label>
+			<span class="selCon">
+				<span id="minorResolution" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.vedioFrameRate%}</label>
+			<span class="selCon IEPZD">
+				<span id="minorFrameRate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD lineNoMarginBtm minorStream">
+			<label class="des desA">{%label.bitRateType%}</label>
+			<span class="selCon IEPZD">
+				<span id="minorBitRateType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line minorVbrSet minorStream">
+			<div class="lineSub lineSubL">
+				<label class="title">{%label.imageQuality%}</label>
+				<div id="minorQuaDL" class="ipcDragLineDiv DragLineSimple"></div>
+			</div>
+		</li>
+
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.bitRateUpBound%}</label>
+			<span class="selCon IEPZD">
+				<span id="minorBitrate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.encodeType%}</label>
+			<span class="selCon">
+				<span id="thirdEncodeType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.resolution%}</label>
+			<span class="selCon">
+				<span id="thirdResolution" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.vedioFrameRate%}</label>
+			<span class="selCon IEPZD">
+				<span id="thirdFrameRate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD lineNoMarginBtm thirdStream">
+			<label class="des desA">{%label.bitRateType%}</label>
+			<span class="selCon IEPZD">
+				<span id="thirdBitRateType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line thirdVbrSet thirdStream">
+			<div class="lineSub lineSubL">
+				<label class="title">{%label.imageQuality%}</label>
+				<div id="thirdQuaDL" class="ipcDragLineDiv DragLineSimple"></div>
+			</div>
+		</li>
+
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.bitRateUpBound%}</label>
+			<span class="selCon IEPZD">
+				<span id="thirdBitrate" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="reset" type="button" value="{%btn.resetDefault%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>
+
+<style type="text/css">
+	li.lineNoMarginBtm{
+		width:328px !important;
+	}
+	div.lineSub label.title{
+		display:inline-block;
+		height:26px !important;
+		font-size:14px;
+		color:#707070;
+		width:70px;
+		margin-right:4px;
+	}
+	li.mainVbrSet, li.minorVbrSet, li.thirdVbrSet{
+		height:40px;
+		margin-bottom: 8px;
+	}
+</style>

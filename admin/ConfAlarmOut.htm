@@ -1,0 +1,602 @@
+<style type="text/css">
+    /* ----------------plan edit -------- */
+    div.peCol span.select{
+        font-size:0px !important;
+    }
+    span.peSelect{
+        width:124px !important;
+        _width:116px !important;
+        font-size:14px !important;
+    }
+
+    /* ----------------plan set---------- */
+    #orgDC{
+        width:662px;
+    }
+    .displayNone{
+        display:none !important;
+    }
+
+    /* ----------------类型选择---------- */
+    i.peTypeRd
+    {
+        width:25px !important;
+        height:25px !important;
+    }
+    i.timeSeled
+    {
+        background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+    }
+    i.timeUnSeled
+    {
+        background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+    }
+    i.mdtUnSeled
+    {
+        background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+    }
+    i.mdtSeled
+    {
+        background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+    }
+    #timingLabel{
+        margin-right:35px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    #mdtLabel{
+        margin-right:347px;
+        *margin-right:340px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    label.typeSeled{
+        color:#fff !important;
+    }
+    /* ----------------plan cpy---------- */
+    div.peCon{
+        left:136px;
+        top:190px;
+        _left:-30px;
+        _top:-10px;
+    }
+    div.peCon div.peConDetail div.peCol4{
+        display: none;
+    }
+
+    /* ----------------alarmOut Info---------- */
+    label.desLogType{
+        font-size:13px;
+        color:#666666;
+        line-height:32px;
+    }
+    #aliasTipStr{
+        color:#707070;
+        font-size:13px;
+        left:160px;
+        line-height:30px !important;
+        position:absolute;
+        top:161px;
+        *top:165px;
+    }
+    ul.line li.lineI{
+        margin-bottom:8px;
+        width:410px;
+        padding:5px 0;
+    }
+    ul.line{
+        font-size:0px;
+        list-style:none;
+        width:720px;
+    }
+    ul.line li.lineR{
+        display:inline-block;
+        *display:inline;
+        *zoom:1;
+        height:100%;
+        font-size:0px;
+        vertical-align:middle;
+        float:right;
+    }
+</style>
+
+<script type="text/javascript">
+   function init()
+    {
+        function errorHandle(code, objOrId)
+        {
+            var showStr = "";
+
+            switch(parseInt(code))
+            {
+            case ENONE:
+                return true;
+            case IPCALAOUTENERR:
+                showStr = errStr.alarmOutEnErr;
+                break;
+            case IPCALAOUTALIASERR:
+                showStr = errStr.alarmOutAliasErr;
+                break;
+            case IPCALAOUTDURERR:
+                showStr = errStr.alarmOutTimeInputErr;
+                break;
+            case IPCUBUSCONNFAIL:
+                showStr = errStr.ipcUbusConnFail;
+                break;
+            case IPCUBUSCALLERR:
+                showStr = errStr.ipcUbusCallErr;
+                break;
+            case IPCARMINGSCHEDULEEOVERFLOW:
+                showStr = errStr.armingScheduleOverflow;
+                break;
+            case IPCARMINGSCHEDULEMIX:
+                showStr = errStr.armingScheduleMix;
+                break;
+            case IPCARMINGSCHEDULEILLEGAL:
+                showStr = errStr.armingScheduleIllegal;
+                break;
+            case IPCUMGUESTNAUTH:
+                showStr = errStr.invPermissionDenied;
+                break;
+            default:
+                showStr = errStr.invRequestFail;
+                break;
+            }
+
+            closeToast();
+            showAlert(showStr, objOrId);
+            return false;
+        }
+
+        function toolArrToString(arr, maxLen)
+        {
+            var res, i, str;
+            var tvArr;
+            var bt;
+            var et;
+
+            if (arr == undefined)
+            {
+                return "";
+            }
+            if (maxLen == undefined)
+            {
+                maxLen = 6;
+            }
+            res = "[";
+            if (arr.length < 1)
+            {
+                res += "\"0000-0000:0\"";
+            }
+            else
+            {
+                for (i = 0; i < arr.length && i < maxLen; i++)
+                {
+                    str = arr[i].toString();
+                    tvArr = str.split(/[-,:]/, 3);
+                    bt = parseInt(tvArr[0], 10);
+                    et = parseInt(tvArr[1], 10);
+                    str = recPlanGrid._getStringWithoutType(bt, et);
+
+                    if (i > 0)
+                    {
+                        res += ",";
+                    }
+
+                    res += ("\"" + str + "\"");
+                }
+            }
+            res += "]";
+            return res;
+        }
+
+        function addType(strTimeVal) {
+            var curTV;
+            var res = new Array();
+
+            if (strTimeVal == undefined)
+            {
+                curTV = "\"0000-0000:0\"";
+                res.push(curTV);
+
+                return res;
+            }
+
+            if (!(strTimeVal instanceof Array))
+            {
+                strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+            }
+
+            for (var i = 0; i < strTimeVal.length; i++)
+            {
+                curTV = strTimeVal[i];
+                var tvArr = curTV.split(/[-]/, 2);
+                var bt = parseInt(tvArr[0], 10);
+                var et = parseInt(tvArr[1], 10);
+                if(0 == bt && 0 == et)
+				{
+					res.push(recPlanGrid._getString(bt, et, 0));
+				}
+				else
+				{
+					res.push(recPlanGrid._getString(bt, et, 1));
+				}
+            }
+
+            return res;
+        }
+
+        function saveArmingSchedule()
+        {
+            var i;
+            var res = recPlanGrid.getTimeVal();
+
+            var data = {};
+            for (i = 0; i < weekArray.length; i++)
+            {
+                data[uciDays[i]] = toolArrToString(res[weekArray[i]]);
+            }
+
+            return data;
+        }
+
+        function alarmTimeHd()
+        {
+            if ((true == checkNum(this.value)) &&
+                (true == checkNumRange(parseInt(this.value), 600, 5)))
+            {
+                showToast("loading");
+                closeToast();
+            }
+            else
+            {
+                showNote("alarmTime", errStr.alarmOutTimeInputErr);
+            }
+
+        }
+
+        function saveHandle()
+        {
+            var reqData = {};
+            var res = recPlanGrid.getTimeVal();
+
+            var alarm_info = ALARM_INFO_PREFIX + curAlarmDevName;
+            var plan = PLAN_PREFIX + curAlarmDevName;
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][alarm_info] = {};
+            reqData[FILE_NAME][plan] = {};
+
+            //获取备注名、报警时长
+            reqData[FILE_NAME][alarm_info][ENABLED] = alarmOutSwitch.state  == 1 ? ENABLED_ON : ENABLED_OFF;
+            reqData[FILE_NAME][alarm_info][ALIAS] = alias.value;
+
+            //获取报警时长
+            if ((false == checkNum(alarmTime.value)) ||
+                (false == checkNumRange(parseInt(alarmTime.value), 600, 5)))
+            {
+                showAlert(errStr.alarmOutTimeInputErr);
+                return;
+            }
+            reqData[FILE_NAME][alarm_info][ALARM_TIME] = alarmTime.value;
+
+            //获取布防时间
+            reqData[FILE_NAME][plan] = saveArmingSchedule();
+
+            showToast();
+            $.modify(reqData, function(result){
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    showToast("success");
+                }
+            });
+        }
+
+        function showArmingSchedule()
+        {
+            var i;
+            var data = {};
+            var plan = PLAN_PREFIX + curAlarmDevName;
+
+            data[FILE_NAME] = {};
+            data[FILE_NAME][NAME] = plan;
+
+            $.query(data, function(resp){
+                if (true == errorHandle(resp[ERR_CODE]))
+                {
+                    recPlanGrid.reset();
+                    for (i = 0; i < weekArray.length; i++)
+                    {
+                        recPlanGrid.setTimeVal(weekArray[i], addType(resp[FILE_NAME][plan][uciDays[i]]));
+                    }
+                }
+            });
+        }
+
+        //隐藏打开布防时间
+        function onRecordHide()
+        {
+            if (!bRecordPlanShow)
+            {
+                id("recordArrow").className ="arrowUp";
+                timeSchedule.style.display = "";
+                bRecordPlanShow = true;
+            }
+            else
+            {
+                id("recordArrow").className ="arrowDown";
+                timeSchedule.style.display = "none";
+                bRecordPlanShow = false;
+            }
+        }
+
+        function selAlarmDev(val)
+        {
+            curAlarmDevName = alarmDevNameList[val];
+            alarmNameSelMode = val;
+
+            showArmingSchedule();
+            getConfig();
+        }
+
+        function getAlarmDevInfo(callBack)
+        {
+            var reqData = {};
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][NAME] = ALARM_DEV_INFO;
+
+            $.query(reqData, function(result){
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    if (true == $.local)
+                    {
+                        var initStr = [{str:"报警输出1", value:"alarmOut1"},
+                            {str:"报警输出2", value:"alarmOut2"},
+                            {str:"报警输出3", value:"alarmOut3"}];
+                        selectInit("alarmNameSel", initStr, "alarmOut1", selAlarmDev);
+                        callBack();
+                        return;
+                    }
+
+                    alarmDevNum = result[FILE_NAME][ALARM_DEV_INFO][ALARM_DEV_NUM];
+                    alarmDevNameList = result[FILE_NAME][ALARM_DEV_INFO][ALARM_DEV_NAME];
+
+                    if(1 == alarmDevNum)
+                    {
+                        $alarmName.hide();
+                        $showingDevNumLabel.show();
+
+                        curAlarmDevName = alarmDevNameList[0];
+                        showingDevNum.innerHTML = curAlarmDevName;
+                    }
+                    else
+                    {
+                        $showingDevNumLabel.hide();
+                        $alarmName.show();
+
+                        curAlarmDevName = alarmDevNameList[0];
+
+                        var initStr = [];
+                        var tmpStr = {};
+
+                        for(var i = 0; i < alarmDevNameList.length; i++)
+                        {
+                            tmpStr = {};
+                            tmpStr["str"] = alarmDevNameList[i];
+                            tmpStr["value"] = i;
+                            initStr[i] = tmpStr;
+                        }
+
+                        alarmNameSelMode = 0;
+
+                        selectInit("alarmNameSel", initStr, 0, selAlarmDev);
+                    }
+                    callBack();
+                }
+            });
+
+        }
+
+        function alarmOutSwitchHd(state) {
+            var hideobj = document.getElementById("hidebg");
+
+            if(0 == state)
+            {
+                hideobj.style.display = "block";
+                $("div.tableDiv").css({"z-index":"-1"}); /* IE6/7兼容 */
+                var saveHeight = getoffset(id("save")).top - getoffset(id("showingDevNum")).top;
+
+                if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+                {
+                    hideobj.style.height = saveHeight + "px";
+                }
+                else
+                {
+                    var peConHeight = getoffset(id("peCon")).top - getoffset(id("showingDevNum")).top + id("peCon").offsetHeight;
+                    hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+                }
+            }
+            else
+            {
+                hideobj.style.display = "none";
+                $("div.tableDiv").css({"z-index":"0"});
+            }
+        }
+
+        function getConfig()
+        {
+            var reqData = {};
+
+            var alarm_info = ALARM_INFO_PREFIX + curAlarmDevName;
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][NAME] = alarm_info;
+
+            $.query(reqData, function(result){
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    if (true == $.local)
+                    {
+                        alarmOutSwitch = new Switch("alarmOutSwitch", 0, alarmOutSwitchHd);
+                        alarmTime.value = "10";
+                        return;
+                    }
+
+                    enable = 0;
+
+                    switchState = result[FILE_NAME][alarm_info][ENABLED];
+                    enable = (switchState == ENABLED_ON) ? 1 : 0;
+                    alarmOutSwitch = new Switch("alarmOutSwitch", enable, alarmOutSwitchHd);
+
+                    //showingDevNum.innerHTML = result[FILE_NAME][alarm_info][DEV_NUM];
+
+                    alias.value = result[FILE_NAME][alarm_info][ALIAS];
+                    alias.value = (alias.value == "undefined") ? "":alias.value;
+
+                    if (alias.value.length != 0)
+                    {
+                        aliasTipStr.style.display = "none";
+                    }
+                    else
+                    {
+                        aliasTipStr.style.display = "inline";
+                    }
+
+                    alarmTime.value = result[FILE_NAME][alarm_info][ALARM_TIME];
+
+                    showDetailCon();
+                }
+            });
+        }
+
+        function pageInit()
+        {
+            //init plan
+            recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+
+            getAlarmDevInfo(function(){
+                showArmingSchedule();
+                getConfig();
+            });
+        }
+
+        var FILE_NAME = uciAlarmOut.fileName;
+        var ALARM_DEV_INFO = uciAlarmOut.secName.alarmOutDevInfo;
+        var ALARM_DEV_NUM = uciAlarmOut.optName.alarmOutDevNum;
+        var ALARM_DEV_NAME = uciAlarmOut.optName.alarmOutDevName;
+
+        var ALARM_INFO_PREFIX = uciAlarmOut.secName.alarmOutPrefix;
+        var PLAN_PREFIX = uciAlarmOut.secName.planPrefix;
+
+        var ENABLED = uciAlarmOut.optName.enabled;
+        var ALARM_TIME = uciAlarmOut.optName.alarmTime;
+        var ALIAS = uciAlarmOut.optName.alias;
+        var ENABLED_ON = uciAlarmOut.optValue.enableVal.on;
+        var ENABLED_OFF = uciAlarmOut.optValue.enableVal. off;
+
+        var alarmOutSwitch = null;
+        var switchState;
+        var enable;
+        var bRecordPlanShow = false;
+
+        var alarmDevNum;
+        var alarmDevNameList = {};
+        var curAlarmDevName;
+
+        var $alarmName = $(".alarmName");
+        var $showingDevNumLabel = $(".showingDevNumLabel");
+        var alias = id("alias");
+        var aliasTipStr = id("aliasTipStr");
+        var showingDevNum = id("showingDevNum");
+        var alarmTime = id("alarmTime");
+        var timeSchedule = id("timeSchedule");
+
+        var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+        var uciDays = [uciAlarmOut.optName.mon, uciAlarmOut.optName.tue, uciAlarmOut.optName.wed, uciAlarmOut.optName.thu, uciAlarmOut.optName.fri, uciAlarmOut.optName.sat, uciAlarmOut.optName.sun];
+        var recPlanGrid;
+
+        pageInit();
+
+        alias.onclick = function()
+        {
+            aliasTipStr.style.display = "none";
+        };
+
+        alias.onblur = function(){
+            if (this.value.length == 0)
+            {
+                aliasTipStr.style.display = "inline";
+            }
+        };
+        alarmTime.onblur = alarmTimeHd;
+        id("save").onclick = saveHandle;
+        id("recordArrow").onclick = onRecordHide;
+        id("clearAll").onclick = function(event){
+            recPlanGrid.reset();
+        };
+    }
+    init();
+</script>
+
+<div class="detailCon">
+     <ul class="line lineL">
+        <li class="line lineI">
+            <label class="des desF">{%label.alarmOutDev%}</label>
+            <div id="alarmOutSwitch" class="switchCon">
+                <i class="switchBg"></i>
+                <i class="switchBall"></i>
+            </div>
+            <label class="des desH"></label>
+        </li>
+        <div style="position:relative;*z-index:1;">
+            <div id="hidebg"></div>
+        </div>
+        <li class="line lineI">
+            <label class="des desF desLogType">{%label.alarmOutDevNum%}:</label>
+            <span class="selCon alarmName">
+                <span id="alarmNameSel" class="select">
+                    <span class="value hsValueA"></span>
+                    <i class="arrow"></i>
+                </span>
+            </span>
+            <label id="showingDevNum" class="des desLogType showingDevNumLabel"></label>
+        </li>
+        <li class="line lineI">
+            <label class="des desF">{%label.alarmOutAlias%}:</label>
+            <input id="alias" type="text" class="text textA1" maxlength="63" />
+            <label id="aliasTipStr" for="alias">{%label.alarmOutDevTip%}</label>
+        </li>
+        <li class="line lineI">
+            <label class="des desF">{%label.alarmDuration%}</label>
+        </li>
+        <li class="line lineI lineBottom">
+            <label class="des desF">{%label.inputDuration%}:</label>
+            <input id="alarmTime" type="text" class="text textA1 textA4" maxLength="3" />
+            <span class="tip">{%label.second%}</span><span class="tip">(5-600s)</span>
+        </li>
+    </ul>
+
+    <div class="actionBarDiv">
+        <div class="actionTitleDiv">
+            <label class="actionTitle">{%label.defenceTime%}</label>
+            <i class="arrowDown" id="recordArrow"></i>
+        </div>
+        <div id="timeSchedule" style="display:none">
+            <ul class="line">
+				<li class="line linePlan">
+					<span class="clearAll" id="clearAll">{%label.clear%}</span>
+					<label class="tips">{%label.alarmOutTips%}</label>
+				</li>
+			</ul>
+			<div class="armingSchedule" id="armingSchedule">
+				<div id="recPlanGrid" class="test"></div>
+			</div>
+        </div>
+    </div>
+    <div class="funcBtnCon">
+        <input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+    </div>
+</div>

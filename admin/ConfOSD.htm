@@ -1,0 +1,635 @@
+﻿<style type="text/css">
+	div.setObj{
+		overflow:hidden;
+		margin-bottom:25px;
+		*height:280px;
+	}
+	label.clorObj{
+		display:inline-block;
+		vertical-align:middle;
+		margin-left:10px;
+		line-height:24px;
+		height:24px;
+	}
+	label.clorObj span.color{
+		display:inline-block;
+		width:18px;
+		height:18px;
+		border:1px solid #898989;
+		border-radius:4px;
+		margin:0 6px 0 5px;
+		vertical-align:middle;
+	}
+	#black{
+		background-color:#000000;
+	}
+	#white{
+		background-color:#ffffff;
+	}
+	#red{
+		background-color:#e70000;
+	}
+	#green{
+		background-color:#00ff18;
+	}
+	#blue{
+		background-color:#0000ff;
+	}
+	ul.lineL2 li.line i{
+		margin-right:10px;
+	}
+	ul.line li.lineBtm{
+		margin-bottom:0px;
+	}
+	ul.line li.lineColor{
+		padding:5px 0;
+	}
+	ul.line li.lineColor label.des{
+		color:#7A8999;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		var setFontDis = ["ntnb", "ntb", "tnb", "tb"];
+		var fontSizeValue = ["auto", "16*16", "32*32", "48*48", "64*64"];
+		var weekArr = [label.Sun, label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta];
+		var disEffOptions = [{str:label.notTranNotFli, value:setFontDis[0]},
+							{str:label.notTranFli, value:setFontDis[1]}/*,
+							{str:label.tranNotFli, value:setFontDis[2]},
+							{str:label.tranFli, value:setFontDis[3]}*/];
+		var fontSizeOptions = [{str:label.selfAdaption, value:fontSizeValue[0]},
+							{str:"16 * 16", value:fontSizeValue[1]},
+							{str:"32 * 32", value:fontSizeValue[2]},
+							{str:"48 * 48", value:fontSizeValue[3]},
+							{str:"64 * 64", value:fontSizeValue[4]}];
+		var fontColorOptions = [{str:label.colorAuto, value:"auto"},
+								{str:label.selfDefine, value:"user_defined"}];
+		/* 星期，通道名，字符1，字符2，时间 */
+		var textValueId = [{id:"weekDayCheck", textId:"weekDay", index:0},
+						{id:"galNameCheck", textId:"galleryName", index:1},
+						{id:"FirCharCheck", textId:"FirChar", index:2},
+						{id:"SecCharCheck", textId:"SecChar", index:3},
+						{id:"dateCheck", textId:"date", index:-1}];
+		var colorValue = "white";
+		var timeHandle = null;
+		var outlineTimeHandle = null;
+		var date = id("date");
+		var weekDay = id("weekDay");
+		var OSDPluObj = null;
+		var bFirstPageLoad = true;
+		var pageResult = {};
+		var fontInfo = null, weekInfo = null, dateInfo = null;
+		var listLen = 0, resList = [];
+		var domAdded = false;
+
+		/* 错误处理函数 */
+		function errHandle(errCode)
+		{
+			var showStr = "";
+			switch(parseInt(errCode))
+			{
+			case ENONE:
+				return true;
+			case IPCOSDDISPERR:
+				showStr = errStr.osdShowEffErr;
+				break;
+			case IPCOSDSIZEERR:
+				showStr = errStr.osdSizeErr;
+				break;
+			case IPCOSDCOLTERR:
+			case IPCOSDCOLERR:
+				showStr = errStr.osdClorErr;
+				break;
+			case IPCOSDENERR:
+			case IPCOSDCOORERR:
+				showStr = errStr.paraErr;
+				break;
+			case IPCOSDTEXTERR:
+				showStr = errStr.osdTextErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCOSDCONTOOLERR:
+				showStr = errStr.osdContoolErr;
+				break;
+			case IPCOSDICONVERR:
+				showStr = errStr.osdIconvErr;
+				break;
+			case IPCUBUSCALLERR:
+				showStr = errStr.osdIconvErr;
+				break;
+			case IPCSYSRPARAERR:
+			case IPCSYSRCONFERR:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr);
+
+			return false;
+		}
+
+		/* 是否选中 */
+		function isCheck(checkId, checkValue)
+		{
+			var chkVal = uciOsd.optValue.enableVal.on == checkValue ? true : false;
+			changeCheckInput(checkId, chkVal);
+		}
+
+		/* 毫秒转换为指定的时间格式 */
+		function tranTime(timeSec, disLet)
+		{
+			var srcTime = new Date();
+			var oTime = {};
+
+			srcTime.setTime(timeSec * 1000);
+			oTime.year = srcTime.getFullYear();
+			oTime.month = srcTime.getMonth() >= 9 ? (srcTime.getMonth() + 1) : "0" + (srcTime.getMonth() + 1);
+			oTime.day = srcTime.getDate() >= 10 ? srcTime.getDate() : "0" + srcTime.getDate();
+			oTime.hour = srcTime.getHours() >= 10 ? srcTime.getHours() : "0" + srcTime.getHours();
+			oTime.min = srcTime.getMinutes() >= 10 ? srcTime.getMinutes() : "0" + srcTime.getMinutes();
+			oTime.sec = srcTime.getSeconds() >= 10 ? srcTime.getSeconds() : "0" + srcTime.getSeconds();
+			oTime.weekDay = weekArr[srcTime.getDay()];
+			oTime.timeStr = oTime.year + disLet + oTime.month + disLet + oTime.day + " " + oTime.hour + ":" + oTime.min + ":" + oTime.sec;
+
+			return oTime;
+		}
+
+		/* 颜色选择 */
+		function fontColorHd(value)
+		{
+			switch(value)
+			{
+			case "auto":
+				id("color").style.display = "none";
+				break;
+			case "user_defined":
+				id("color").style.display = "inline-block";
+				break;
+			default:
+				break;
+			}
+
+			if (false == bFirstPageLoad)
+			{
+				showCurEff();
+			}
+
+		}
+
+		/* 10s请求一次时间，10s期间，时间自动+1 */
+		function outlineTimeRun(timeTmp)
+		{
+			var time = tranTime(timeTmp, "-");
+			date.innerHTML = time.timeStr;
+			weekDay.innerHTML = time.weekDay;
+			outlineTimeHandle = $.setTimeout(function(){
+				outlineTimeRun(++timeTmp);
+			}, 1000);
+		}
+
+		/* 页面时间同步操作 */
+		function getTimeFun()
+		{
+			var reqData = {}, time, timeTmp;
+			reqData[uciSystem.fileName] = {};
+			reqData[uciSystem.fileName][NAME] = uciSystem.secName.clockStatus;
+
+			clearTimeout(timeHandle);
+			clearTimeout(outlineTimeHandle);
+			$.queryP(reqData, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					timeTmp = result[uciSystem.fileName][uciSystem.secName.clockStatus][uciSystem.optName.seconds];
+					time = tranTime(timeTmp, "-");
+					date.innerHTML = time.timeStr;
+					weekDay.innerHTML = time.weekDay;
+					outlineTimeHandle = $.setTimeout(function(){
+						outlineTimeRun(++timeTmp);
+					}, 1000);
+					timeHandle = $.setTimeout(getTimeFun, 10000);
+				}
+			});
+		}
+
+		/* 星期和日期 */
+		function handleShow()
+		{
+			if (null != id("dateCheck").getAttribute("checked") && "true" == id("dateCheck").getAttribute("checked").toString())
+			{
+				$("#weekDayCheck").css({"opacity":"1"}).attr("disabled", false);
+			}
+			else
+			{
+				$("#weekDayCheck").css({"opacity":"0.3"}).attr("disabled", true);
+				changeCheckInput("weekDayCheck", false);
+				chkClick(false, 0);
+			}
+		}
+
+		function setPluginOSDInfo(result)
+		{
+			OSDPluObj.setOSD(undefined, dateInfo, fontInfo);
+			var showWeek = weekInfo.enabled == "on" ? 1 : 0;
+			OSDPluObj.bShowWeek(showWeek);
+
+			for (var i = 1; i <= listLen; i++)
+			{
+				OSDPluObj.setOSD(i, resList[i-1], fontInfo);
+			}
+		}
+
+		function setPageOSDInfo(result)
+		{
+			var time = null;
+
+			fontInfo = result[uciOsd.fileName][uciOsd.secName.font];
+			weekInfo = result[uciOsd.fileName][uciOsd.secName.week];
+			dateInfo = result[uciOsd.fileName][uciOsd.secName.date];
+			resList = formatTableData(result[uciOsd.fileName][uciOsd.secType.labelInfo]);
+			listLen = resList.length;
+
+			if (domAdded == false)
+			{
+				domAdded = true;
+				selectInit("disEffSel", disEffOptions, fontInfo[uciOsd.optName.display], showCurEff);
+				selectInit("fontSizeSel", fontSizeOptions, fontInfo[uciOsd.optName.size], showCurEff);
+				selectInit("fontColorSel", fontColorOptions, fontInfo[uciOsd.optName.colorType], fontColorHd);
+			}
+			else
+			{
+				id("disEffSel").resetSel(fontInfo[uciOsd.optName.display]);
+				id("fontSizeSel").resetSel(fontInfo[uciOsd.optName.size]);
+				id("fontColorSel").resetSel(fontInfo[uciOsd.optName.colorType]);
+			}
+			fontColorHd(fontInfo[uciOsd.optName.colorType]);
+			bFirstPageLoad = false;
+			$("#color span.color").css({"border":"1px solid #898989"});
+			id(fontInfo[uciOsd.optName.color]).style.border = "2px solid #2693f9";
+			colorValue = fontInfo[uciOsd.optName.color];
+
+			time = tranTime(result[uciSystem.fileName][uciSystem.secName.clockStatus][uciSystem.optName.seconds], "-");
+
+			date.innerHTML = time.timeStr;
+			isCheck("dateCheck", dateInfo[uciOsd.optName.enabled]);
+
+			weekInfo.text = time.weekDay;
+			weekDay.innerHTML = weekInfo.text;
+			isCheck("weekDayCheck", weekInfo[uciOsd.optName.enabled]);
+			handleShow();
+
+			for (var i = 1; i <= listLen; i++)
+			{
+				isCheck(textValueId[i].id, resList[i-1][uciOsd.optName.enabled]);
+				id(textValueId[i].textId).value = resList[i-1][uciOsd.optName.text];
+			}
+		}
+
+		/* 获取OSD信息 */
+		function getOSDInfo(callBack)
+		{
+			var reqData = {};
+
+			reqData[uciOsd.fileName] = {};
+			reqData[uciOsd.fileName][NAME] = [uciOsd.secName.font, uciOsd.secName.week, uciOsd.secName.date];
+			reqData[uciOsd.fileName][KEY_TABLE] = uciOsd.secType.labelInfo;
+			reqData[uciSystem.fileName] = {};
+			reqData[uciSystem.fileName][NAME] = uciSystem.secName.clockStatus;
+
+			showToast("loading");
+			$.query(reqData, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					pageResult = result;
+					callBack(result);
+					//closeToast();
+				}
+			});
+		}
+
+		/* 是否选中 */
+		function resWork(idObj)
+		{
+			if (null != id(idObj).getAttribute("checked") &&
+				"true" == id(idObj).getAttribute("checked").toString())
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		/* 获取通道名、字符信息 */
+		function getSaveDate(index)
+		{
+			var data = {};
+
+			data[uciOsd.optName.enabled] = resWork(textValueId[index].id) ? "on":"off";
+			data[uciOsd.optName.text] = id(textValueId[index].textId).value;
+			data[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition(index).x;
+			data[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition(index).y;
+
+			if (0 == data[uciOsd.optName.text].length)
+			{
+				data[uciOsd.optName.text] = " ";
+			}
+
+			return data;
+		}
+
+		function getFontInfo()
+		{
+			var fontCfg = {};
+
+			fontCfg[uciOsd.optName.display] = id("disEffSel").value;
+			fontCfg[uciOsd.optName.size] = true == $.local ? 25 : id("fontSizeSel").value;
+			fontCfg[uciOsd.optName.colorType] = id("fontColorSel").value;
+			fontCfg[uciOsd.optName.color] = colorValue;
+
+			return fontCfg;
+		}
+
+		/* 实时显示osd信息 */
+		function showCurEff()
+		{
+			var fontCfg = {}, dateCfg = {}, weekCfg = {}, letCfg = {};
+
+			fontCfg = getFontInfo();
+			if (true == $.local)
+			{
+				fontCfg[uciOsd.optName.size] = "36*36";
+				fontCfg[uciOsd.optName.color] = 0xfffddd;
+			}
+
+			dateCfg[uciOsd.optName.enabled] = resWork("dateCheck") ? "on":"off";
+			dateCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition().x;
+			dateCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition().y;
+			OSDPluObj.setOSD(undefined, dateCfg, fontCfg);
+
+			weekCfg[uciOsd.optName.enabled] = resWork("weekDayCheck") ? "on":"off";
+			weekCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition(0).x;
+			weekCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition(0).y;
+			weekCfg[uciOsd.optName.text] = id("weekDay").innerHTML;
+
+			OSDPluObj.bShowWeek(weekCfg[uciOsd.optName.enabled] == "on" ? 1 : 0);
+
+			for (var i = 1; i <= 3; i++)
+			{
+				letCfg = getSaveDate(i);
+				OSDPluObj.setOSD(i, letCfg, fontCfg);
+			}
+		}
+
+		/* 保存修改 */
+		function onSave()
+		{
+			var data = {}, fontCfg = {}, dateCfg = {}, weekCfg = {};
+
+			showToast("loading");
+			fontCfg = getFontInfo();
+			data[uciOsd.fileName] = {};
+			data[uciOsd.fileName][uciOsd.secName.font] = fontCfg;
+
+			data[uciOsd.fileName][uciOsd.secName.date] = dateCfg;
+			dateCfg[uciOsd.optName.enabled] = resWork("dateCheck") ? "on":"off";
+			dateCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition().x;
+			dateCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition().y;
+
+			data[uciOsd.fileName][uciOsd.secName.week] = weekCfg;
+			weekCfg[uciOsd.optName.enabled] = resWork("weekDayCheck") ? "on":"off";
+			weekCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition(0).x;
+			weekCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition(0).y;
+
+			for (var i = 1; i <= 3; i++)
+			{
+				if ((true == resWork(textValueId[i].id)) && (false == checkVal(getSaveDate(i)[uciOsd.optName.text])))
+				{
+					showAlert(label.invEnterLet);
+					closeToast();
+					return;
+				}
+
+				data[uciOsd.fileName][uciOsd.secType.labelInfo + "_" + i] = getSaveDate(i);
+			}
+
+			$.modify(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function resetDefaultData()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[uciSystem.fileName] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset][uciSystem.optName.configName] = [uciOsd.fileName];
+
+					showToast("loading");
+					$.action(data, function(result){
+						if (true == errHandle(result[ERR_CODE]))
+						{
+							getOSDInfo(function(result){
+								setPageOSDInfo(result);
+								setPluginOSDInfo(pageResult);
+								showToast("success");
+							});
+						}
+					});
+				}
+			});
+		}
+
+		function setColor()
+		{
+			var aColorSpan = $("#color span.color");
+			aColorSpan.click(function(){
+				aColorSpan.css({"border":"1px solid #898989"});
+				$(this).css({"border":"2px solid #2693f9"});
+				colorValue = $(this).attr("id");
+			});
+		}
+
+		function checkVal(val)
+		{
+			return /^[\x21-\x7E\s\u4E00-\u9FA5\uFF01\uFFE5\u2026\uFF08\uFF09\uFF1A\u201C\u201D\u300A\u300B\uFF1F\u3010\u3011\uFF1B\u2018\u2019\u3001\uFF0C\u3002]*$/gi.test(val);
+		}
+
+		function blurShowOsd()
+		{
+			var dataCfg = {}, fontCfg = {}, txtVal = {}, index = 0;
+
+			for (var i = 1; i <= 3; i++)
+			{
+				id(textValueId[i].textId).index = i;
+				id(textValueId[i].textId).onblur = function() {
+					txtVal = this.value;
+					if ((true == resWork(textValueId[this.index].id)) && (false == checkVal(txtVal)))
+					{
+						showAlert(label.invEnterLet);
+					}
+
+					fontCfg = getFontInfo();
+					dataCfg[uciOsd.optName.enabled] = resWork(textValueId[this.index].id) ? "on":"off";
+					dataCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition(this.index).x;
+					dataCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition(this.index).y;
+					dataCfg[uciOsd.optName.text] = txtVal;
+					OSDPluObj.setOSD(this.index, dataCfg, fontCfg);
+				};
+			}
+		}
+
+		/* 回调函数，判断是否显示信息 */
+		function chkClick(chked, index)
+		{
+			var dateCfg = {}, fontCfg = {};
+
+			if (0 == index)
+			{
+				OSDPluObj.bShowWeek(true == chked ? 1 : 0);
+				return;
+			}
+
+			fontCfg = getFontInfo();
+			dateCfg[uciOsd.optName.enabled] = true == chked ? "on":"off";
+			dateCfg[uciOsd.optName.xCoor] = OSDPluObj.getOsdPosition(index).x;
+			dateCfg[uciOsd.optName.yCoor] = OSDPluObj.getOsdPosition(index).y;
+
+			if (true == $.local)
+			{
+				fontCfg[uciOsd.optName.size] = "25*25";
+				fontCfg[uciOsd.optName.color] = 0xfffddd;
+				dateCfg[uciOsd.optName.coorInfo] = "(200,200)";
+			}
+
+			if (index > 0)
+			{
+				dateCfg[uciOsd.optName.text] = id(textValueId[index].textId).value;
+			}
+
+			OSDPluObj.setOSD(index, dateCfg, fontCfg);
+		}
+
+		id("save").onclick = onSave;
+		id("resetDefault").onclick = resetDefaultData;
+		initCheckInput("showInfo", function(checked, index){
+			chkClick(checked, index);
+			handleShow();
+		});
+		setColor();
+
+		blurShowOsd();
+		getTimeFun();
+		getOSDInfo(function(result){
+			OSDPluObj = new Plugin({
+				id:"curVideo",
+				className:"vedioActiveX",
+				readyHd:function(){
+					setPluginOSDInfo(pageResult);
+				}
+			});
+
+			setPageOSDInfo(result);
+			OSDPluObj.playVideo();
+			$.setTimeout(showDetailCon, 0);
+		});
+		if (true == $.local)
+		{
+			selectInit("disEffSel", disEffOptions, setFontDis[1], showCurEff);
+			selectInit("fontSizeSel", fontSizeOptions, fontSizeValue[1], showCurEff);
+			selectInit("fontColorSel", fontColorOptions, "auto", fontColorHd);
+			fontColorHd("auto");
+			blurShowOsd();
+			showDetailCon();
+
+			return;
+		}
+	}
+	init();
+</script>
+<div class="detailCon">
+	<div id="curVideo"></div>
+	<div class="setObj">
+		<ul class="line lineL2">
+			<li class="line lineE">
+				<i name="showInfo" id="dateCheck" value="-1"></i>
+				<label class="des desA">{%label.date%}</label>
+				<label id="date" class="des desG">2015-05-12 12:32:32</label>
+			</li>
+			<li class="line lineE">
+				<i name="showInfo" id="weekDayCheck" value="0"></i>
+				<label class="des desA">{%label.weekDay%}</label>
+				<label id="weekDay" class="des desG">{%label.Wen%}</label>
+			</li>
+			<li class="line lineE">
+				<i name="showInfo" id="galNameCheck" value="1"></i>
+				<label class="des desA">{%label.galleryName%}</label>
+				<input type="text" class="text textB5" id="galleryName" value="" maxlength="25" />
+			</li>
+			<li class="line lineE">
+				<i name="showInfo" id="FirCharCheck" value="2"></i>
+				<label class="des desA">{%label.selfDefiChar%}</label>
+				<input type="text" class="text textB5" id="FirChar" value="" maxlength="25" />
+			</li>
+			<li class="line lineE">
+				<i name="showInfo" id="SecCharCheck" value="3"></i>
+				<label class="des desA">{%label.selfDefiChar%}</label>
+				<input type="text" class="text textB5" id="SecChar" value="" maxlength="25" />
+			</li>
+		</ul>
+		<ul class="line lineR2">
+			<li class="line lineE">
+				<label class="des desA">{%label.displayEffect%}</label>
+				<span class="selCon">
+					<span id="disEffSel" class="select">
+						<span class="value hsValueC"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="line lineE">
+				<label class="des desA">{%label.fontSize%}</label>
+				<span class="selCon">
+					<span id="fontSizeSel" class="select">
+						<span class="value hsValueC"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="line lineE lineBtm">
+				<label class="des desA">{%label.fontColor%}</label>
+				<span class="selCon">
+					<span id="fontColorSel" class="select">
+						<span class="value hsValueC"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="line lineColor" id="color">
+				<label class="des desA">{%label.chosColor%}</label>
+				<label class="clorObj">
+					<span id="white" class="color"></span>
+					<span id="black" class="color"></span>
+					<span id="red" class="color"></span>
+					<span id="green" class="color"></span>
+					<span id="blue" class="color"></span>
+				</label>
+			</li>
+		</ul>
+	</div>
+	<div class="funcBtnCon">
+		<input class="subBtnB btnA" type="button" id="resetDefault" value="{%btn.resetDefault%}" />
+		<input class="subBtn btnA" type="button" id="save" value="{%btn.save%}"/>
+	</div>
+</div>

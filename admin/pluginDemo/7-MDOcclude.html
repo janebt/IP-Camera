@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>motion detection</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> motion detection </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>   
+		<p>
+			<input type="button" value="start" id="start" >
+			<input type="button" value="控制台打印RECT信息" id="getRect" >
+			<input type="button" value="删除" id="del" >
+		</p>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	
+	pluginObj.startMDOcclude = function(){
+		obj.MDOccludeOn = 1;                             //开启视频遮挡检测区域绘制
+		
+		obj.addMDOccludeRect(1562, 2777, 1562, 4861)     //新增视频遮挡矩形区域， 参数：start point X | start point Y | width | height
+	};
+	
+	pluginObj.stopMDOcclude = function(){
+		obj.MDOccludeOn = 0;                //关闭视频遮挡检测区域绘制。每次obj.MDOccludeOn的值置为0时，插件中的视频遮挡矩形区域信息都会全部清除，开启时必须重新设置。
+	};
+	
+	pluginObj.getMDOccludeInfo = function(){     //分别从插件获取区域覆盖矩形的左上角X，Y坐标和右下角X，Y坐标。之后就可以上传到服务器进行保存操作了。
+		var startPoint = {};  //左上角坐标
+		var width, height;    //长宽
+		var pos = [-1, -1, -1, -1];
+
+		obj.getMDOccludePos(pos);                  //getMDOccludePos()得到“视频遮挡”矩形的信息，输入参数是下标和一个长度为4的数组，数组必须预先定义。
+		startPoint.x = pos[0];                          //getMDOccludePos()方法调用后，其参数数组的值发生变化，第0位是左上角X坐标，第1位是左上角Y坐标，第3位是矩形长度，第4位是高度。
+		startPoint.y = pos[1];
+		width = pos[2];                            //如果没有选取矩形区域时就调用该方法，各位置信息会得到-1
+		height = pos[3];
+		console.log("ROI Rect : startPoint(" +  startPoint.x + ", " + startPoint.y + ")    " + "width = " +  width + ", height = " + height );
+		
+	};
+	
+	pluginObj.delMDOccludeRect = function(){
+		obj.delMDOccludeRect();      //delMDOccludeRect(),删除视频遮挡检测的矩形
+	};
+
+	(function(){
+		document.getElementById("start").onclick = function(){
+			if(this.value == "start")
+			{
+				this.value = "end";
+				pluginObj.startMDOcclude();
+			}
+			else if(this.value == "end")
+			{
+				this.value = "start";
+				pluginObj.stopMDOcclude();
+			}
+		};
+		document.getElementById("getRect").onclick = pluginObj.getMDOccludeInfo;
+
+		document.getElementById("del").onclick = pluginObj.delMDOccludeRect;
+		
+	})();
+
+	
+</script>
+
+<div>
+<h2>移动侦测 - 视频遮盖</h2>
+<p>移动侦测中的视频遮盖功能。当用户选定的矩形区域被遮盖时报警。<br>当前仅支持1个矩形。</p>
+
+<h5>MDOccludeOn</h5>
+<p>
+	属性：是否开启移动侦测-视频遮盖功能。为 0 时关闭，为 1 时开启。<br>
+</p>
+
+<h5>addMDOccludeRect(pointX, pointY, width, height)</h5>
+<p>
+	接口方法：用于将从后台获取的矩形信息设置进插件。<br>
+	参数1：数值，左上角X坐标（经过转换的值，后面同）；参数2：数值，左上角Y坐标；参数3：矩形width；参数4：矩形height。
+</p>
+
+<h5>getMDOccludePos(array)</h5>
+<p>
+	接口方法：用于从插件读取的矩形信息。<br>
+	参数1：长度为4的数组，必须预先定义，否则会出错。<br>
+	经过这个方法调用后，参数array的值被修改为[左上角X坐标， 左上角Y坐标， 矩形width， 矩形height]。
+</p>
+
+<h5>delMDOccludeRect()</h5>
+<p>
+	接口方法：删除绘制的矩形。<br>
+	无参数。
+</p>
+
+</div>
+
+</body>

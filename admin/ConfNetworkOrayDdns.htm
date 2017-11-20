@@ -1,0 +1,343 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var usrName = id("usrName");
+		var psw = id("psw");
+		var domain = id("domain");
+		var connectStat = id("loginStatus");
+		var multiDomain = id("multiDomain");
+
+		/* uci */
+		var ddnsFN = uciDdns.fileName;
+		var ddnsSN = uciDdns.secName;
+		var ddnsON = uciDdns.optName;
+		var ddnsOV = uciDdns.optValue;
+		var ddnsAN = uciDdns.actionName;
+
+		var isHandleStarted = false;
+		var getStaHandle = -1;
+		var timeInterval = 2000;
+
+		function errorHandle(code, objOrId)
+		{
+			var str = "";
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case ENAMEBLANK:
+				str = errStr.ddnsUsrNameBlank;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case EDDNSPWDBLANK:
+				str = errStr.ddnsPwdBlank;
+				break;
+			case EINVNAME:
+				str = errStr.ddnsUsrNameIllegal;
+				break;
+			case EDDNSPWD:
+				str = errStr.ddnsPwdIllegal;
+				break
+			default:
+				break;
+			}
+
+			closeToast();
+			showNote(objOrId, str);
+			return false;
+		}
+
+		function fillDom(resp)
+		{
+			if (true == $.local)
+			{
+				resp = {
+					"error_code":0,
+					ddns:{
+						phddns:{
+							username:"ddnsUsrName",
+							password:"123456"
+						}
+					}
+				};
+			}
+
+			if (true == errorHandle(resp[ERR_CODE]))
+			{
+				if (resp[ddnsFN][ddnsSN.phddns].hasOwnProperty([ddnsON.username]))
+				{
+					usrName.value = resp[ddnsFN][ddnsSN.phddns][ddnsON.username];
+				}
+				else
+				{
+					usrName.value = "";
+				}
+				
+				if (resp[ddnsFN][ddnsSN.phddns].hasOwnProperty([ddnsON.password]))
+				{
+					psw.value = resp[ddnsFN][ddnsSN.phddns][ddnsON.password];
+				}
+				else
+				{
+					psw.value = "";
+				}
+			}
+
+			showDetailCon();
+		}
+
+		function showDdnsStatus(resp)
+		{
+			var ddnsSta, curSta, staStr;
+			if (true == $.local)
+			{
+				resp = {
+					error_code:0,
+					ddns:{
+						ddns_status:{
+							status:3,
+							domain_num:3,
+							domains:["com", "net", "org"]
+						}
+					}
+				};
+			}
+
+			if (true == errorHandle(resp[ERR_CODE]))
+			{
+				ddnsSta = resp[ddnsFN][uciDdns.dynData.ddnsStatus];
+				curSta = parseInt(ddnsSta.status);
+
+				switch (curSta)
+				{
+				case DDNS_STATE_STOP:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_DISCONNECTED];
+					break;
+				case DDNS_STATE_READY:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_CONNECTING] + ddnsLinkStatus[DDNS_LINK_STATUS_GETTING_IP];
+					break;
+				case DDNS_STATE_CONNECTING_WORKING_SERVER:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_CONNECTING] + ddnsLinkStatus[DDNS_LINK_STATUS_REGISTERRING];
+					break;
+				case DDNS_STATE_UP:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_CONNECTED];
+					break;
+				case DDNS_STATE_INVALID_URL:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_DISCONNECTED_SUB_STATE] + ddnsLinkStatus[DDNS_LINK_STATUS_DOMAINERROR];
+					break;
+				case DDNS_STATE_AUTH_FAIL:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_DISCONNECTED_SUB_STATE] + ddnsLinkStatus[DDNS_LINK_STATUS_VERIFYFAIL];
+					break;
+				default:
+					staStr = ddnsLinkStatus[DDNS_LINK_STATUS_DISCONNECTED];
+					break;
+				}
+
+				connectStat.innerHTML = staStr;
+				setDdnsInfo(ddnsSta);
+			}
+		}
+
+		function setDdnsInfo(ddnsStatus)
+		{
+			var serviceTypeIndex = DDNS_SERVICE_TYPE_NONE;
+			var i = 0;
+			var domainInfo;
+
+			if ((0 == parseInt(ddnsStatus.domain_num)) || (DDNS_STATE_UP != ddnsStatus.status))
+			{
+				domain.innerHTML = label.none;
+				multiDomain.innerHTML = "";
+				multiDomain.style.display = "none";
+			}
+			else
+			{
+				domain.innerHTML = "";
+				multiDomain.innerHTML = "";
+				multiDomain.style.display = "none";
+				for (i = 0; i < parseInt(ddnsStatus.domain_num); i++)
+				{
+					if (i == 0)
+					{
+						domain.innerHTML = ddnsStatus.domains[i];
+					}
+					else
+					{
+						multiDomain.style.display = "block";
+						domainInfo = multiDomain.innerHTML;
+						domainInfo += "<label class=\"des desA\"></label><label class=\"infoLabel\">" + ddnsStatus.domains[i] + "</label><br></br>";
+						multiDomain.innerHTML = domainInfo;
+					}
+				}
+			}
+		}
+
+		function getDdnsStatus()
+		{
+			var data = {};
+
+			data[ddnsFN] = {};
+			data[ddnsFN][KEY_NAME] = [uciDdns.dynData.ddnsStatus];
+			$.queryP(data, showDdnsStatus);
+			getStaHandle = $.setTimeout(getDdnsStatus, timeInterval);
+		}
+
+		function checkValue()
+		{
+			if ((undefined == usrName) || (typeof usrName.value != "string"))
+			{
+				return errorHandle(EINVNAME, "usrName");
+			}
+			
+			if ((undefined == psw) || (typeof psw.value != "string") || ((/\s+/).test(psw.value) == true))
+			{
+				return errorHandle(EDDNSPWD, "psw");
+			}
+
+			if ((undefined == usrName) || ("" == usrName.value))
+			{
+				return errorHandle(ENAMEBLANK, "usrName");
+			}
+
+			if ((undefined == psw) || ("" == psw.value))
+			{
+				return errorHandle(EDDNSPWDBLANK, "psw");
+			}
+
+			return true;
+		}
+		function onLogout()
+		{
+			var loginInstruct;
+			var data = {};
+
+			data[ddnsFN] = {};
+			data[ddnsFN][ddnsSN.phddns] = {};
+			data[ddnsFN][ddnsSN.phddns][ddnsON.autologin] = 0;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+					loginInstruct = {};
+					loginInstruct[ddnsFN] = {};
+					loginInstruct[ddnsFN][ddnsAN.logout] = null;
+
+					$.action(loginInstruct, function(resp){
+						if (true == errorHandle(resp[ERR_CODE]))
+						{
+							domain.innerHTML = label.none;
+							multiDomain.innerHTML = "";
+							multiDomain.style.display = "none";
+						}
+					});
+				}
+			});
+		}
+		function onLogin()
+		{
+			var loginInstruct;
+			var data={};
+
+			if (false == checkValue())
+			{
+				return;
+			}
+
+			data[ddnsFN] = {};
+			data[ddnsFN][ddnsSN.phddns] = {};
+			data[ddnsFN][ddnsSN.phddns][ddnsON.autologin] = 1;
+			data[ddnsFN][ddnsSN.phddns][ddnsON.username] = usrName.value;
+			data[ddnsFN][ddnsSN.phddns][ddnsON.password] = psw.value;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+					loginInstruct = {};
+					loginInstruct[ddnsFN] = {};
+					loginInstruct[ddnsFN][ddnsAN.login] = null;
+
+					$.action(loginInstruct, function(resp){
+						if (true == errorHandle(resp[ERR_CODE]))
+						{
+							if (!isHandleStarted && -1 == getStaHandle)
+							{
+								isHandleStarted = true;
+								getDdnsStatus();
+							}
+						}
+					});
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			id("ddnsLogout").onclick = onLogout;
+			id("login").onclick = onLogin;
+
+			var data = {};
+			data[ddnsFN] = {};
+			data[ddnsFN][KEY_NAME] = [ddnsSN.phddns];
+
+			$.query(data, fillDom);
+			isHandleStarted = true;
+			getDdnsStatus();
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+
+<style type="text/css">
+	label.infoLabel{
+		display:inline-block;
+		font-size:14px;
+		vertical-align:middle;
+		color:#a0a0a0;
+		height:32px;
+		line-height:32px;
+	}
+	#multiDomain{
+		display:none;
+		margin-top:-22px !important;
+	}
+</style>
+
+<div class="detailConRs">
+	<ul class="line">
+		<li class="line lineG">
+			<label class="des desA">{%label.loginStatus%}</label>
+			<label id="loginStatus" class="infoLabel"></label>
+		</li>
+		<li class="line lineG">
+			<label class="des desA">{%label.srvAddr%}</label>
+			<label id="server" class="infoLabel">http://www.oray.com</label>
+		</li>
+		<li class="line lineG">
+			<label class="des desA">{%label.domain%}</label>
+			<label id="domain" class="infoLabel"></label>
+		</li>
+		<li class="line lineG" id="multiDomain">
+		</li>
+		<li class="line lineG">
+			<label class="des desA">{%label.userName%}</label>
+			<input id="usrName" maxLength="63" class="textInput text textA1"/><i class="tip"></i>
+		</li>
+		<li class="line lineG">
+			<label class="des desA">{%label.password%}</label>
+			<input id="psw" type="password" maxLength="63" class="textInput text textA1"/><i class="tip"></i>
+		</li>
+	</ul>
+
+	<div class="funcBtnCon">
+		<input id="ddnsLogout" type="button" value="{%btn.logout%}" class="subBtn btnA" />
+		<input id="login" type="button" value="{%btn.login%}" class="subBtn btnA" />
+	</div>
+</div>

@@ -1,0 +1,571 @@
+<script type="text/javascript">
+	function init()
+	{
+		var uciFile = uciProto.fileName;
+		var uciTypeIface = uciProto.secType.iface;
+		var uciTypeProto = uciProto.secType.proto;
+		var uciWan = uciProto.secName.wan;
+		var uciStatic = uciProto.secName.sta;
+		var uciIpaddr = uciProto.optName.ip;
+		var uciMask = uciProto.optName.netmask;
+		var uciGateway = uciProto.optName.gateway;
+		var uciPriDns = uciProto.optName.priDns;
+		var uciSndDns = uciProto.optName.sndDns;
+		var uciMtu = uciProto.optName.mtu;
+		var uciSpeed = uciProto.optName.speed;
+		var uciWanType = uciProto.optName.type;
+		var updateTimerHandle;
+		var connectStat = id("connectStat");
+
+		var uciNetFile = uciNetwork.fileName;
+		var CHECK_IP_CONFLICT = uciNetwork.action.checkIpConflict;
+
+		var FAIL_INTERVAL = 4000;
+		var SUCCESS_INTERVAL = 20000;
+		var GET_STATUS_INTERVAL = 4000;
+
+		var uhttpdFN = uciUhttpd.fileName;
+		var uhttpdSN = uciUhttpd.secName;
+		var uhttpdON = uciUhttpd.optName;
+		var proV = uciProto.optValue;
+		var dynIp = DEF_WAN_T = proV.proto.dynIp;
+		var staticIp = proV.proto.staticIp;
+		var pppoe = proV.proto.pppoe;
+		var urlArr = {dynIp:"DynamicIp.htm",
+			staticIp:"StaticIp.htm",
+			pppoe:"PPPoE.htm"
+			};
+
+		var gIpVal, gOrgIpVal, gOrgMask, gOrgWanType;
+		var DTOS_DELAY_INTERVAL = 8000;
+		var STOS_DELAY_INTERVAL = 8000;
+		var gPort = DEF_PORT = 80;
+
+		function errHandle(errNo)
+		{
+			var str = "";
+			//closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return false;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return true;
+		}
+
+		function errHandleBeforeSave(errNo, objOrId)
+		{
+			var str = "";
+			//closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return false;
+			case EINVNET:
+				str = errStr.ipAddrNetErr;
+				break;
+			case EINVIP:
+				str = errStr.ipAddrErr;
+				break;
+			case EINVIPFMT:
+				str = errStr.ipAddrFmtErr;
+				break;
+			case EINVGROUPIP:
+				str = errStr.ipAddrGroupErr;
+				break;
+			case EINVLOOPIP:
+				str = errStr.ipAddrLoopErr;
+				break;
+			case EINVMASK:
+				str = errStr.maskErr;
+				break;
+			case EINVNETID:
+				str = errStr.ipAddrNetIdErr;
+				break;
+			case EINVHOSTID:
+				str = errStr.ipAddrHostIdErr;
+				break;
+			case EINVIPMASKPAIR:
+				str = errStr.ipAddrMaskNotMatch;
+				break;
+			case ECOMFLICTNET:
+				str = errStr.ipAddrLanWanConflict;
+				break;
+			case EINVGTW:
+				str = errStr.gatewayErr;
+				break;
+			case EINVMTU:
+				str = errStr.stcMtuErr;
+				break;
+			case EINVFDNSVR:
+				str = errStr.primDnsErr;
+				break;
+			case EINVSDNSVR:
+				str = errStr.seDnsErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showNote(objOrId, str);
+			closeToast();
+			return true;
+		}
+
+		function checkGateway(value)
+		{
+			return ENONE != checkIp(value) ? EINVGTW : ENONE;
+		}
+
+		function checkPrimDns(value)
+		{
+			if ("" == value || "0.0.0.0" == value)
+			{
+				id("dns0").value = "0.0.0.0";
+				return ENONE;
+			}
+
+			return ENONE != checkIp(value) ? EINVFDNSVR : ENONE;
+		}
+
+		function checkSeDns(value)
+		{
+			if ("" == value || "0.0.0.0" == value)
+			{
+				id("dns1").value = "0.0.0.0";
+				return ENONE;
+			}
+
+			return ENONE != checkIp(value) ? EINVSDNSVR : ENONE;
+		}
+
+		function setStaicWanStatus(data)
+		{
+			var wanStatus = data[uciNetwork.fileName][uciNetwork.dynData.wanStatus];
+
+			if (wanStatus[uciNetwork.optName.proto] != uciProto.optValue.proto.staticIp)
+			{
+				clearTimeout(updateTimerHandle);
+				return;
+			}
+
+			var code = wanStatus[ERR_CODE];
+
+			/* check the phy_status firstly */
+			if (parseInt(wanStatus[uciNetwork.optName.phyStatus]) == LINK_UP)
+			{
+				switch(parseInt(wanStatus[uciNetwork.optName.linkStatus]))
+				{
+				case LINK_DOWN:
+					/* 异常断开连接的，加注错误提示 */
+					if ((LINK_CODE_MANUAL != wanStatus[ERR_CODE]) && (LINK_CODE_NORMAL != wanStatus[ERR_CODE]))
+					{
+					}
+					else
+					{
+					}
+
+					GET_STATUS_INTERVAL = FAIL_INTERVAL;
+					connectStat.innerHTML = statusStr.disconcted;
+					$(connectStat).css("color", "#FF5500");
+
+					break;
+				case LINK_UP:
+					GET_STATUS_INTERVAL = SUCCESS_INTERVAL;
+					connectStat.innerHTML = statusStr.concted;
+					$(connectStat).css("color", "#325FE0");
+					break;
+				default:
+					GET_STATUS_INTERVAL = FAIL_INTERVAL;
+					break;
+				}
+			}
+			else
+			{
+				GET_STATUS_INTERVAL = FAIL_INTERVAL;
+			}
+
+			clearTimeout(updateTimerHandle);
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		function refreshWanStatus()
+		{
+			var data = {};
+
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+			$.queryP(data, setStaicWanStatus);
+		}
+
+		function navigateToIp()
+		{
+			var port = "";
+			if (gPort != DEF_PORT)
+			{
+				port = ":" + gPort;
+			}
+			window.location.href = "http://" + gIpVal + port;
+		}
+
+		function onBlur()
+		{
+			var ipVal = id("ip").value, maskVal = id("mask").value, gatewayVal = id("gateway").value;
+			var primDnsVal = id("dns0").value, seDnsVal = id("dns1").value, mtuVal = id("mtu").value;
+
+			errHandleBeforeSave(checkIp(ipVal), "ip");
+			errHandleBeforeSave(checkMask(maskVal), "mask");
+			errHandleBeforeSave(checkIpMask(ipVal, maskVal), "mask");
+			errHandleBeforeSave(checkGateway(gatewayVal), "gateway");
+			errHandleBeforeSave(checkPrimDns(primDnsVal), "dns0");
+			errHandleBeforeSave(checkSeDns(seDnsVal), "dns1");
+			errHandleBeforeSave(checkMtu(mtuVal), "mtu");
+		}
+
+		function onSave()
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+
+			data[uciNetFile] = module;
+			module[CHECK_IP_CONFLICT] = actObj;
+
+			var ipVal = id("ip").value, maskVal = id("mask").value, gatewayVal = id("gateway").value;
+			var primDnsVal = id("dns0").value, seDnsVal = id("dns1").value, mtuVal = id("mtu").value;
+
+			/* 检查合法性 */
+			if (errHandleBeforeSave(checkIp(ipVal), "ip") ||
+				errHandleBeforeSave(checkMask(maskVal), "mask") ||
+				errHandleBeforeSave(checkIpMask(ipVal, maskVal), "mask") ||
+				errHandleBeforeSave(checkGateway(gatewayVal), "gateway") ||
+				errHandleBeforeSave(checkPrimDns(primDnsVal), "dns0") ||
+				errHandleBeforeSave(checkSeDns(seDnsVal), "dns1") ||
+				errHandleBeforeSave(checkMtu(mtuVal), "mtu"))
+			{
+				return;
+			}
+
+			/* 去掉前导0 */
+			ipVal = hideLeadingZeros(ipVal);
+			id("ip").value = ipVal;
+			maskVal = hideLeadingZeros(maskVal);
+			id("mask").value = maskVal;
+			gatewayVal = hideLeadingZeros(gatewayVal);
+			id("gateway").value = gatewayVal;
+			primDnsVal = hideLeadingZeros(primDnsVal);
+			id("dns0").value = primDnsVal;
+			seDnsVal = hideLeadingZeros(seDnsVal);
+			id("dns1").value = seDnsVal;
+			mtuVal = hideLeadingZeros(mtuVal);
+			id("mtu").value = mtuVal;
+
+			actObj[uciIpaddr] = ipVal;
+
+			connectStat.innerHTML = statusStr.connting;
+			$(connectStat).css("color", "#325FE0");
+			showDetailCon();
+			showToast("loading");
+			$.action(data, function(result){
+				if (EIPCONFLICT == result[ERR_CODE])
+				{
+					closeToast();
+					showConfirm(label.ipConflictConfirm, function(flag){
+						if (flag == true)
+						{
+							var cfg = {}, cfgProto = {}, cfgStaic = {}, cfgWan = {};
+
+							cfg[uciFile] = cfgProto;
+							cfgProto[uciWan] = cfgWan;
+							cfgProto[uciStatic] = cfgStaic;
+
+							cfgStaic[uciIpaddr] = ipVal;
+							cfgStaic[uciMask] = maskVal;
+							cfgStaic[uciGateway] = gatewayVal;
+							cfgStaic[uciMtu] = mtuVal;
+							cfgStaic[uciPriDns] = primDnsVal;
+							cfgStaic[uciSndDns] = seDnsVal;
+
+							cfgWan[uciWanType] = uciProto.optValue.proto.staticIp;
+
+							showToast("loading");
+							$.modify(cfg,
+							   function(result)
+							   {
+									if (false == errHandle(result[ERR_CODE]))
+									{
+										showToast("success");
+										gIpVal = ipVal;
+										if (gOrgWanType == dynIp)
+										{
+											showToast("other", {noteStr:label.navigateToIp});
+											$.changeDomain(gIpVal + ":" + gPort);
+											lanDetecting(navigateToIp);
+										}
+										else
+										{
+											if (gOrgIpVal != gIpVal || gOrgMask != maskVal)
+											{
+												showToast("other", {noteStr:label.navigateToIp});
+												$.changeDomain(gIpVal + ":" + gPort);
+												lanDetecting(navigateToIp);
+											}
+											else
+											{
+												closeToast();
+											}
+										}
+									}
+								});
+						}
+					});
+				}
+				else if (ENONE == result[ERR_CODE])
+				{
+					var cfg = {}, cfgProto = {}, cfgStaic = {}, cfgWan = {};
+
+					cfg[uciFile] = cfgProto;
+					cfgProto[uciWan] = cfgWan;
+					cfgProto[uciStatic] = cfgStaic;
+
+					cfgStaic[uciIpaddr] = ipVal;
+					cfgStaic[uciMask] = maskVal;
+					cfgStaic[uciGateway] = gatewayVal;
+					cfgStaic[uciMtu] = mtuVal;
+					cfgStaic[uciPriDns] = primDnsVal;
+					cfgStaic[uciSndDns] = seDnsVal;
+
+					cfgWan[uciWanType] = uciProto.optValue.proto.staticIp;
+
+					$.modify(cfg,
+					   function(result)
+					   {
+							if (false == errHandle(result[ERR_CODE]))
+							{
+								showToast("success");
+								gIpVal = ipVal;
+								if (gOrgWanType == dynIp)
+								{
+									showToast("other", {noteStr:label.navigateToIp});
+									$.changeDomain(gIpVal + ":" + gPort);
+									lanDetecting(navigateToIp);
+								}
+								else
+								{
+									if (gOrgIpVal != gIpVal || gOrgMask != maskVal)
+									{
+										showToast("other", {noteStr:label.navigateToIp});
+										$.changeDomain(gIpVal + ":" + gPort);
+										lanDetecting(navigateToIp);
+									}
+									else
+									{
+										closeToast();
+									}
+								}
+							}
+						});
+				}
+			});
+
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		function setStaIpCfg(ALL_DATA)
+		{
+			if (true == errHandle(ALL_DATA[ERR_CODE]))
+			{
+				return;
+			}
+
+			var data = ALL_DATA[uciFile];
+			var wanCfg = data[uciWan];
+			var staCfg = data[uciStatic];
+
+			$("#ip").val(staCfg[uciIpaddr]);
+			$("#mask").val(staCfg[uciMask]);
+			$("#gateway").val(staCfg[uciGateway]);
+			$("#mtu").val(staCfg[uciMtu]);
+			$("#dns0").val(staCfg[uciPriDns]);
+			$("#dns1").val(staCfg[uciSndDns]);
+
+			gOrgWanType = ALL_DATA[uciNetwork.fileName][uciNetwork.dynData.wanStatus][uciNetwork.optName.proto];
+			gOrgIpVal = staCfg[uciIpaddr];
+			gOrgMask = staCfg[uciMask];
+			gPort = ALL_DATA[uhttpdFN][uhttpdSN.main][uhttpdON.listenHttpPort];
+
+			if (statusStr.disconcted == connectStat.innerHTML)
+			{
+				$(connectStat).css("color", "#FF5500");
+			}
+			else
+			{
+				$(connectStat).css("color", "#325FE0");
+			}
+			//设置WAN口状态
+			setStaicWanStatus(ALL_DATA);
+
+			showDetailCon();
+		}
+
+		function getStaIpData()
+		{
+			var data = {};
+
+			data[uciFile] = {};
+			data[uciFile][KEY_NAME] = [uciWan, uciStatic];
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+			data[uhttpdFN] = {};
+			data[uhttpdFN][NAME] = [uhttpdSN.main];
+
+			$.query(data, setStaIpCfg);
+		}
+
+		function wanSel(val)
+		{
+			if (val == dynIp)
+			{
+				loadPage(urlArr.dynIp, "wanCon");
+			}
+			else if (val == staticIp)
+			{
+				loadPage(urlArr.staticIp, "wanCon");
+			}
+		}
+
+		function pageInit()
+		{
+			id("ip").onblur = onBlur;
+			id("mask").onblur = onBlur;
+			id("gateway").onblur = onBlur;
+			id("dns0").onblur = onBlur;
+			id("dns1").onblur = onBlur;
+			id("mtu").onblur = onBlur;
+			id("ip").onfocus = closeNoteAll;
+			id("mask").onfocus = closeNoteAll;
+			id("gateway").onfocus = closeNoteAll;
+			id("dns0").onfocus = closeNoteAll;
+			id("dns1").onfocus = closeNoteAll;
+			id("mtu").onfocus = closeNoteAll;
+			selectInit("wanMode", [{str:label.smartIp, value:proV.proto.dynIp},
+				{str:label.staticIp, value:proV.proto.staticIp}
+				], proV.proto.staticIp, wanSel);
+
+			id("save").onclick = onSave;
+			getStaIpData();
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		pageInit();
+	}
+
+	init();
+</script>
+<style type="text/css">
+	ul.line li.lineI, ul.line li.lineC{
+		display:block;
+	}
+</style>
+<div class="detailCon">
+	<div class="hsHelp"></div>
+	<div class="stateDiv">
+		<label class="statLabel">{%label.phState%}{%label.colon%}</label>
+		<label id="connectStat" class="statLabel">{%statusStr.disconcted%}</label>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.basicSet%}</label>
+		</div>
+		<!-- 模式选择 -->
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+				<li class="line lineI">
+					<label class="des desA">{%label.mode%}</label>
+					<span class="selCon">
+						<span id="wanMode" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</li>
+				<li class="line lineI">
+					<label class="des desA">{%label.ipAddr%}</label>
+					<input id="ip" class="text textA1"/><i class="tip"></i>
+				</li>
+				<li class="line lineI">
+					<label class="des desA">{%label.mask%}</label>
+					<input id="mask" class="text textA1"/><i class="tip"></i>
+				</li>
+				<li class="line lineI">
+					<label class="des desA">{%label.gateway%}</label>
+					<input id="gateway" class="text textA1"/><i class="tip"></i>
+				</li>
+				<li class="line lineI">
+					<label class="des desA">{%label.dns0%}</label>
+					<input id="dns0" class="text textA1"/><i class="tip"></i>
+				</li>
+				<li class="line lineI">
+					<label class="des desA">{%label.dns1%}</label>
+					<input id="dns1" class="text textA1"/><i class="tip"></i>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.highSet%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+				<li class="line lineC">
+					<label class="des desA">{%label.mtu%}</label>
+					<input id="mtu" class="text textA1" maxLength="4" />
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<div class="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

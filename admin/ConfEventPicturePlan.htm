@@ -1,0 +1,406 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		// uci
+		var fileName = uciPicturePlan.fileName;
+		var schedule = uciPicturePlan.secName.schedule;
+		var eventConfig = uciPicturePlan.secName.eventConfig;
+		var enabled = uciPicturePlan.optName.enabled;
+		//var codecType = uciPicturePlan.optName.codecType;
+		//var resolution = uciPicturePlan.optName.resolution;
+		//var quality = uciPicturePlan.optName.quality;
+		var captureInterval = uciPicturePlan.optName.captureInterval;
+		var pictureNumber = uciPicturePlan.optName.captureNumber;
+
+		// static data
+		//var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+		//var uciDays = [uciRecordPlan.optName.mon, uciRecordPlan.optName.tue, uciRecordPlan.optName.wed, uciRecordPlan.optName.thu, uciRecordPlan.optName.fri, uciRecordPlan.optName.sat, uciRecordPlan.optName.sun];
+
+		// tmp
+		var data;
+		var tmp, tmpStr, i;
+		var intervalTypeValue;
+		var millisecond = 1;
+		var second = 1000;
+
+		// switch
+		var exSwitch = null;
+		var exSwitchState = 0;
+
+		var pictureInterval = id("pictureInterval");
+
+		function errorHandler(code)
+		{
+			var str = "";
+
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case EINVARG:
+				str = errStr.IPCParamInvalid;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function onCancel()
+		{
+			fetchServerSta();
+		}
+
+		function setInterval(value, type)
+		{
+			pictureInterval.value = Math.ceil(value / type);
+		}
+
+		function intervalTypeChange(state)
+		{
+			setInterval(pictureInterval.value * intervalTypeValue, state);
+			intervalTypeValue = state;
+		}
+
+		function chkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+
+		function pictureIntervalCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value * intervalTypeValue;
+			var result = true;
+
+			if (!checkNum(con.value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (value > 65535 || value < 1000)
+			{
+				var str;
+				switch (intervalTypeValue)
+				{
+				case second:
+					str = errStr.picParaRangeSec;
+					break;
+				case millisecond:
+					str = errStr.picParaRangeMSec;
+					break;
+				default:
+					str = errStr.picParaOutOfRange;
+					break;
+				}
+				showNote(idStr, str);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function pictureNumberCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (!checkNum(con.value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (value > 10 || value < 1)
+			{
+				var str = errStr.picParaRangeNumber;
+				showNote(idStr, str);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function onSave()
+		{
+			var i;
+
+			data = {};
+			data[fileName] = {};
+			data[fileName][eventConfig] = {};
+			data[fileName][eventConfig][enabled] = exSwitch.state ? uciPicturePlan.optValue.on:uciPicturePlan.optValue.off;
+			//data[fileName][eventConfig][quality] = id("pictureQuality").value;
+
+			if (pictureNumberCheck("pictureNumber") == false)
+			{
+				return;
+			}
+
+			data[fileName][eventConfig][pictureNumber] = id("pictureNumber").value;
+
+			if (pictureIntervalCheck("pictureInterval") == false)
+			{
+				return;
+			}
+
+			data[fileName][eventConfig][captureInterval] = pictureInterval.value *　intervalTypeValue;
+
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				showDetailCon();
+			});
+		}
+		function fetchServerSta()
+		{
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [eventConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (resp[fileName][eventConfig][enabled] == "on")
+					{
+						exSwitch.setState(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+					}
+
+					/*selectInit("pictureType", [{str:"JPEG", value:0}], 0);
+					selectInit("pictureQuality", [{str:"高", value:"high"},
+												{str:"中", value:"medium"},
+												{str:"低", value:"low"}], resp[fileName][eventConfig][quality]);
+					id("resolution").innerHTML = resp[fileName][eventConfig][resolution];*/
+					selectInit("intervalType", [{str:label.milliSecond, value:millisecond},
+												{str:label.second, value:second}], millisecond, intervalTypeChange);
+					setInterval(resp[fileName][eventConfig][captureInterval], millisecond);
+					intervalTypeValue = millisecond;
+					id("pictureNumber").value = resp[fileName][eventConfig][pictureNumber];
+				}
+			});
+		}
+
+		/* 绑定各个按钮的响应事件 */
+		function bindEvent()
+		{
+			id("cancel").onclick = onCancel;
+
+			id("save").onclick = onSave;
+		}
+
+		function exSwitchHd(state)
+		{
+			exSwitchState = state;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("pictureInterval")).top + "px";
+			}
+			else
+			{
+				hideobj.style.display = "none";
+			}
+		}
+
+		function onBlur()
+		{
+			pictureIntervalCheck("pictureInterval");
+			pictureNumberCheck("pictureNumber");
+		}
+
+		function pageInit()
+		{
+			exSwitch = new Switch("exSwitch", 0, exSwitchHd);
+
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [eventConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						selectInit("intervalType", [{str:label.milliSecond, value:millisecond},{str:label.second, value:second}], second, intervalTypeChange);
+						intervalTypeValue = second;
+						pictureInterval.value = 1;
+						id("pictureNumber").value = 5;
+						return;
+					}
+
+					if (resp[fileName][eventConfig][enabled] == "on")
+					{
+						exSwitch.setState(1);
+					}
+					else
+					{
+						exSwitch.setState(0);
+					}
+
+					/*selectInit("pictureType", [{str:"JPEG", value:0}], 0);
+					selectInit("pictureQuality", [{str:"高", value:"high"},
+												{str:"中", value:"medium"},
+												{str:"低", value:"low"}], resp[fileName][eventConfig][quality]);
+					id("resolution").innerHTML = resp[fileName][eventConfig][resolution];*/
+					selectInit("intervalType", [{str:label.milliSecond, value:millisecond},
+												{str:label.second, value:second}], millisecond, intervalTypeChange);
+					setInterval(resp[fileName][eventConfig][captureInterval], millisecond);
+					intervalTypeValue = millisecond;
+					id("pictureNumber").value = resp[fileName][eventConfig][pictureNumber];
+				}
+				showDetailCon();
+			});
+
+			id("pictureInterval").onblur = onBlur;
+			id("pictureNumber").onblur = onBlur;
+			id("pictureInterval").onfocus = closeNoteAll;
+			id("pictureNumber").onfocus = closeNoteAll;
+		}
+
+		pageInit();
+		initCheckInput("showInfo", null);
+		bindEvent();
+	}
+	init();
+</script>
+<style type="text/css">
+	label.desECED{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 32px;
+		margin-right: 16px;
+	}
+	label.desECEE{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 40px;
+		margin-right: 16px;
+		vertical-align:middle;
+	}
+	label.desECEF{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 40px;
+		margin-left: 60px;
+		vertical-align:middle;
+		margin-right: 45px;
+	}
+	label.desECEG{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 40px;
+		vertical-align:middle;
+		margin-right: 45px;
+	}
+	div.lineCon{
+		background:url(../../web-static/images/line.png) repeat-x 0px 15px;
+		clear:both;
+		padding-top:30px;
+		font-size:0px;
+	}
+	label.regionName{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		margin-left:430px;
+	}
+	div.peCon{
+		position:absolute;
+		box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+		width:661px;
+		height:210px;
+		border-radius: 14px;
+		background-color: #252525;
+		z-index:2;
+		left:48px;
+		top:100px;
+	}
+	div.peCon div.peConTips
+	{
+		display: none;
+	}
+	div.peCon div.peConDetail
+	{
+		display: none;
+	}
+	input.textTime{
+		border:1px solid #2e2e2e;
+		height:24px;
+		line-height:24px;
+		margin-right:12px;
+		width:40px;
+	}
+	ul.line span.textRes{
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:40px;
+		margin-left: 20px;
+		margin-right: 174px;
+	}
+	span.selCon{
+		margin-left:10px;
+	}
+	input.textA{
+		width:98px;
+	}
+</style>
+
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label id="exSwitchDes" class="des desF">{%menuStr.eventPicture%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+	</ul>
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desF">{%label.pictureInterval%}</label>
+			<input class="text textA" id="pictureInterval" maxlength="5" />
+			<span class="selCon">
+				<span id="intervalType" class="select">
+					<span class="value hsValueB"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+
+	<ul class="line">
+		<li class="line lineF2 lineD">
+			<label class="des desF">{%label.pictureNumber%}</label>
+			<input class="text textA" id="pictureNumber" maxlength="2" />
+		</li>
+	</ul>
+
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="cancel" type="button" value="{%btn.gridCancel%}" class="subBtnB btnA"/>
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>

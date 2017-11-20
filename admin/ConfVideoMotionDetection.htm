@@ -1,0 +1,333 @@
+<script type="text/javascript">
+	function init()
+	{
+		function errorHandle(code, objOrId)
+		{
+			var showStr = "";
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCMDNUMERR:
+				showStr = errStr.IPCRangeOver;
+				break;
+			case IPCMDENERR:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCMDSENERR:
+				showStr = errStr.ipcImInfsErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCMDEMAILERR:
+			case IPCMDALARMERR:
+			case IPCMDRECORDERR:
+			case IPCMDFTPERR:
+				showStr = errStr.IPCHandleInalid;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function setMotionRange(secObj)
+		{
+			var regionArray = formatTableData(secObj);
+
+			for (var index in regionArray)
+			{
+				var item = regionArray[index];
+				plugin.showMoveDetInfo({x:item[X_COOR], y:item[Y_COOR], width:item[WIDTH], height:item[HEIGHT]});
+			}
+		}
+
+		function getMotionRange()
+		{
+			var regionArray = [];
+			var i = 0, item, tmpObj;
+			var len = 0;
+
+			for (; i < 14; i++)
+			{
+				item = plugin.getMoveDetInfo(i);
+				if (item.x >= 0)
+				{
+					tmpObj = {};
+					tmpObj[X_COOR] = item.x;
+					tmpObj[Y_COOR] = item.y;
+					tmpObj[WIDTH] = item.width;
+					tmpObj[HEIGHT] = item.height;
+					regionArray[len++] = tmpObj;
+				}
+			}
+
+			return regionArray;
+		}
+
+		function saveHandle()
+		{
+			var reqData = {};
+			var rigionData = {};
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][MOTION_DET] = {};
+			reqData[FILE_NAME][MOTION_NOTIF_LIST] = {};
+
+			//TODO:获取灵敏度、区域、处理方式
+			reqData[FILE_NAME][MOTION_DET][SENSITIVITY] = sensitivityValue;
+			reqData[FILE_NAME][MOTION_DET][ENABLED] = switchState;
+			reqData[FILE_NAME][MOTION_NOTIF_LIST][EMAIL_ENABLED] = sendEmail.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][MOTION_NOTIF_LIST][ALARM_ENABLED] = triggerAlarmDevice.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][MOTION_NOTIF_LIST][RECORD_ENABLED] = triggerRecord.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][MOTION_NOTIF_LIST][FTP_ENABLED] = sendToFtp.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+
+			showToast();
+			$.modify(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					rigionData[FILE_NAME] = {};
+					rigionData[FILE_NAME][ADD_MD_REGIONS] = {};
+					rigionData[FILE_NAME][ADD_MD_REGIONS][REGION_INFO] = getMotionRange();
+					$.action(rigionData, function(){
+						showToast("success");
+					});
+				}
+			});
+		}
+
+		/* 删除当前选中的方框 */
+		function delMotionRange()
+		{
+			plugin.delMoveDetInfo(PLUGIN_STATE_ON);
+		}
+
+		/* 删除所有方框 */
+		function clearMotionRange()
+		{
+			plugin.delMoveDetInfo(PLUGIN_STATE_MINUS);
+		}
+
+		function motionSwichHd(state)
+		{
+			motionSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+			switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				plugin.setOSDStatus(0);
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top + "px";
+				$("#sensitivityDragLineDragLineStrip").css({"*z-index":"-1"}); /* IE6/7兼容 */
+			}
+			else
+			{
+				plugin.setOSDStatus(1);
+				hideobj.style.display = "none";
+				$("#sensitivityDragLineDragLineStrip").css({"*z-index":"0"});
+			}
+		}
+
+		function sensitivityChange(val) {
+			sensitivityValue = val;
+			sensitivityDragLine.setValue(val);
+			if ((true == checkNum(val)) &&
+					(true == checkNumRange(parseInt(val), 100, 1)))
+			{
+				sensitivityErr = false;
+			}
+			else
+			{
+				showNote("sensitivityDragLineDragLineInput", errStr.sensitivityErr);
+				sensitivityErr = true;
+			}
+		}
+
+		function hideHandleWay(event) {
+			if (!bHandleWayShow)
+			{
+				id("handleArrow").className ="arrowUp";
+				handleWay.style.display = "";
+				bHandleWayShow = true;
+			}
+			else
+			{
+				id("handleArrow").className ="arrowDown";
+				handleWay.style.display = "none";
+				bHandleWayShow = false;
+			}
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			enable = 0;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [MOTION_DET, MOTION_NOTIF_LIST];
+			reqData[FILE_NAME][KEY_TABLE] = [REGION_INFO];
+
+			plugin = new Plugin({id:"videoPluginCon", className:"vedioActiveX", readyHd:function(arg){
+				if (PLUGIN_STATE_ON == arg && true == bFirstReady)
+				{
+					bFirstReady = false;
+					plugin.setMoveDetState(2);
+					plugin.setRectArrLen(14);
+					setMotionRange(secObj);
+					plugin.setOSDStatus(motionSwitch.state);
+				}
+			}});
+
+			sensitivityDragLine = new DragLine({id:"sensitivityDragLine", name:label.sensitivity, cb:sensitivityChange, lowerBound:1});
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						motionSwitch = new Switch("motionSwitch", 0, motionSwichHd);
+						return;
+					}
+
+					switchState = result[FILE_NAME][MOTION_DET][ENABLED];
+					enable = (switchState == ENABLED_ON) ? 1 : 0;
+					motionSwitch = new Switch("motionSwitch", enable, motionSwichHd);
+
+					secObj = result[FILE_NAME][REGION_INFO];
+
+					sensitivityValue = result[FILE_NAME][MOTION_DET][SENSITIVITY];
+					sensitivityDragLine.setValue(sensitivityValue);
+
+					enable = (result[FILE_NAME][MOTION_NOTIF_LIST][EMAIL_ENABLED] == ENABLED_ON);
+					changeCheckInput(sendEmail, enable);
+					enable = (result[FILE_NAME][MOTION_NOTIF_LIST][ALARM_ENABLED] == ENABLED_ON);
+					changeCheckInput(triggerAlarmDevice, enable);
+					enable = (result[FILE_NAME][MOTION_NOTIF_LIST][RECORD_ENABLED] == ENABLED_ON);
+					changeCheckInput(triggerRecord, enable);
+					enable = (result[FILE_NAME][MOTION_NOTIF_LIST][FTP_ENABLED] == ENABLED_ON);
+					changeCheckInput(sendToFtp, enable);
+					plugin.playVideo();
+
+					showDetailCon();
+				}
+			});
+
+			initCheckInput("showInfo", null);
+			id("save").onclick = saveHandle;
+			id("clear").onclick = clearMotionRange;
+			id("del").onclick = delMotionRange;
+			id("handleArrow").onclick = hideHandleWay;
+		}
+
+		var FILE_NAME = uciMotionDetection.fileName;
+		var MOTION_DET = uciMotionDetection.secName.motionDet;
+		var MOTION_NOTIF_LIST = uciMotionDetection.secName.motionNotifList;
+		var REGION = uciMotionDetection.secName.region;
+		var REGION_INFO = uciMotionDetection.secType.regionInfo;
+		var RECT_ARRAY = uciMotionDetection.optName.rectArray;
+		var ENABLED = uciMotionDetection.optName.enabled;
+		var SENSITIVITY = uciMotionDetection.optName.sensitivity;
+		var X_COOR = uciMotionDetection.optName.xCoor;
+		var Y_COOR = uciMotionDetection.optName.yCoor;
+		var WIDTH = uciMotionDetection.optName.width;
+		var HEIGHT = uciMotionDetection.optName.height;
+		var EMAIL_ENABLED = uciMotionDetection.optName.emailEnabled;
+		var ALARM_ENABLED = uciMotionDetection.optName.alarmEnabled;
+		var RECORD_ENABLED = uciMotionDetection.optName.recordEnabled;
+		var FTP_ENABLED = uciMotionDetection.optName.ftpEnabled;
+		var ENABLED_ON = uciMotionDetection.optValue.enableVal.on;
+		var ENABLED_OFF = uciMotionDetection.optValue.enableVal.off;
+		var ADD_MD_REGIONS = uciMotionDetection.actionName.addMdRegions;
+
+		var bFirstReady = true;
+		var enable, secObj;
+		var motionSwitch;
+		var switchState;
+		var motionSwitchDes = id("motionSwitchDes");
+		var plugin;
+		var sensitivityDragLine;
+		var sensitivityValue;
+		var sensitivityErr = false;
+		var sendEmail = id("sendEmail");
+		var triggerAlarmDevice = id("triggerAlarmDevice");
+		var triggerRecord = id("triggerRecord");
+		var sendToFtp = id("sendToFtp");
+		var handleWay = id("handleWay");
+		var bHandleWayShow = false;
+		pageInit();
+	}
+	init();
+</script>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineA">
+			<label class="des desA">{%menuStr.motionDetection%}</label>
+			<div id="motionSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label id="motionSwitchDes" class="des desH">{%btn.close%}</label>
+		</li>
+	</ul>
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div id="videoPluginCon"></div>
+	<ul class="line lineB">
+		<li class="line">
+			<input id="del" type="button" class="subBtnB btnA delIcon" value="{%btn.del%}" />
+		</li>
+		<li class="line ml">
+			<input id="clear" type="button" class="subBtnB btnA clearIcon" value="{%btn.clean%}" />
+		</li>
+	</ul>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.regionSetting%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line lineL1">
+				<li class="dragLine">
+					<div id="sensitivityDragLine" class="ipcDragLineDiv"></div>
+				</li>
+			</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+			<i class="arrowDown" id="handleArrow"></i>
+		</div>
+		<div class="handleWay" id="handleWay" style="display: none">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="triggerRecord" class="chObj" value="1"></i>
+					<label class="des desA">{%label.triggerRecord%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="sendEmail" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="triggerAlarmDevice" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="sendToFtp" class="chObj" value="2"></i>
+					<label class="des desA">{%label.sendFtp%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

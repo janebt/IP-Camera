@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>how to start and stop the video player</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 960px;
+            height: 540px;
+            border: 1px solid gray;
+        }
+		
+		input.selectedBtn {
+			border: 1px solid black;
+			background: #dd8;
+		}
+        
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> Motion Detection </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="960" height="540">
+		<a href="#">get new plugin</a>			
+	</object>
+	</div>
+	<form action="#"> 
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="主码流" id="startTest1" onclick="startPlayFunc1(); ">
+			<input type="button" value="子码流" id="startTest0" onclick="startPlayFunc0();">
+			<input type="button" value="停止" id="stop" onclick="stopPlayFunc();">
+		</p>
+		
+	</form>
+</div>
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}	
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");
+
+	
+	
+	function startPlayFunc1(){	
+		obj.ip = document.getElementById('serverIp').value;  
+		obj.port = 8080;     
+		obj.username = "admin";   
+		obj.password = "YWRtaW4=";  
+		obj.streamtype = 2;
+			
+		//设置主（1）、子码流（0），默认值0，设置0、1之外的值则无变化，仍保留当前值
+		obj.streamresolution = 1;	
+       
+        obj.width = 960;    
+		obj.height = 540;  
+		
+		obj.PlayVideo();	
+		
+		document.getElementById("startTest1").className = "selectedBtn";
+		document.getElementById("startTest0").className = "";
+	}
+	
+	function startPlayFunc0(){
+		obj.ip = document.getElementById('serverIp').value;  
+		obj.port = 8080;     
+		obj.username = "admin";   
+		obj.password = "YWRtaW4=";  
+		obj.streamtype = 2;
+		
+		obj.streamresolution = 0;	
+       
+        obj.width = 640;    
+		obj.height = 480;  
+		
+		obj.PlayVideo();	
+		
+		document.getElementById("startTest1").className = "";
+		document.getElementById("startTest0").className = "selectedBtn";
+	}
+	
+	function stopPlayFunc(){
+		obj.StopVideo();
+	}
+	
+	
+	function isVideoReadyCB(arg){    
+
+	};
+	
+	function isVideoConnectCB(arg){    
+
+	};
+	
+	obj.videoReadyCallback( isVideoReadyCB );    	
+		
+	obj.videoConnectCallback( isVideoConnectCB ); 
+	
+	
+	startPlayFunc0();
+	
+</script>
+
+
+
+</body>

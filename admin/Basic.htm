@@ -1,0 +1,442 @@
+﻿<script type="text/javascript">
+	var gBasicMenuUl = id("basicMenuUl");
+	var gBasicResizeArr = {};
+
+	function basicResizeArrRemove(name)
+	{
+		if (undefined == name)
+		{
+			return;
+		}
+
+		name = name.toString();
+		for (var prop in gBasicResizeArr)
+		{
+			if (prop == name)
+			{
+				delete gBasicResizeArr[prop];
+				break;
+			}
+		}
+	}
+
+	function init()
+	{
+		var basicAFObj = {
+			head:id("basicHead"),
+			basicCon:id("basicCon")
+		};
+
+		function getConfData(callBack)
+		{
+			var data = {}, pppoeIp, staticIp, vhttpdInnerPort,
+			rtspInnerPort, rtspExtPort, vhttpdExtPort, upnpList;
+
+			data[uciUpnp.fileName] = {};
+			data[uciUpnp.fileName][KEY_TABLE] = uciUpnp.secType.upnpStatus;
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+
+			$.query(data, function(result){
+				typeof callBack == "function" && callBack();
+
+				if (ENONE == result[ERR_CODE])
+				{
+					upnpList = formatTableData(result[uciUpnp.fileName][uciUpnp.secType.upnpStatus]);
+
+					for (var i = 0, len = upnpList.length; i < len; i++)
+					{
+						if (uciUpnp.secName.vhttpd == upnpList[i][SEC_NAME])
+						{
+							vhttpdExtPort = parseInt(upnpList[i][uciUpnp.optName.extPort], 10);
+							vhttpdInnerPort = parseInt(upnpList[i][uciUpnp.optName.innerPort], 10);
+							vhttpdStatus = upnpList[i][uciUpnp.optName.status];
+							continue;
+						}
+						
+						if (uciUpnp.secName.rtsp == upnpList[i][SEC_NAME])
+						{
+							rtspExtPort = parseInt(upnpList[i][uciUpnp.optName.extPort], 10);
+							rtspInnerPort = parseInt(upnpList[i][uciUpnp.optName.innerPort], 10);
+							rtspStatus = upnpList[i][uciUpnp.optName.status];
+							continue;
+						}
+					}
+
+					staticIp = result[uciNetwork.fileName][uciNetwork.dynData.wanStatus][uciNetwork.optName.ipAddr];
+					pppoeIp = result[uciNetwork.fileName][uciNetwork.dynData.wanStatus][uciNetwork.optName.pppoeIpv4];
+					$.staticIp = staticIp;
+					$.pppoeIp = pppoeIp;
+					$.vhttpdInnerPort = vhttpdInnerPort;
+					$.rtspInnerPort = rtspInnerPort;
+
+					/*upnp手动模式下,不生效时外部端口为0*/
+					if(vhttpdStatus == "on")
+					{
+						$.vhttpdExtPort = vhttpdExtPort;
+					}
+					else
+					{
+						$.vhttpdExtPort = "0";
+					}
+
+					if(rtspStatus == "on")
+					{
+						$.rtspExtPort = rtspExtPort;
+					}
+					else
+					{
+						$.rtspExtPort = "0";
+					}
+
+				}
+			});
+		}
+
+		function basicPHAutoFit()
+		{
+			var height, tmpHeight, basicHeightL, basicHeightR;
+			var bodyHeight = parseInt(document.documentElement.clientHeight);
+			var basicCon = basicAFObj.basicCon;
+			var headHeight = parseInt(basicAFObj.head.offsetHeight);
+			var basicConL = $("div.basicConL")[0];
+			var basicConR = $("div.basicConR")[0];
+			var pluginUpInfoCon = $("div.pluginUpInfoCon")[0];
+			var fieldset = $("fieldset")[0];
+			var minHeight = 550;
+			//var width = "980px";
+			var item;
+
+			try
+			{
+				/*if (document.documentElement.clientWidth < parseInt(width))
+				{
+					document.body.style.width = width;
+				}
+				else
+				{
+					document.body.style.width = document.documentElement.clientWidth + "px";
+				}*/
+
+				document.body.style.width = document.documentElement.clientWidth + "px";
+				bodyHeight = parseInt(document.documentElement.clientHeight);
+				if (isIESix == true)
+				{
+					if (null != basicConR)
+					{
+						basicHeightR = parseInt(basicConR.offsetHeight);
+					}
+					else
+					{
+						basicHeightR = 0;
+					}
+
+					if (null != basicHeightL)
+					{
+						basicHeightL = parseInt(basicConL.offsetHeight) - parseInt(getNodeDefaultView(basicConL, "paddingBottom"));
+					}
+					else
+					{
+						basicHeightL = 0;
+					}
+
+					tmpHeight = basicHeightL > basicHeightR ? basicHeightL : basicHeightR;
+					height = bodyHeight - headHeight;
+					height = height > tmpHeight ? height : tmpHeight;
+					height = height < minHeight ? minHeight : height;
+					height = height + "px";
+					basicCon.style.height = height;
+
+					if (null != basicConR)
+					{
+						basicConR.style.height = height;
+					}
+
+					if (null != basicConL)
+					{
+						basicConL.style.height = height;
+					}
+				}
+				else
+				{
+					if(pluginUpInfoCon){
+						height = bodyHeight - headHeight - parseInt(pluginUpInfoCon.offsetHeight);
+					}
+					else{
+						height = bodyHeight - headHeight;					
+					}
+					//height = height < minHeight ? minHeight : height;
+					height = height + "px";
+					//basicCon.style.minHeight = height;
+					basicCon.style.Height = height;
+					if (null != fieldset)
+					{
+						fieldset.style.height = height;
+					}
+
+					if (null != basicConR)
+					{
+						//basicConR.style.minHeight = height;
+						basicConR.style.height = height;
+					}
+
+					if (null != basicConL)
+					{
+						//basicConL.style.minHeight = height;
+						basicConL.style.height = height;
+					}
+				}
+
+				if (null != basicConR)
+				{
+					simulateMouseC(basicConR);
+				}
+
+				for (var prop in gBasicResizeArr)
+				{
+					try
+					{
+						item = gBasicResizeArr[prop];
+						item != undefined && typeof item.func == "function" && item.func();
+					}catch(ex){
+						log(ex);
+					}
+				}
+			}catch(ex){
+				log("basicPHAutoFit:", ex);
+			}
+		}
+
+		function pageInit()
+		{
+			var helpBtn = id("helpBtn");
+			var plugin = new Plugin({id:"localStoragePlugin"});
+
+			if (false == $.local)
+			{
+				id("userNameSpn").innerHTML = $.username.replace(/&/g, "&amp;");
+			}
+			else
+			{
+				id("userNameSpn").innerHTML = "Admin";
+			}
+
+			if ($.group == GROUP_ROOT || $.group == GROUP_ADMIN || true == $.local)
+			{
+				helpBtn.onclick = function(){
+					var tmpUrl = window.location.href.split("?")[0];
+
+					tmpUrl += "#" + LOADHELPTYPE;
+
+					for (var para in LoadPageIndex)
+					{
+						if (-1 != LoadPageIndex[para] && undefined != LoadPageIndex[para] && "function" != typeof LoadPageIndex[para])
+						{
+							tmpUrl = tmpUrl + "&" + para + "=" + LoadPageIndex[para];
+						}
+					}
+
+					window.open(tmpUrl);
+				};
+
+				helpBtn.style.display = "inline";
+			}
+
+			id("logout").onclick = $.logout;
+			id("StorageFolder").onclick = function(){
+				if (false == plugin.checkInstalled())
+				{
+					showDetailCon();
+					showAlert(errStr.sLclPluginInstallTip);
+				}
+				$("#StorageFolder").css('background-image','url(../web-static/images/save_normal.png)');
+				plugin.openStorageFolder();
+			}
+
+			window.basicPHAutoFit = basicPHAutoFit;
+			window.setTimeout(function(){
+				attachEvnt(window, "resize", function(){
+					if (id("basicCon") != null)
+					{
+						basicPHAutoFit();
+					}
+				});
+			}, 1000);
+
+			if (true == $.local)
+			{
+				menuInit_Basic();
+				return;
+			}
+
+			id("logout").onmouseover = function()
+			{
+				this.className = "logout logoutHover";
+			}
+			id("logout").onmouseout = function()
+			{
+				this.className = "logout";
+			}
+			id("StorageFolder").onmouseover = function()
+			{
+				this.className = "StorageFolder StorageFolderHover";
+			}
+			id("StorageFolder").onmouseout = function()
+			{
+				this.className = "StorageFolder";
+			}
+			id("helpBtn").onmouseover = function()
+			{
+				this.className = "helpBtn helpBtnHover";
+			}
+			id("helpBtn").onmouseout = function()
+			{
+				this.className = "helpBtn";
+			}
+			getConfData(menuInit_Basic);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	body{
+		background:#E6E7EB;
+		font-size:12px;
+		overflow-y:hidden;
+		*overflow-y:visible;
+		min-width:1100px;
+		_width:expression((documentElement.clientWidth < 1100)?"1100px":"auto");
+	}
+	div.basicHead{
+		background:url(../web-static/images/logoWhite.png) no-repeat 40px 12px;
+		background-color:#356BD5;
+		height:44px;
+		line-height: 44px;
+		text-align: center;
+		position:relative;
+	}
+	div.basicCon{
+		overflow:visible;
+	}
+	div.basicConL{
+		background:#E6E7EB;
+		float:left;
+		padding-left:40px;
+		padding-right:16px;
+		overflow-y:auto;
+	}
+	div.basicConR{
+		position:relative;
+	}
+	div.basicHead span{
+		color:#FFFFFF;
+		height: 16px;
+		line-height:16px;
+		*padding:2px 0;
+		top: 14px;
+		font-size:12px;
+	}
+	div.basicMenuCon{
+		height:44px;
+		width: 396px;
+		display: inline-block;
+		_zoom:1;
+		_display:inline;
+	}
+	ul.basicMenuUl{
+		margin:0 auto;
+		list-style:none;
+		position:relative;
+		overflow:hidden;
+		text-align:center;
+	}
+	ul.basicMenuUl li{
+		cursor:pointer;
+		display:inline-block;
+		_zoom:1;
+		*display:inline;
+		font-size:16px;
+		margin:0 32px;
+		line-height:44px;
+		position:relative;/*删除此属性IE6下顶部栏会异常*/
+		width:32px;
+		*width: 34px;/*为了解决IE6下字体加粗后换行的bug*/
+		*margin: 0 31px;
+	}
+	ul.basicMenuUl li.menuLi{
+		color:#C0D0F0;
+	}
+	ul.basicMenuUl li.menuLiHover{
+		color:#FFFFFF;
+	}
+	ul.basicMenuUl li.menuLiClick{
+		font-weight: bold;
+		color:#FFFFFF;
+	}
+	#localStoragePlugin{
+		visibility:hidden;
+		width:0px;
+		height:0px;
+	}
+	#localStoragePlugin object{
+		width:0px;
+		height:0px;
+	}
+	#userNameSpn{
+		position: absolute;
+		right: 256px;
+		*padding:0;
+	}
+	#helpBtn{
+		padding-left:20px;
+		position: absolute;
+		right: 192px;
+		cursor: pointer;
+	}
+	.helpBtn{
+		background:url(../web-static/images/help_normal.png) no-repeat 0px 0px;
+	}
+	.helpBtnHover{
+		font-weight: bold;
+		background:url(../web-static/images/help_hover.png) no-repeat 0px 0px;
+	}
+	#StorageFolder{
+		padding-left:20px;
+		position: absolute;
+		right: 104px;
+		cursor: pointer;
+	}
+	.StorageFolder{
+		background:url(../web-static/images/save_normal.png) no-repeat 0px 0px;
+	}
+	.StorageFolderHover{
+		font-weight: bold;
+		background:url(../web-static/images/save_hover.png) no-repeat 0px 0px;
+	}
+	#logout{
+		padding-left:20px;
+		position: absolute;
+		right: 40px;
+		cursor: pointer;
+	}
+	.logout{
+		background: url(../web-static/images/quit_normal.png) no-repeat 0px 0px;
+	}
+	.logoutHover{
+		font-weight: bold;
+		background: url(../web-static/images/quit_hover.png) no-repeat 0px -1px;
+	}
+</style>
+<div id="basicHead" class="basicHead">
+	<div id="localStoragePlugin"></div>
+	<div class="basicMenuCon">
+		<ul id="basicMenuUl" class="basicMenuUl"></ul>
+	</div>
+	<span id="logout" class="logout">{%btn.logout%}</span>
+	<span id="StorageFolder" class="StorageFolder">{%label.localFile%}</span>
+	<span id="helpBtn" class="helpBtn">{%label.help%}</span>
+	<span id="userNameSpn" class="userNameSpn"></span>
+</div>
+<div id="basicCon" class="basicCon basicConHFit layout"></div>

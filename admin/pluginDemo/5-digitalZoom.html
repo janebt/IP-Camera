@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>digital zoom</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+		
+		input.on {
+			border: 1px solid black;
+			background: #dd5;
+		}
+		input.off {
+			border: 1px solid black;
+			background: #5dd;
+		}
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> 预览 &gt; digital zoom </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>   
+		<p>
+			<input type="button" value="电子放大" id="digitalZoom" class="off">
+		</p>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480,
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	
+	pluginObj.startDigitalZoom = function(){     //开启电子放大功能，能够在视频上选取矩形区域
+		obj.bDigitalZoomOn = 1;                  
+	};
+	
+	pluginObj.stopDigitalZoom = function(){      //关闭电子放大功能
+		obj.bDigitalZoomOn = 0;
+	};
+	
+	
+	pluginObj.regCallback = function(){	     
+		
+		//选取矩形完成，触发回调。回调函数需要从插件获取被选取的矩形信息，并传递给后台，由后台实现将该选取区域放大并填充整个视频区。
+		obj.digitalZoomCallback(function(x, y, w, h){      //回调函数带4个参数，分别是电子放大矩形区域的左上角X、Y坐标和矩形Width、height。
+			var startPoint = {};  //左上角坐标的变换值    
+			var width, height;    //矩形长宽的变换值
+			startPoint.x = x;      //点的x变换值为 实际值 * 10000 / 分辨率的width。其它值类似
+			startPoint.y = y;        
+			width = w;              
+			height = h;               
+			console.log("digital Zoom Rect  : startPoint(" +  startPoint.x + ", " + startPoint.y + ")    " + "width = " + width + ", " + "height = " + height);				
+		});
+		
+	};
+	
+
+	(function(){
+		document.getElementById("digitalZoom").onclick = function(){
+			if(this.className == "off")
+			{
+				this.className = "on";
+				pluginObj.startDigitalZoom();
+			}
+			else if(this.className == "on")
+			{
+				this.className = "off";
+				pluginObj.stopDigitalZoom();
+			}
+			
+		} 
+		
+		pluginObj.regCallback();    //注册鼠标弹起时的回调函数
+	})();
+
+</script>
+
+<div>
+<h2>电子放大</h2>
+<p>该功能位于预览页面。开启后用户可以在视频上选取矩形区域，当鼠标左键弹起，选中的矩形区域放大并填充整个视频区，如果选取的矩形区域长宽比不符合标准则进行拉伸显示。<br>
+   只要电子放大功能未关闭，且未达到最大放大倍数，则放大后仍可继续选取矩形进行放大。<br>
+   这个功能后台方案都没有确定，所以接口也可能发生更改。该版本为暂定接口。<br>
+   现在的实现是，一旦鼠标弹起，则绘制的矩形框不再显示。理论上，应该矩形框消除应该发生在放大完成时，但是现在不知道后台如何实现，并传递放大完成的信号，所以此处待定。
+</p>
+
+<h5>bDigitalZoomOn</h5>
+<p>
+	属性：赋值为1时开启电子放大功能；赋值为0时关闭电子放大功能。<br>
+</p>
+
+<h5>digitalZoomCallback(function)</h5>
+<p>
+	接口方法：注册电子放大矩形区域绘制完成的回调函数。<br>
+	参数1：JS函数，鼠标左键弹起时调用该JS函数。这个函数会带4个参数，当调用发生时，这4个参数分别传递用户所选取矩形区域的左上角X坐标、Y坐标和矩形的width、height。<br>
+	回调函数的参数都是经过转换的坐标值，转换方法同OSD的demo所述。且不影响前端。
+</p>
+
+</div>
+
+</body>

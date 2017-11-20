@@ -1,0 +1,387 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var FILE_NAME = uciSystem.fileName;
+		var SEC_NAME_BASIC = uciSystem.secName.basic;
+		var SEC_NAME_NTP = uciSystem.secName.ntp;
+		var TIME_MODE = uciSystem.optValue.timeMode;
+		var OPT_NAME_TIME_MODE = uciSystem.optName.timingMode;
+		var SERVER = uciSystem.optName.server;
+		var NTP_PORT = uciSystem.optName.ntpPort;
+		var CLOCK_STATUS = uciSystem.secName.clockStatus;
+		var SECONDS = uciSystem.optName.seconds;
+		var SETDATE = uciSystem.optName.setDate;
+		var sysTimeClock = id("sysTimeClock");
+		var manualA = id("manualA");
+		var ntpA = id("ntpA");
+		var srvAddr = id("srvAddr");
+		var synTimeSelOption = [{str:label.synTimeNTP, value:TIME_MODE.ntp}, {str:label.synTimeManual, value:TIME_MODE.manual}];
+		var eptData, selValue;
+		var bSynTimeLclCp = false;
+		var bSetTimeManual = false;
+		var fSetTimeManual = true;
+		var synTimeComputerHd;
+		var synTimeNTPHd;
+		var time = id("time");
+		var date = id("date");
+
+		function errorHandle(code, objOrId)
+		{
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCSYSNPORTERR:
+				showStr = errStr.sysNtpPortErr;
+				break;
+			case IPCSYSNSERVERERR:
+				showStr = errStr.sysNtpServerErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case EINVIP:
+				showStr = errStr.ipAddrErr;
+				break;
+			case EINVGROUPIP:
+				showStr = errStr.ipAddrGroupErr;
+				break;
+			case EINVIPFMT:
+				showStr = errStr.ipAddrFmtErr;
+				break;
+			case EINVLOOPIP:
+				showStr = errStr.ipAddrLoopErr;
+				break;
+			case EINVNET:
+				showStr = errStr.ipAddrNetErr;
+				break;
+			case EINDOMAIN:
+				showStr = errStr.domainErr;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+		function synTimeComputer()
+		{
+			var dateTime;
+
+			clearTimeout(synTimeNTPHd);
+			clearTimeout(synTimeComputerHd);
+
+			if (true == bSynTimeLclCp)
+			{
+				dateTime = formateDate();
+				sysTimeClock.innerHTML = dateTime;
+				synTimeToTimepicker(dateTime);
+				synTimeComputerHd = $.setTimeout(arguments.callee, 1000);
+			}
+		}
+		function synTimeCpBtnHd()
+		{
+			bSynTimeLclCp = true;
+			bSetTimeManual = false;
+			fSetTimeManual = false;
+			synTimeComputer();
+		}
+		function synTimeSelHd(value)
+		{
+			selValue = value;
+			if (value == TIME_MODE.ntp)
+			{
+				manualA.style.display = "none";
+				ntpA.style.display = "block";
+			}
+			else
+			{
+				manualA.style.display = "block";
+				ntpA.style.display = "none";
+			}
+
+			synTimeNtp();
+		}
+		function synTimeToTimepicker(arg)
+		{
+			var dateTime = arg.split(" ");
+
+			date.value = dateTime[0];
+			time.value = dateTime[1].replace(/\:/g, " : ");
+		}
+		function modifyTimeStr(value)
+		{
+			if (value < 10)
+			{
+				value = "0" + value;
+			}
+
+			return value;
+		}
+		function formateDate(msecs)
+		{
+			var now;
+
+			if (undefined == msecs)
+			{
+				now = new Date();
+			}
+			else
+			{
+				now = new Date(msecs);
+			}
+
+			return now.getFullYear() + "-" + modifyTimeStr(now.getMonth() + 1) + "-" + modifyTimeStr(now.getDate()) + " " +
+					modifyTimeStr(now.getHours()) + ":" + modifyTimeStr(now.getMinutes()) + ":" + modifyTimeStr(now.getSeconds());
+		}
+		function synTimeNtp()
+		{
+			var data = {};
+
+			clearTimeout(synTimeComputerHd);
+			clearTimeout(synTimeNTPHd);
+			data[FILE_NAME] = {};
+			data[FILE_NAME][NAME] = CLOCK_STATUS;
+			$.queryP(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]) && bSynTimeLclCp == false)
+				{
+					var dateTime = formateDate(Math.round(result[FILE_NAME][CLOCK_STATUS][SECONDS]) * 1000);
+
+					sysTimeClock.innerHTML = dateTime;
+
+					if (selValue == TIME_MODE.manual && false == bSetTimeManual)
+					{
+						synTimeToTimepicker(dateTime);
+					}
+				}
+
+				synTimeNTPHd = $.setTimeout(synTimeNtp, 1000);
+			});
+		}
+		function saveHandle()
+		{
+			var data = {};
+			var module = data[FILE_NAME] = {};
+			var srvAddrVal = srvAddr.value;
+
+			if (false == fSetTimeManual)
+			{
+				synTimeCpBtnHd();
+			}
+
+			if (selValue == TIME_MODE.ntp)
+			{
+				/*if (false == checkNum(srvPortVal))
+				{
+					showAlert(errStr.portIllegalErr);
+					return;
+				}*/
+
+				if (false == errorHandle(checkDomain(srvAddrVal)))
+				{
+					return;
+				}
+			}
+
+			module[SEC_NAME_BASIC] = {};
+			module[SEC_NAME_BASIC][OPT_NAME_TIME_MODE] = selValue;
+			showToast();
+			$.modify(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					data = {}
+					module = data[FILE_NAME] = {};
+					bSynTimeLclCp = false;
+					bSetTimeManual = false;
+
+					if (selValue == TIME_MODE.ntp)
+					{
+						module[SEC_NAME_NTP] = {};
+						module[SEC_NAME_NTP][SERVER] = srvAddrVal;
+						$.modify(data, function(result){
+							if (true == errorHandle(result[ERR_CODE]))
+							{
+								showToast("setNTPSuccess");
+								synTimeNtp();
+							}
+						});
+					}
+					else
+					{
+						module[SETDATE] = {};
+
+						if (bSynTimeLclCp == true)
+						{
+							module[SETDATE][SECONDS] = Math.round((new Date()).getTime() / 1000);
+						}
+						else
+						{
+							if (time.value.length == 0 || date.value.length == 0)
+							{
+								closeToast();
+								showAlert(errStr.setDateTimeNull);
+								return;
+							}
+							else
+							{
+								module[SETDATE][SECONDS] = getSelSeconds();
+							}
+						}
+
+						$.action(data, function(result){
+							if (true == errorHandle(result[ERR_CODE]))
+							{
+								showToast("success");
+								synTimeNtp();
+							}
+						});
+					}
+				}
+			});
+		}
+
+		function getSelSeconds()
+		{
+			var dateObj = new Date();
+			var dataList = date.value.split("-");
+			var timeList = time.value.split(":");
+
+			dateObj.setFullYear(dataList[0], parseInt(dataList[1], 10) - 1, dataList[2]);
+			dateObj.setHours(parseInt(timeList[0], 10));
+			dateObj.setMinutes(parseInt(timeList[1], 10));
+			dateObj.setSeconds(parseInt(timeList[2], 10));
+
+			return parseInt(dateObj.getTime()/1000, 10);
+		}
+
+		function initPage()
+		{
+			var data = {};
+			var module = data[FILE_NAME] = {};
+
+			module[NAME] = [SEC_NAME_BASIC, SEC_NAME_NTP];
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						selectInit("synTimeSel", synTimeSelOption, TIME_MODE.manual, synTimeSelHd);
+						synTimeSelHd(TIME_MODE.manual);
+						laydate({elem:"#date"});
+						timePickerInit("time");
+						date.value = formateDate().split(" ")[0];
+						time.value = formateDate().split(" ")[1];
+						sysTimeClock.innerHTML = formateDate();
+						showDetailCon();
+						return;
+					}
+
+					srvAddr.value = result[FILE_NAME][SEC_NAME_NTP][SERVER];
+					eptData = result[FILE_NAME][SEC_NAME_BASIC];
+					selValue = eptData[OPT_NAME_TIME_MODE];
+					selectInit("synTimeSel", synTimeSelOption, selValue, synTimeSelHd);
+					synTimeSelHd(selValue);
+
+					showDetailCon();
+				}
+			});
+
+			id("synTimeCpBtn").onclick = synTimeCpBtnHd;
+			id("save").onclick = saveHandle;
+			date.onkeydown = function(event){
+				event = event || window.event;
+				eventPreventDefault(event);
+			};
+			time.onkeydown = function(event){
+				event = event || window.event;
+				eventPreventDefault(event);
+			};
+			laydate({elem:"#date"});
+			timePickerInit("time");
+			attachEvnt(date, "click", function(){
+				bSynTimeLclCp = false;
+				bSetTimeManual = true;
+				fSetTimeManual = true;
+				synTimeNtp();
+			});
+			attachEvnt(time, "click", function(){
+				bSynTimeLclCp = false;
+				bSetTimeManual = true;
+				fSetTimeManual = true;
+				synTimeNtp();
+			});
+			synTimeNtp();
+		}
+
+		initPage();
+	}
+	init();
+</script>
+<style type="text/css">
+	#manualA{
+		display:none;
+	}
+	#ntpA{
+		display:none;
+	}
+	input.textClock{
+		background:url(../web-static/images/clock.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+	}
+	input.textCalender{
+		background:url(../web-static/images/calender.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+	}
+	li.line input.btnA{
+		width:190px;
+		*padding:2px 12px 1px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line lineL">
+		<li class="line lineE">
+			<label class="des desA">{%label.sysTime%}</label>
+			<span id="sysTimeClock" class="text textA"></span>
+		</li>
+		<li class="line lineE">
+			<label class="des desA" for="eptSerial">{%label.synTimeMethod%}</label>
+			<span class="selCon">
+				<span id="synTimeSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<a id="manualA">
+			<li class="line lineE">
+				<label class="des desA">{%label.setTime%}</label>
+				<input id="date" type="text" value="" class="text textA2 textCalender" readonly="true" />
+			</li>
+			<li class="line lineE">
+				<label class="des desA"></label>
+				<input id="time" type="text" value="" class="text textA2 textClock" readonly="true" />
+			</li>
+			<li class="line lineE">
+				<label class="des desA"></label>
+				<input id="synTimeCpBtn" class="subBtn btnA" type="button" value="{%label.synTimeComputer%}" />
+			</li>
+		</a>
+		<a id="ntpA">
+			<li class="line lineE">
+				<label class="des desA">{%label.srvAddr%}</label>
+				<input id="srvAddr" type="text" class="text textA1" />
+			</li>
+		</a>
+	</ul>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>
+

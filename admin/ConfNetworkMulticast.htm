@@ -1,0 +1,719 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var STREAM_MAIN = "main";
+		var STREAM_MINOR = "minor";
+		var STREAM_THIRD = "third";
+		var defStreamType = STREAM_MAIN;
+		var streamType = id("streamType");
+		var mainDiv = $(".mainStream");
+		var minorDiv = $(".minorStream");
+		var thirdDiv = $(".thirdStream");
+		var multicastMainEnabled = id("multicastMainEnabled");
+		var multicastMainAddr = id("multicastMainAddr");
+		var multicastMainPort = id("multicastMainPort");
+		var multicastMainRandomEnabled = id("multicastMainRandomEnabled");
+		var multicastMinorEnabled = id("multicastMinorEnabled");
+		var multicastMinorAddr = id("multicastMinorAddr");
+		var multicastMinorPort = id("multicastMinorPort");
+		var multicastMinorRandomEnabled = id("multicastMinorRandomEnabled");
+		var multicastThirdEnabled = id("multicastThirdEnabled");
+		var multicastThirdAddr = id("multicastThirdAddr");
+		var multicastThirdPort = id("multicastThirdPort");
+		var multicastThirdRandomEnabled = id("multicastThirdRandomEnabled");
+		var saveBt = id("save");
+
+		var EMPTYPORT = -50415;
+		var MAXPORT = 65535;
+		var MINPORT = 1025;
+
+		var multicastFN = uciMulticast.fileName;
+		var multicastON = uciMulticast.optName;
+		var multicastSN = uciMulticast.secName;
+
+		var gMulticastMainEnabled = DEF_MULTI_MAIN_ENABLED = uciMulticast.optValue.enableVal.off;
+		var gMulticastMainAddr = DEF_MULTI_MAIN_ADDR = "224.0.1.0";
+		var gMulticastMainPort = DEF_MULTI_MAIN_PORT = 10000;
+		var gMulticastMainRandomEnabled = DEF_MULTI_MAIN_RANDOM_ENABLED = uciMulticast.optValue.enableVal.on;
+
+		var gMulticastMinorEnabled = DEF_MULTI_MINOR_ENABLED = uciMulticast.optValue.enableVal.off;
+		var gMulticastMinorAddr = DEF_MULTI_MINOR_ADDR = "224.0.1.0";
+		var gMulticastMinorPort = DEF_MULTI_MINOR_PORT = 10002;
+		var gMulticastMinorRandomEnabled = DEF_MULTI_MINOR_RANDOM_ENABLED = uciMulticast.optValue.enableVal.on;
+
+		var gMulticastThirdThirdEnabled = DEF_MULTI_THIRD_ENABLED = uciMulticast.optValue.enableVal.off;
+		var gMulticastThirdAddr = DEF_MULTI_THIRD_ADDR = "224.0.1.0";
+		var gMulticastThirdPort = DEF_MULTI_THIRD_PORT = 10004;
+		var gMulticastThirdRandomEnabled = DEF_MULTI_THIRD_RANDOM_ENABLED = uciMulticast.optValue.enableVal.on;
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case EINVNET:
+				showStr = errStr.ipAddrNetErr;
+				break;
+			case EINVIP:
+				showStr = errStr.ipAddrErr;
+				break;
+			case EINVIPFMT:
+				showStr = errStr.ipAddrFmtErr;
+				break;
+			case EINVGROUPIPRANGE:
+				showStr = errStr.ipAddrGroupRangeErr;
+				break;
+			case EINVLOOPIP:
+				showStr = errStr.ipAddrLoopErr;
+				break;
+			case EILLEGALPORT:
+				showStr = errStr.portIllegalErr;
+				break;
+			case EINVPORT:
+				showStr = errStr.invPortErr;
+				break;
+			case EMPTYPORT:
+				showStr = errStr.noPortInputErr;
+				break;
+			case EDUPLICATEDIPANDPORT:
+				showStr = errStr.ipAddrAndPortDuplicated;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.unknown + errNo;
+				break;
+			}
+				showNote(objOrId, showStr);
+			return false;
+		}
+
+		function checkPort(val, max, min)
+		{
+			if (val.length < 1)
+			{
+				return EMPTYPORT;
+			}
+
+			if (false == checkNum(val))
+			{
+				return EILLEGALPORT;
+			}
+
+			if (false == checkNumRange(parseInt(val), max, min))
+			{
+				return EINVPORT;
+			}
+			return ENONE;
+		}
+
+		function fillDom(resp)
+		{
+			if (resp[ERR_CODE] != ERR_NONE)
+			{
+				return;
+			}
+
+			var multicastData = resp[multicastFN];
+
+			gMulticastMainEnabled = multicastData[multicastSN.main][multicastON.enabled];
+			setChecked(multicastMainEnabled, gMulticastMainEnabled);
+			gMulticastMainAddr = multicastMainAddr.value = multicastData[multicastSN.main][multicastON.address];
+			gMulticastMainPort = multicastMainPort.value = multicastData[multicastSN.main][multicastON.port];
+			gMulticastMainRandomEnabled = multicastData[multicastSN.main][multicastON.random];
+			setChecked(multicastMainRandomEnabled, gMulticastMainRandomEnabled);
+
+			gMulticastMinorEnabled = multicastData[multicastSN.minor][multicastON.enabled];
+			setChecked(multicastMinorEnabled, gMulticastMinorEnabled);
+			gMulticastMinorAddr = multicastMinorAddr.value = multicastData[multicastSN.minor][multicastON.address];
+			gMulticastMinorPort = multicastMinorPort.value = multicastData[multicastSN.minor][multicastON.port];
+			gMulticastMinorRandomEnabled = multicastData[multicastSN.minor][multicastON.random];
+			setChecked(multicastMinorRandomEnabled, gMulticastMinorRandomEnabled);
+
+			gMulticastThirdEnabled = multicastData[multicastSN.third][multicastON.enabled];
+			setChecked(multicastThirdEnabled, gMulticastThirdEnabled);
+			gMulticastThirdAddr = multicastThirdAddr.value = multicastData[multicastSN.third][multicastON.address];
+			gMulticastThirdPort = multicastThirdPort.value = multicastData[multicastSN.third][multicastON.port];
+			gMulticastThirdRandomEnabled = multicastData[multicastSN.third][multicastON.random];
+			setChecked(multicastThirdRandomEnabled, gMulticastThirdRandomEnabled);
+
+			handleShow();
+
+			showDetailCon();
+		}
+
+		function reset(value)
+		{
+			if(value)
+			{
+				gMulticastMainEnabled = DEF_MULTI_MAIN_ENABLED;
+				setChecked(multicastMainEnabled, gMulticastMainEnabled);
+				gMulticastMainAddr = multicastMainAddr.value = DEF_MULTI_MAIN_ADDR;
+				gMulticastMainPort = multicastMainPort.value = DEF_MULTI_MAIN_PORT;
+				gMulticastMainRandomEnabled = DEF_MULTI_MAIN_RANDOM_ENABLED;
+				setChecked(multicastMainRandomEnabled, gMulticastMainRandomEnabled);
+
+				gMulticastMinorEnabled = DEF_MULTI_MINOR_ENABLED;
+				setChecked(multicastMinorEnabled, gMulticastMinorEnabled);
+				gMulticastMinorAddr = multicastMinorAddr.value = DEF_MULTI_MINOR_ADDR;
+				gMulticastMinorPort = multicastMinorPort.value = DEF_MULTI_MINOR_PORT;
+				gMulticastMinorRandomEnabled = DEF_MULTI_MINOR_RANDOM_ENABLED;
+				setChecked(multicastMinorRandomEnabled, gMulticastMinorRandomEnabled);
+
+				gMulticastThirdEnabled = DEF_MULTI_THIRD_ENABLED;
+				setChecked(multicastThirdEnabled, gMulticastThirdEnabled);
+				gMulticastThirdAddr = multicastThirdAddr.value = DEF_MULTI_THIRD_ADDR;
+				gMulticastThirdPort = multicastThirdPort.value = DEF_MULTI_THIRD_PORT;
+				gMulticastThirdRandomEnabled = DEF_MULTI_THIRD_RANDOM_ENABLED;
+				setChecked(multicastThirdRandomEnabled, gMulticastThirdRandomEnabled);
+
+				modifyMulticast();
+				handleShow();
+
+				showDetailCon();
+			}
+			else
+			{
+				return;
+			}
+		}
+
+		function onReset()
+		{
+			closeNoteAll();
+			showConfirm(label.multicastResetWarnning, reset);
+		}
+
+		var checkOption = {};
+		checkOption.unCheckMutiIp = true;
+		checkOption.checkGroupIPRange = true;
+
+		function verifyMain()
+		{
+			/*var result = getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled") &&
+						(!errHandle(checkPort(multicastMainPort.value, MAXPORT, MINPORT), "multicastMainPort") ||
+						!errHandle(checkIp(multicastMainAddr.value, checkOption), "multicastMainAddr") ||
+						!errHandle((getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled") &&
+						multicastMainAddr.value == multicastMinorAddr.value && multicastMainPort.value == multicastMinorPort.value) ||
+						(getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled") &&
+						multicastMainAddr.value == multicastThirdAddr.value && multicastMainPort.value == multicastThirdPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastMainPort"));*/
+
+			var result = getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled");
+			if (result)
+			{
+				var res = !errHandle(checkPort(multicastMainPort.value, MAXPORT, MINPORT), "multicastMainPort");
+				res = !errHandle(checkIp(multicastMainAddr.value, checkOption), "multicastMainAddr") || res;
+				res = !errHandle((getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled") &&
+						multicastMainAddr.value == multicastMinorAddr.value && multicastMainPort.value == multicastMinorPort.value) ||
+						(getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled") &&
+						multicastMainAddr.value == multicastThirdAddr.value && multicastMainPort.value == multicastThirdPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastMainPort")
+						|| res;
+				result = res && result;
+			}
+			else
+			{
+				if (checkPort(multicastMainPort.value, MAXPORT, MINPORT) !== ENONE)
+				{
+					multicastMainPort.value = gMulticastMainPort;
+				}
+				if (checkIp(multicastMainAddr.value, checkOption) !== ENONE)
+				{
+					multicastMainAddr.value = gMulticastMainAddr;
+				}
+			}
+
+			if (result && STREAM_MAIN != streamType.value)
+			{
+				onStreamChange(STREAM_MAIN);
+				verifyMain();
+			}
+			return result;
+		}
+
+		function verifyMinor()
+		{
+			/*var result = getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled") &&
+						(!errHandle(checkPort(multicastMinorPort.value, MAXPORT, MINPORT), "multicastMinorPort") ||
+						!errHandle(checkIp(multicastMinorAddr.value, checkOption), "multicastMinorAddr") ||
+						!errHandle((getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled") &&
+						multicastMinorAddr.value == multicastMainAddr.value && multicastMinorPort.value == multicastMainPort.value) ||
+						(getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled") &&
+						multicastMinorAddr.value == multicastThirdAddr.value && multicastMinorPort.value == multicastThirdPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastMinorPort"));*/
+
+			var result = getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled");
+			if (result)
+			{
+				var res = !errHandle(checkPort(multicastMinorPort.value, MAXPORT, MINPORT), "multicastMinorPort");
+				res = !errHandle(checkIp(multicastMinorAddr.value, checkOption), "multicastMinorAddr") || res;
+				res = !errHandle((getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled") &&
+						multicastMinorAddr.value == multicastMainAddr.value && multicastMinorPort.value == multicastMainPort.value) ||
+						(getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled") &&
+						multicastMinorAddr.value == multicastThirdAddr.value && multicastMinorPort.value == multicastThirdPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastMinorPort")
+						|| res;
+				result = res && result;
+			}
+			else
+			{
+				if (checkPort(multicastMinorPort.value, MAXPORT, MINPORT) !== ENONE)
+				{
+					multicastMinorPort.value = gMulticastMinorPort;
+				}
+				if (checkIp(multicastMinorAddr.value, checkOption) !== ENONE)
+				{
+					multicastMinorAddr.value = gMulticastMinorAddr;
+				}
+			}
+
+			if (result && STREAM_MINOR != streamType.value)
+			{
+				onStreamChange(STREAM_MINOR);
+				verifyMinor();
+			}
+			return result;
+		}
+
+		function verifyThird()
+		{
+			/*var result = getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled") &&
+						(!errHandle(checkPort(multicastThirdPort.value, MAXPORT, MINPORT), "multicastThirdPort") ||
+						!errHandle(checkIp(multicastThirdAddr.value, checkOption), "multicastThirdAddr") ||
+						!errHandle((getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled") &&
+						multicastThirdAddr.value == multicastMainAddr.value && multicastThirdPort.value == multicastMainPort.value) ||
+						(getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled") &&
+						multicastThirdAddr.value == multicastMinorAddr.value && multicastThirdPort.value == multicastMinorPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastThirdPort"));*/
+
+			var result = getChecked("multicastThirdEnabled") && !getChecked("multicastThirdRandomEnabled");
+			if (result)
+			{
+				var res = !errHandle(checkPort(multicastThirdPort.value, MAXPORT, MINPORT), "multicastThirdPort");
+				res = !errHandle(checkIp(multicastThirdAddr.value, checkOption), "multicastThirdAddr") || res;
+				res = !errHandle((getChecked("multicastMainEnabled") && !getChecked("multicastMainRandomEnabled") &&
+						multicastThirdAddr.value == multicastMainAddr.value && multicastThirdPort.value == multicastMainPort.value) ||
+						(getChecked("multicastMinorEnabled") && !getChecked("multicastMinorRandomEnabled") &&
+						multicastThirdAddr.value == multicastMinorAddr.value && multicastThirdPort.value == multicastMinorPort.value)?EDUPLICATEDIPANDPORT:ENONE, "multicastThirdPort")
+						|| res;
+				result = res && result;
+			}
+			else
+			{
+				if (checkPort(multicastThirdPort.value, MAXPORT, MINPORT) !== ENONE)
+				{
+					multicastThirdPort.value = gMulticastThirdPort;
+				}
+				if (checkIp(multicastThirdAddr.value, checkOption) !== ENONE)
+				{
+					multicastThirdAddr.value = gMulticastThirdAddr;
+				}
+			}
+
+			if (result && STREAM_THIRD != streamType.value)
+			{
+				onStreamChange(STREAM_THIRD);
+				verifyThird();
+			}
+			return result;
+		}
+
+		function onBlur()
+		{
+			var result;
+			switch (streamType.value)
+			{
+				case STREAM_MAIN:
+					result = verifyMain();
+					break;
+				case STREAM_MINOR:
+					result = verifyMinor();
+					break;
+				case STREAM_THIRD:
+					result = verifyThird();
+					break;
+				default:
+					result = verifyMain() ||
+							verifyThird() ||
+							verifyMinor();
+			}
+
+		}
+
+		function onSave()
+		{
+			var result;
+			switch (streamType.value)
+			{
+				case STREAM_MAIN:
+					result = verifyMain() ||
+							verifyThird() ||
+							verifyMinor();
+					break;
+				case STREAM_MINOR:
+					result = verifyMinor() ||
+							verifyThird() ||
+							verifyMain();
+					break;
+				case STREAM_THIRD:
+					result = verifyThird() ||
+							verifyMinor() ||
+							verifyMain();
+					break;
+				default:
+					result = verifyMain() ||
+							verifyThird() ||
+							verifyMinor();
+			}
+			if (result)
+			{
+				return false;
+			}
+
+			gMulticastMainEnabled = getChecked("multicastMainEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+			gMulticastMainAddr = multicastMainAddr.value;
+			gMulticastMainPort = multicastMainPort.value;
+			gMulticastMainRandomEnabled = getChecked("multicastMainRandomEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+
+			gMulticastMinorEnabled = getChecked("multicastMinorEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+			gMulticastMinorAddr = multicastMinorAddr.value;
+			gMulticastMinorPort = multicastMinorPort.value;
+			gMulticastMinorRandomEnabled = getChecked("multicastMinorRandomEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+
+			gMulticastThirdEnabled = getChecked("multicastThirdEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+			gMulticastThirdAddr = multicastThirdAddr.value;
+			gMulticastThirdPort = multicastThirdPort.value;
+			gMulticastThirdRandomEnabled = getChecked("multicastThirdRandomEnabled")?uciMulticast.optValue.enableVal.on:uciMulticast.optValue.enableVal.off;
+
+			modifyMulticast();
+		}
+
+		function modifyMulticast()
+		{
+			var data={}; // TODO: 根据配置文件修改数据
+			data[multicastFN] = {};
+
+			data[multicastFN][multicastSN.main] = {};
+			data[multicastFN][multicastSN.main][multicastON.enabled] = gMulticastMainEnabled;
+			data[multicastFN][multicastSN.main][multicastON.address] = gMulticastMainAddr;
+			data[multicastFN][multicastSN.main][multicastON.port] = gMulticastMainPort;
+			data[multicastFN][multicastSN.main][multicastON.random] = gMulticastMainRandomEnabled;
+
+			data[multicastFN][multicastSN.minor] = {};
+			data[multicastFN][multicastSN.minor][multicastON.enabled] = gMulticastMinorEnabled;
+			data[multicastFN][multicastSN.minor][multicastON.address] = gMulticastMinorAddr;
+			data[multicastFN][multicastSN.minor][multicastON.port] = gMulticastMinorPort;
+			data[multicastFN][multicastSN.minor][multicastON.random] = gMulticastMinorRandomEnabled;
+
+			data[multicastFN][multicastSN.third] = {};
+			data[multicastFN][multicastSN.third][multicastON.enabled] = gMulticastThirdEnabled;
+			data[multicastFN][multicastSN.third][multicastON.address] = gMulticastThirdAddr;
+			data[multicastFN][multicastSN.third][multicastON.port] = gMulticastThirdPort;
+			data[multicastFN][multicastSN.third][multicastON.random] = gMulticastThirdRandomEnabled;
+
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+					//alert("failure! errNo: " + resp[ERR_CODE]);
+					refresh();
+				}
+			});
+		}
+
+		/* 刷新配置 */
+		function refresh()
+		{
+			var data = {};
+			data[multicastFN] = {};
+			data[multicastFN][NAME] = [multicastSN.main, multicastSN.minor, multicastSN.third];
+			$.query(data, fillDom);
+		}
+
+		/* 设置选中状态 */
+		function setChecked(checkId, checkValue)
+		{
+			var chkVal = uciMulticast.optValue.enableVal.on == checkValue ? true : false;
+			changeCheckInput(checkId, chkVal);
+		}
+
+		/* 获取选中状态 */
+		function getChecked(idObj)
+		{
+			if (null != id(idObj).getAttribute("checked") &&
+				"true" == id(idObj).getAttribute("checked").toString())
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		function handleShow()
+		{
+			if (getChecked("multicastMainEnabled"))
+			{
+				$("#multicastMainRandomEnabled").css({"opacity":"1"});
+				$("#multicastMainRandomEnabled").attr("disabled", false);
+				if (getChecked("multicastMainRandomEnabled"))
+				{
+					$("#multicastMainAddr").css({"opacity":"0.3"});
+					$("#multicastMainAddr").attr("disabled", true);
+					$("#multicastMainPort").css({"opacity":"0.3"});
+					$("#multicastMainPort").attr("disabled", true);
+					closeNoteAll();
+					verifyMain();
+				}
+				else
+				{
+					$("#multicastMainAddr").css({"opacity":"1"});
+					$("#multicastMainAddr").attr("disabled", false);
+					$("#multicastMainPort").css({"opacity":"1"});
+					$("#multicastMainPort").attr("disabled", false);
+					verifyMain();
+				}
+			}
+			else
+			{
+				$("#multicastMainRandomEnabled").css({"opacity":"0.3"});
+				$("#multicastMainRandomEnabled").attr("disabled", true);
+
+				$("#multicastMainAddr").css({"opacity":"0.3"});
+				$("#multicastMainAddr").attr("disabled", true);
+				$("#multicastMainPort").css({"opacity":"0.3"});
+				$("#multicastMainPort").attr("disabled", true);
+			}
+
+			if (getChecked("multicastMinorEnabled"))
+			{
+				$("#multicastMinorRandomEnabled").css({"opacity":"1"});
+				$("#multicastMinorRandomEnabled").attr("disabled", false);
+				if (getChecked("multicastMinorRandomEnabled"))
+				{
+					$("#multicastMinorAddr").css({"opacity":"0.3"});
+					$("#multicastMinorAddr").attr("disabled", true);
+					$("#multicastMinorPort").css({"opacity":"0.3"});
+					$("#multicastMinorPort").attr("disabled", true);
+					closeNoteAll();
+					verifyMinor();
+				}
+				else
+				{
+					$("#multicastMinorAddr").css({"opacity":"1"});
+					$("#multicastMinorAddr").attr("disabled", false);
+					$("#multicastMinorPort").css({"opacity":"1"});
+					$("#multicastMinorPort").attr("disabled", false);
+					verifyMinor();
+				}
+			}
+			else
+			{
+				$("#multicastMinorRandomEnabled").css({"opacity":"0.3"});
+				$("#multicastMinorRandomEnabled").attr("disabled", true);
+
+				$("#multicastMinorAddr").css({"opacity":"0.3"});
+				$("#multicastMinorAddr").attr("disabled", true);
+				$("#multicastMinorPort").css({"opacity":"0.3"});
+				$("#multicastMinorPort").attr("disabled", true);
+			}
+
+			if (getChecked("multicastThirdEnabled"))
+			{
+				$("#multicastThirdRandomEnabled").css({"opacity":"1"});
+				$("#multicastThirdRandomEnabled").attr("disabled", false);
+				if (getChecked("multicastThirdRandomEnabled"))
+				{
+					$("#multicastThirdAddr").css({"opacity":"0.3"});
+					$("#multicastThirdAddr").attr("disabled", true);
+					$("#multicastThirdPort").css({"opacity":"0.3"});
+					$("#multicastThirdPort").attr("disabled", true);
+					closeNoteAll();
+					verifyThird();
+				}
+				else
+				{
+					$("#multicastThirdAddr").css({"opacity":"1"});
+					$("#multicastThirdAddr").attr("disabled", false);
+					$("#multicastThirdPort").css({"opacity":"1"});
+					$("#multicastThirdPort").attr("disabled", false);
+					verifyThird();
+				}
+			}
+			else
+			{
+				$("#multicastThirdRandomEnabled").css({"opacity":"0.3"});
+				$("#multicastThirdRandomEnabled").attr("disabled", true);
+
+				$("#multicastThirdAddr").css({"opacity":"0.3"});
+				$("#multicastThirdAddr").attr("disabled", true);
+				$("#multicastThirdPort").css({"opacity":"0.3"});
+				$("#multicastThirdPort").attr("disabled", true);
+			}
+		}
+
+		function onStreamChange(value)
+		{
+			if (value != streamType.value)
+			{
+				streamType.resetSel(value);
+			}
+			switch (value)
+			{
+				case STREAM_MAIN:
+					mainDiv.show();
+					minorDiv.hide();
+					thirdDiv.hide();
+					closeNoteAll();
+					verifyMain();
+					break;
+				case STREAM_MINOR:
+					mainDiv.hide();
+					minorDiv.show();
+					thirdDiv.hide();
+					closeNoteAll();
+					verifyMinor();
+					break;
+				case STREAM_THIRD:
+					mainDiv.hide();
+					minorDiv.hide();
+					thirdDiv.show();
+					closeNoteAll();
+					verifyThird();
+					break;
+			}
+		}
+
+		function constructDOM()
+		{
+			var streamOpt = [{str:label.mCodeStream, value:STREAM_MAIN},
+			   {str:label.cCodeStream, value:STREAM_MINOR}/*,
+			   {str:label.thdCodeStream, value:STREAM_THIRD}*/];
+			selectInit("streamType", streamOpt, defStreamType, onStreamChange);
+			onStreamChange(defStreamType);
+			initCheckInput("Enabled", function(checked, index){
+				handleShow();
+			});
+		}
+
+		function pageInit()
+		{
+			id("multicastMainAddr").onblur = onBlur;
+			id("multicastMainPort").onblur = onBlur;
+			id("multicastMinorAddr").onblur = onBlur;
+			id("multicastMinorPort").onblur = onBlur;
+			id("multicastThirdAddr").onblur = onBlur;
+			id("multicastThirdPort").onblur = onBlur;
+			id("multicastMainAddr").onfocus = closeNoteAll;
+			id("multicastMainPort").onfocus = closeNoteAll;
+			id("multicastMinorAddr").onfocus = closeNoteAll;
+			id("multicastMinorPort").onfocus = closeNoteAll;
+			id("multicastThirdAddr").onfocus = closeNoteAll;
+			id("multicastThirdPort").onfocus = closeNoteAll;
+			saveBt.onclick = onSave;
+			id("reset").onclick = onReset;
+			constructDOM();
+			refresh();
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	ul.lineL{
+		width:100%;
+	}
+	ul.line li.lineD{
+		display:block;
+		width:100%;
+	}
+	ul.line label.range{
+		width:200px;
+		height:30px;
+		display:inline-block;
+		vertical-align:middle;
+		margin-left:4px;
+	}
+	ul.line label.desA{
+		width:90px;
+	}
+</style>
+<div class="detailCon detailConMorePad">
+	<ul class="line lineL">
+		<li class="line lineD">
+			<label class="des desA">{%label.codeStreamType%}</label>
+			<span class="selCon">
+				<span id="streamType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.multicastenabled%}</label>
+			<i name="Enabled" id="multicastMainEnabled" value="0"></i>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.multicastAddr%}</label>
+			<input id="multicastMainAddr" class="textInput text textA1"/><i class="tip"></i>
+			<label class="desA range">{%label.multicastAddrRange%}</label>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.multicastPort%}</label>
+			<input id="multicastMainPort" class="textInput text textA1" maxlength="5" /><i class="tip"></i>
+			<label class="desA range">{%label.multicastPortRange%}</label>
+		</li>
+		<li class="line lineD mainStream">
+			<label class="des desA">{%label.randomAddrAndPort%}</label>
+			<i name="Enabled" id="multicastMainRandomEnabled" value="1"></i>
+		</li>
+
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.multicastenabled%}</label>
+			<i name="Enabled" id="multicastMinorEnabled" value="2"></i>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.multicastAddr%}</label>
+			<input id="multicastMinorAddr" class="textInput text textA1"/><i class="tip"></i>
+			<label class="desA range">{%label.multicastAddrRange%}</label>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.multicastPort%}</label>
+			<input id="multicastMinorPort" class="textInput text textA1" maxlength="5" /><i class="tip"></i>
+			<label class="desA range">{%label.multicastPortRange%}</label>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA">{%label.randomAddrAndPort%}</label>
+			<i name="Enabled" id="multicastMinorRandomEnabled" value="3"></i>
+		</li>
+
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.multicastenabled%}</label>
+			<i name="Enabled" id="multicastThirdEnabled" value="4"></i>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.multicastAddr%}</label>
+			<input id="multicastThirdAddr" class="textInput text textA1"/><i class="tip"></i>
+			<label class="desA range">{%label.multicastAddrRange%}</label>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.multicastPort%}</label>
+			<input id="multicastThirdPort" class="textInput text textA1" maxlength="5" /><i class="tip"></i>
+			<label class="desA range">{%label.multicastPortRange%}</label>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA">{%label.randomAddrAndPort%}</label>
+			<i name="Enabled" id="multicastThirdRandomEnabled" value="5"></i>
+		</li>
+	</ul>
+
+	<div class="funcBtnCon">
+		<input id="reset" type="button" value="{%btn.resetDefault%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

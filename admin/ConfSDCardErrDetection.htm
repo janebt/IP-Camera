@@ -1,0 +1,163 @@
+<script type="text/javascript">
+	function init()
+	{
+		var FILE_NAME = uciAbnormalEvents.fileName;
+		var SD_ERROR = uciAbnormalEvents.secName.sdError;
+
+		var ALARM_ENABLED = uciAbnormalEvents.optName.alarmEnabled;
+		var EMAIL_ENABLED = uciAbnormalEvents.optName.emailEnabled;
+
+		var SD_ERROR_ENABLED = uciAbnormalEvents.optName.enabled;
+		var ON = uciAbnormalEvents.optValue.enableVal.on;
+		var OFF = uciAbnormalEvents.optValue.enableVal.off;
+
+		var exSwitch;
+		var exSwitchDes = id("exSwitchDes");
+		var sendEmail = id("sendEmail");
+		var triggerAlarmDevice = id("triggerAlarmDevice");
+
+		function errorHandle(code)
+		{
+			var str;
+			closeNoteAll();
+
+			switch(parseInt(code))
+			{
+				case ENONE:
+					return true;
+				case IPCABENERR:
+					str = errStr.ipcAbEnErr;
+					break;
+				case IPCABEMAILENERR:
+					str = errStr.ipcAbEmailenErr;
+					break;
+				case IPCABALARMENERR:
+					str = errStr.ipcAbAlarmenErr;
+					break;
+				case IPCUMGUESTNAUTH:
+					showStr = errStr.invPermissionDenied;
+					break;
+				default:
+					str = errStr.invRequestFail;
+					break;
+			}
+
+			showAlert(str);
+			closeToast();
+
+			return false;
+		}
+
+		function saveHandle()
+		{
+			var reqData = {};
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][SD_ERROR] = {};
+
+			reqData[FILE_NAME][SD_ERROR][SD_ERROR_ENABLED] = (exSwitch.state == 1 ? ON : OFF);
+			reqData[FILE_NAME][SD_ERROR][EMAIL_ENABLED] = sendEmail.getAttribute("checked") == "true" ? ON : OFF;
+			reqData[FILE_NAME][SD_ERROR][ALARM_ENABLED] = triggerAlarmDevice.getAttribute("checked") == "true" ? ON : OFF;
+
+			showToast("loading");
+			$.modify(reqData, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function exSwitchHd(state)
+		{
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("actionBarDiv")).top + "px";
+			}
+			else
+			{
+				hideobj.style.display = "none";
+			}
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			var enable = 0;
+
+			id("save").onclick = saveHandle;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [SD_ERROR];
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						exSwitch = new Switch("exSwitch", 0, exSwitchHd);
+						showDetailCon();
+						return;
+					}
+
+					enable = (result[FILE_NAME][SD_ERROR][SD_ERROR_ENABLED] == ON) ? 1 : 0;
+					exSwitch = new Switch("exSwitch", enable, exSwitchHd);
+
+					changeCheckInput(sendEmail, result[FILE_NAME][SD_ERROR][EMAIL_ENABLED] == ON);
+					changeCheckInput(triggerAlarmDevice, result[FILE_NAME][SD_ERROR][ALARM_ENABLED] == ON);
+					showDetailCon();
+				}
+			});
+		}
+		pageInit();
+		initCheckInput("showInfo", null);
+	}
+	init();
+</script>
+<style type="text/css">
+	label.desECED{
+		font-size:13px;
+		color:#666666;
+		line-height:30px;
+		width:130px;
+		margin-right:4px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line firUl">
+		<li class="line lineA">
+			<label id="exSwitchDes" class="des desECED">{%label.sdCardError%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+	</ul>
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div class="actionBarDiv" id="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="sendEmail" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="triggerAlarmDevice" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

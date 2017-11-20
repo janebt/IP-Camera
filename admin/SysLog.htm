@@ -1,0 +1,441 @@
+<script type="text/javascript">
+	function init()
+	{
+		var curSysTimeSec = 0;
+		var PAGE_NUM = 8;
+		var INIT_PAGE_NUM = 1;
+		var VAL_TYPE = uciSystem.optValue.types;
+		var searchType = VAL_TYPE.all;
+		var typeOnShow = VAL_TYPE.all; //当前表格显示的日志类型
+		var oneWeekSec = 7*24*3600;
+		var dataGridLog = new DataGrid();
+		var logList = [];
+		var FILE_NAME = uciSystem.fileName;
+		var OPT_NAME = uciSystem.optName;
+		var READ_LOG = uciSystem.actionName.readLogs;
+		var CLOCK_STATUS = uciSystem.secName.clockStatus;
+		var SECONDS = uciSystem.optName.seconds;
+		var DOWNLOAD_LOG = uciSystem.actionName.downloadLogs;
+		var CLEAN_LOG = uciSystem.actionName.syslogClean;
+		var SYS_LOG = uciSystem.secType.syslog;
+		var sysTypeList = [{str:label.sysTypeAll, value:VAL_TYPE.all},
+						   {str:label.sysTypeWarn, value:VAL_TYPE.alarm},
+						   {str:label.sysTypeException, value:VAL_TYPE.abnormal},
+						   {str:label.sysTypeAction, value:VAL_TYPE.op},
+						   {str:label.sysTypeInfo, value:VAL_TYPE.info}];
+		var logTypeObj = {};
+		var sysTypeArr = {};
+		var beginDate = id("beginDate");
+		var endDate = id("endDate");
+		var beginTime = id("beginTime");
+		var endTimeD = id("endTime");
+		var bPageFirstLoaded = true;
+		var searchBtnClicked = false;
+
+		function errorHandle(code, objOrId)
+		{
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCSYSLOGPARAERR:
+				showStr = errStr.sysLogParErr;
+				break;
+			case IPCSYSLOGTIMEERR:
+				showStr = errStr.sysLogTimeErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function sysTypeArrInit()
+		{
+			sysTypeArr[VAL_TYPE.all] = label.sysTypeAll;
+			sysTypeArr[VAL_TYPE.alarm] = label.sysTypeWarn;
+			sysTypeArr[VAL_TYPE.abnormal] = label.sysTypeException;
+			sysTypeArr[VAL_TYPE.op] = label.sysTypeAction;
+			sysTypeArr[VAL_TYPE.info] = label.sysTypeInfo;
+		}
+
+		function changeSearchType(value)
+		{
+			searchType = value;
+		}
+
+		function refreshTable(pageNum, logs, totalNum, pageInfo)
+		{
+			var item, logStr, startIndex;
+			var logOrder = 0;
+
+			dataGridLog.blankTable();
+			logList = [];
+
+			if (true == $.local)
+			{
+				logs = [];
+				totalNum = PAGE_NUM;
+
+				for (var i = 1, len = 20; i < len; i++)
+				{
+					logs[i - 1] = {};
+					logs[i - 1][SYS_LOG + "_" + i] = "<1>123123123[log]11111111";
+				}
+			}
+
+			if (pageNum > pageInfo)
+			{
+				pageNum = pageInfo;
+			}
+
+			// startIndex = (pageNum - 1) * PAGE_NUM + 1;
+			startIndex = 1;
+
+			for(var i = 0, len = logs.length; i < len; i++)
+			{
+				item = {};
+				logStr = logs[i][SYS_LOG + "_" + (startIndex + i)];
+				item["date"] = formateDate(parseInt(logStr.substring(logStr.indexOf(">") + 1, logStr.indexOf("[")), 10) * 1000);
+				item["event"] = logStr.substring(logStr.indexOf("]") + 1);
+				logList[logOrder] = item;
+				logOrder++;
+			}
+
+			if (pageInfo > 0)
+			{
+				dataGridLog.refreshPage(logList, totalNum, pageInfo);
+			}
+			else
+			{
+				dataGridLog.setDataSource(logList);
+				dataGridLog.refresh(pageNum);
+			}
+		}
+
+		function getTableLogData(pageNum, startTime, endTime, type)
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+
+			data[FILE_NAME] = module;
+			module[READ_LOG] = actObj;
+			actObj[OPT_NAME.startTime] = startTime;
+			actObj[OPT_NAME.endTime] = endTime;
+			actObj[OPT_NAME.pageNum] = pageNum;
+			actObj[OPT_NAME.logsPerPage] = PAGE_NUM;
+			actObj[OPT_NAME.type] = type || typeOnShow;
+
+			showToast();
+			$.action(data, function(result){
+				if (errorHandle(result[ERR_CODE]))
+				{
+					if (searchBtnClicked)
+					{
+						searchBtnClicked = false;
+						id("showingType").innerHTML = logTypeObj[typeOnShow];
+					}
+					closeToast();
+					refreshTable(pageNum, result[SYS_LOG], result[OPT_NAME.total], result[OPT_NAME.page]);
+					if (result[OPT_NAME.total] > 0)
+					{
+						id("cleanLog").disabled = false;
+						$("#cleanLog").css({"opacity":"1"});
+					}
+					else
+					{
+						id("cleanLog").disabled = true;
+						$("#cleanLog").css({"opacity":"0.3"});
+					}
+				}
+				else
+				{
+					searchBtnClicked = false;
+				}
+
+				if (bPageFirstLoaded == true)
+				{
+					bPageFirstLoaded = false;
+					showDetailCon();
+				}
+			});
+		}
+
+		function modifyTimeStr(value)
+		{
+			if (value < 10)
+			{
+				value = "0" + value;
+			}
+
+			return value;
+		}
+
+		function formateDate(msecs)
+		{
+			var now;
+
+			if (undefined == msecs)
+			{
+				now = new Date();
+			}
+			else
+			{
+				now = new Date(msecs);
+			}
+
+			return now.getFullYear() + "-" + modifyTimeStr(now.getMonth() + 1) + "-" + modifyTimeStr(now.getDate()) + " " +
+					modifyTimeStr(now.getHours()) + ":" + modifyTimeStr(now.getMinutes()) + ":" + modifyTimeStr(now.getSeconds());
+		}
+
+		function getSysTime(callBack)
+		{
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][NAME] = CLOCK_STATUS;
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						curSysTimeSec = 1000;
+					}
+					else
+					{
+						curSysTimeSec = parseInt(result[FILE_NAME][CLOCK_STATUS][SECONDS]);
+					}
+
+					callBack(curSysTimeSec);
+				}
+			});
+		}
+
+		function getSelSeconds(date, time)
+		{
+			var dateObj = new Date();
+			var dataList = date.value.split("-");
+			var timeList = time.value.split(":");
+
+			dateObj.setFullYear(dataList[0], parseInt(dataList[1], 10) - 1, dataList[2]);
+			dateObj.setHours(parseInt(timeList[0], 10));
+			dateObj.setMinutes(parseInt(timeList[1], 10));
+			dateObj.setSeconds(parseInt(timeList[2], 10));
+
+			return parseInt(dateObj.getTime()/1000, 10);
+		}
+
+		function downloadLogs()
+		{
+			var reqData = {}, module = {};
+
+			reqData[FILE_NAME] = {};
+			module = reqData[FILE_NAME][DOWNLOAD_LOG] = {};
+			module[OPT_NAME.startTime] = getSelSeconds(beginDate, beginTime);
+			module[OPT_NAME.endTime] = getSelSeconds(endDate, endTimeD);
+			module[OPT_NAME.type] = typeOnShow;
+
+			$.action(reqData, function(data){
+				location.href = $.orgURL(data[OPT_NAME.url]);
+			});
+		}
+
+		function cleanLogs()
+		{
+			showConfirmIpc(label.cleanLogConfirmIpc, function(choose)
+			{
+				if (true == choose)
+				{
+					var reqData = {}, module = {};
+
+					reqData[FILE_NAME] = {};
+					module = reqData[FILE_NAME][CLEAN_LOG] = null;
+
+					showToast("loading");
+					$.action(reqData, function(data){
+						if (errorHandle(data[ERR_CODE]))
+						{
+							getTableLogData(INIT_PAGE_NUM, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType);
+							showToast("success");
+						}
+					});
+				}
+			});
+		}
+
+		function pageTableInit()
+		{
+			dataGridLog.init({
+				id:"logTbl",	// table ID
+				data:logList,	// 数据源
+				hasID:true,
+				edit:false,
+				hasSelBox:false,
+				paging:{num:PAGE_NUM},
+				head:[{field:label.time, width:80},			// 表头选项
+					  {field:label.event, width:140}],
+				list:[{name:"date"},
+					  {name:"event"}],
+				pageTurnFunc:function(pageNum){
+					getTableLogData(pageNum, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD));
+				}
+			});
+		}
+
+		function typeObjInit()
+		{
+			$.each(sysTypeList, function(idx, item){
+				logTypeObj[item.value] = item.str;
+			});
+		}
+
+		function pageInit()
+		{
+			laydate({elem:"#beginDate"});
+			laydate({elem:"#endDate"});
+			timePickerInit("beginTime");
+			timePickerInit("endTime");
+			selectInit("mainType", sysTypeList, VAL_TYPE.all, changeSearchType);
+			pageTableInit();
+			typeObjInit();
+			id("showingType").innerHTML = logTypeObj[typeOnShow];
+			getSysTime(function(seconds){
+				var startTime = seconds > oneWeekSec ? seconds - oneWeekSec : 0, seconds;
+				var startDT = formateDate(startTime * 1000).split(" ");
+				var endDT = formateDate(seconds * 1000).split(" ");
+
+				beginDate.value = startDT[0];
+				endDate.value = endDT[0];
+				beginTime.value = startDT[1].replace(/\:/g, " : ");
+				endTimeD.value = endDT[1].replace(/\:/g, " : ");
+				getTableLogData(INIT_PAGE_NUM, startTime, seconds);
+			});
+			id("searchLog").onclick = function(){
+				typeOnShow = searchType;
+				searchBtnClicked = true;
+				getTableLogData(INIT_PAGE_NUM, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType);
+			};
+			id("outputLog").onclick = downloadLogs;
+			id("cleanLog").onclick = cleanLogs;
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	ul.line li.lineD{
+		width:70%;
+	}
+	ul.line li.lineD2{
+		width:30%;
+		text-align:right;
+	}
+	li.lineD input.dateText{
+		width:156px;
+	}
+	ul.logType{
+		margin-top:24px;
+		position:relative;
+		*z-index:2;
+	}
+	ul.logTypeTips{
+		margin-top:24px;
+		z-index:1;
+		position:relative;
+	}
+	label.desLogType{
+		font-size:13px;
+		color:#333333;
+		line-height:32px;
+	}
+	ul.logType li.logType{
+		width:50%;
+	}
+	span.dateCon{
+		position:relative;
+	}
+	span.dateCon i.dateIcon{
+		position:absolute;
+	}
+	input.textClock{
+		background:url(../web-static/images/clock.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+	}
+	input.textCalender{
+		background:url(../web-static/images/calender.png) no-repeat 160px 5px #ffffff;
+		cursor:pointer;
+		text-align:left;
+		text-indent:10px;
+		margin-right:8px;
+	}
+	div.tableCon div.tableBorderCon{
+		margin-top:0px !important;
+	}
+	div.tableFunc{
+		clear:both;
+		margin-top:7px;
+		*margin-top:-41px;
+		text-align:right;
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+	}
+	div.tableFunc input{
+		margin-right:12px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desA">{%label.beginTime%}</label>
+			<input id="beginDate" type="text" class="text textA1 textCalender" readonly="true" />
+			<input id="beginTime" type="text" class="text textA1 time textClock" readonly="true" />
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.endTime%}</label>
+			<input id="endDate" type="text" class="text textA1 textCalender" readonly="true" />
+			<input id="endTime" type="text" class="text textA1 time textClock" readonly="true" />
+		</li>
+	</ul>
+	<ul class="line logType">
+		<li class="line lineD">
+			<label class="des desA">{%label.logTypeMain%}</label>
+			<span class="selCon">
+				<span id="mainType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD lineD2">
+			<input id="searchLog" type="button" value="{%btn.searchLog%}" class="subBtn btnA btnSmall" />
+		</li>
+	</ul>
+	<ul class="line logTypeTips">
+		<li class="line lineD">
+			<label class="des desLogType">{%label.sysShowType%}</label>
+			<label id="showingType" class="des desLogType"></label>
+		</li>
+	</ul>
+	<div class="tableCon">
+		<div class="tableBorderCon">
+			<table id="logTbl" class="dataGrid">
+			</table>
+		</div>
+		<div class="tableFunc">
+			<input id="cleanLog" type="button" value="{%btn.cleanLog%}" class="subBtnB btnA btnSmall" />
+			<input id="outputLog" type="button" value="{%btn.exportLog%}" class="subBtnB btnA btnSmall" />
+		</div>
+	</div>
+</div>

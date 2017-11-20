@@ -1,0 +1,915 @@
+<style type="text/css">
+	#tplinkId{
+		font-size:14px;
+		color:#a0a0a0;
+		margin-right:16px;
+	}
+	#bind{
+		text-align:center;
+		width:100px;
+		padding:0px;
+		height:30px;
+	}
+	label.mainUrl{
+		font-size:14px;
+		color:#a0a0a0;
+		margin-right:10px;
+	}
+	label.suffix{
+		font-size:14px;
+		color:#a0a0a0;
+		margin-left:10px;
+	}
+	div.tableBorderCon{
+		position:relative;
+	}
+	div.crtTpddnsDiv{
+		position:absolute;
+		top:-9999px;
+		left:0;
+		z-index:1;
+		width:100%;
+	}
+	div.crtCon{
+		padding:20px 0 10px;
+		width:400px;
+		border-radius:16px;
+		background-color:#2a2a2a;
+		margin:0 auto;
+	}
+	div.crtCon h3.title{
+		font-size:14px;
+		color:#a0a0a0;
+		line-height:32px;
+		margin-left:25px;
+		margin-bottom:20px;
+	}
+	div.crtCon li.line{
+		text-align:center;
+	}
+	div.crtCon input.subBtn{
+		background:#404040 !important;
+		margin-right:15px;
+	}
+	#domName{
+		width:520px;
+		font-size:14px;
+		color:#A0A0A0;
+		line-height:32px;
+		height:32px;
+		word-break:break-all;
+		word-wrap:break-word;
+		white-space:pre-wrap;
+		text-indent:-45px;
+		margin-left:45px;
+	}
+	#unbindTpId{
+		display:none;
+	}
+	div.tableBorderCon{
+		overflow:visible;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		var tplinkId = id("tplinkId");
+		var bindBtn = id("bindTpId");
+		var unbindBtn = id("unbindTpId");
+		var domainName = id("domain");
+		var saveBtn = id("save");
+		var saveDiv = id("funcBtnCon");
+		var domainStateLi = id("domainStateLi");
+		var crtDomainLi = id("crtDomainLi");
+		var tableDiv = id("tableDiv");
+		var crtTpddnsBtn = id("crtTpddns");
+		var refreshBtn = id("refreshList");
+		var crtTpddnsDiv = id("crtTpddnsDiv");
+		var newDomain = id("newDomain");
+		var crtBtn = id("crtBtn");
+		var cancelBtn = id("cancelBtn");
+		var domName = id("domName");
+		var BINDED = 1, UNBINDED = 0;
+		var bindTpddnsStatus = UNBINDED;/* 是否成功绑定TPDDNS域名 */
+		var bindTpddnsName = "";
+		var firDomain = ".tpddns.cn";
+		var statusCode = {"Failed":0, 
+			"Idle":1, "Prepare":2, 
+			"Trying":3, "Success":4,
+			"Timeout":5, "Max":6
+		};
+		var listTimeout = null;
+		var bindTimeout = null;
+		var unbindTimeout = null;
+		var crtTimeout = null;
+		var getListStatusPara = uciDdns.optValue.get_domain_list_status;
+		var regStatusPara = uciDdns.optValue.register_status;
+		var bindStatusPara = uciDdns.optValue.bind_status;
+		var unbindStatusPara = uciDdns.optValue.unbind_status;
+		var tpddnsList = [];
+		var clickNum = 0; /* 进入页面是否第一次点击保存按钮 */
+		var statusFun = {};
+		var dataGridDdns = null;
+		var showTpddnsList = [];
+
+		/* 错误处理函数 */
+		function errHandle(code, id, callBack)
+		{
+			var showStr = "";
+			var showNoteStr = "";
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case EINVACCOUNTIN:
+				showStr = errorStr.invalidArg;
+				break;
+			case EINVSYSTEM:
+				showStr = errStr.systemErr;
+				break;
+			/* 创建域名 */
+			case EDOUDOMAIN:
+				showNoteStr = errStr.TPDDNSRegisted;
+				break;
+			case EOVERREGMAXDOMAIN:
+				showNoteStr = errStr.invDomainLimit;
+				break;
+			/* 绑定域名 */
+			case EOVERBINDMAXDOMAIN:
+				showStr = errStr.TPDDNSBinded;
+				break;
+			case EDOMAINBINDOTHER:
+				showStr = errStr.TPDDNSLogined;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case ENORESDOMAIN:
+				showStr = errStr.TPDDNSBindNoDomain;
+			/* 解除域名绑定 */
+			case ENOBINDDOMIAN:
+				showStr = errStr.TPDDNSUnbindDomain;
+				break;
+			case EINVDOMAINBLANK:
+				showNoteStr = errStr.TPDDNSNotBlank;
+				break;
+			case EINVDOMAINLENGTH: 
+				showNoteStr = errStr.TPDDNSInvLen;
+				break;
+			case EINDOMAIN:
+				showNoteStr = errStr.TPDDNSInvLetter;
+				break;
+			case EINVFIRSTLASTRAIL:
+				showNoteStr = errStr.TPDDNSInvLink;
+				break;
+			case EINVCLOUDERRORPERMISSIONDENIED:
+				showStr = errStr.cloudReqTimeout;
+				break;
+			case EINVSENDREQMSGFAILED:
+				showStr = errStr.invSendReqMsgFailed;
+				break;
+			case EINDEVICEALREADYUNBOUND:
+				tplinkId.innerHTML = label.none;
+				unbindBtn.style.display = "none";
+				bindBtn.style.display = "inline-block";
+				domainName.value = "";
+				domName.innerHTML = "---";
+				TpLinkIdBindStatus = UNBINDED;
+				tpddnsList.length = 0;
+				showTrueEle();
+				showStr = errStr.cloudAccountReadyUnbind;
+				break;
+			default:
+				showStr = errStr.unknown + code;
+				break;
+			}
+
+			closeToast();
+
+			if (typeof callBack == "function")
+			{
+				callBack(parseInt(code));
+			}
+			else if ("" != showStr)
+			{
+				showAlert(showStr);
+			}
+			else if ("" != showNoteStr)
+			{
+				showNote(id, showNoteStr);
+			}
+
+			return false;
+		}
+
+		/* 检测tpddns的合法性 */
+		function checkDdns(tpddnsInputValue, id)
+		{
+			var len = tpddnsInputValue.length;
+			var result = false;
+			var showErrStr = "";
+
+			if (0 == len)
+			{
+				showErrStr = errStr.TPDDNSNotBlank;
+			}
+			else if (63 < len)
+			{
+				showErrStr = errStr.TPDDNSInvLen;
+			}
+			else if ((0 == tpddnsInputValue.indexOf("-")) || 
+				(len -1 == tpddnsInputValue.lastIndexOf("-")))
+			{
+				showErrStr = errStr.TPDDNSInvLink;
+			}
+			else
+			{
+				result = /^[a-zA-Z0-9-]{0,63}$/gi.test(tpddnsInputValue);
+				if (false == result)
+				{
+					showErrStr = errStr.TPDDNSInvLetter;
+				}
+			}
+
+			if ("" != showErrStr)
+			{
+				showNote(id, showErrStr);
+				return false;
+			}
+
+			return true;
+		}
+
+		/* 轮询函数：verifyFunS
+		 * 执行动作：域名列表查询，创建域名，绑定域名，解绑域名
+		 * 轮询定时器
+		 * 成功函数
+		 * 失败函数
+		*/
+		function verifyFunS(keyName, verifyTimeout, successFun, failFun)
+		{
+			var status = 0,  errCode = 0;
+			var reqData = {};
+			var runStaFun = null; /* 每一次轮询之后执行的函数 */
+
+			reqData[ucitpddnsFile] = {};
+			reqData[ucitpddnsFile][KEY_NAME] = keyName;
+
+			clearTimeout(verifyTimeout);
+			$.queryP(reqData, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					status = parseInt(result[ucitpddnsFile][keyName][uciDdns.optName.status]);
+					errCode = parseInt(result[ucitpddnsFile][keyName][ERR_CODE]) || 0;
+
+					statusFun["Failed"] = statusFun["Timeout"] = statusFun["Max"] = failFun;
+					statusFun["Success"] = successFun;
+					statusFun["Idle"] = statusFun["Prepare"] = statusFun["Trying"] = function(){
+						verifyTimeout = $.setTimeout(function(){
+							verifyFunS(keyName, verifyTimeout, successFun, failFun);
+						}, 1000);
+					};
+
+					switch(parseInt(status))
+					{
+					case statusCode["Failed"]:
+						runStaFun = statusFun["Failed"];
+						break;
+					case statusCode["Idle"]:
+						runStaFun = statusFun["Idle"];
+						break;
+					case statusCode["Prepare"]:
+						runStaFun = statusFun["Prepare"];
+						break;
+					case statusCode["Trying"]:
+						runStaFun = statusFun["Trying"];
+						break;
+					case statusCode["Success"]:
+						runStaFun = statusFun["Success"];
+						break;
+					case statusCode["Timeout"]:
+						runStaFun = statusFun["Timeout"];
+						break;
+					case statusCode["Max"]:
+						runStaFun = statusFun["Max"];
+						break;
+					default:
+						runStaFun = statusFun["Failed"];
+						break;
+					}
+
+					typeof runStaFun == "function" && runStaFun(errCode);
+				}
+				else
+				{
+					failFun(errCode);
+				}
+			});
+		}
+
+		/* 域名列表查询 */
+		function tpddnsListFromSer(successFun, failFun)
+		{
+			var reqData = {};
+			reqData[ucitpddnsFile] = {};
+			reqData[ucitpddnsFile][uciDdns.actionName.get_domain_list] = null;
+
+			$.action(reqData, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					verifyFunS(getListStatusPara, listTimeout, successFun, failFun);
+				}
+				else 
+				{
+					failFun();
+				}
+			});	
+		}
+
+		/* 获取域名列表 */
+		function getTpddnsList(successFun, failFun)
+		{
+			var reqData = {};
+			reqData[ucitpddnsFile] = {};
+			reqData[ucitpddnsFile][uciDdns.optName.table] = uciDdns.optValue.ddns_list;
+
+			tpddnsList.length = 0;
+			$.queryP(reqData, function(result){
+				if (ENONE == parseInt(result[ERR_CODE]))
+				{
+					tpddnsList = formatTableData(result[ucitpddnsFile][uciDdns.optValue.ddns_list]);
+					typeof successFun == "function" && successFun();
+				}
+				else
+				{
+					typeof failFun == "function" && failFun();
+				}
+			});	
+		}
+
+		/* 创建新域名 */
+		function createTpddns(tpddnsName, firTpddns, successFun, failFun)
+		{
+			var data = {};
+
+			data[ucitpddnsFile] = {};
+			data[ucitpddnsFile][uciDdns.actionName.register_domain] = {};
+			data[ucitpddnsFile][uciDdns.actionName.register_domain][uciDdns.actionDetail.domain] = tpddnsName;
+			data[ucitpddnsFile][uciDdns.actionName.register_domain][uciDdns.actionDetail.suffix] = firTpddns;
+
+			$.action(data, function(result){
+				if (ENONE == parseInt(result[ERR_CODE])) /* 路由器成功接收到信息 */
+				{
+					verifyFunS(regStatusPara, bindTimeout, successFun, failFun);
+				}
+				else
+				{
+					failFun(result[ERR_CODE]);
+				}
+			});
+		}
+
+		/* 路由器绑定域名 */
+		function bindTpddns(tpddnsName, sign, successFun, failFun)
+		{
+			var data = {};
+			data[ucitpddnsFile] = {};
+			data[ucitpddnsFile][uciDdns.actionName.bind_domain] = {};
+			data[ucitpddnsFile][uciDdns.actionName.bind_domain][uciDdns.actionDetail.domain] = tpddnsName;
+			data[ucitpddnsFile][uciDdns.actionName.bind_domain][uciDdns.actionDetail.force] = sign == undefined ? 0 : sign;
+
+			$.action(data, function(result){
+				if (ENONE == parseInt(result[ERR_CODE]))
+				{
+					verifyFunS(bindStatusPara, bindTimeout, successFun, failFun);
+				}
+				else
+				{
+					failFun();
+				}
+			});
+		}
+
+		/* 路由器解除域名绑定 */
+		function unbindTpddns(tpddnsName, successFun, failFun)
+		{
+			var data = {};
+			data[ucitpddnsFile] = {};
+			data[ucitpddnsFile][uciDdns.actionName.unbind_domain] = {};
+			data[ucitpddnsFile][uciDdns.actionName.unbind_domain][uciDdns.actionDetail.domain] = tpddnsName;
+
+			$.action(data, function(result){
+				if (ENONE == parseInt(result[ERR_CODE]))
+				{
+					verifyFunS(unbindStatusPara, unbindTimeout, successFun, failFun);
+				}
+				else
+				{
+					failFun();
+				}
+			});
+		}
+
+		/* TP-LINK ID 没有注册过域名，创建并登录域名 */
+		function crtAndLoginTpddns(tpName)
+		{
+			createTpddns(tpName, firDomain, 
+				function() /* 创建成功——登录域名 */
+				{
+					showToast("loading", {noteStr:label.TPDDNSLogining});
+					bindTpddns(tpName, undefined, 
+						function(){
+							bindTpddnsName = tpName;
+							bindTpddnsStatus = BINDED;
+							domName.innerHTML = label.ddnsLogined + bindTpddnsName + firDomain;
+							refreshTable();
+						},
+						function(errNum)
+						{
+							errHandle(errNum);
+							refreshTable(errStr.invRequestFailRefresh);
+						}
+					);
+				}, 
+				function(errCode) /* 创建失败 */
+				{
+					errHandle(errCode, "domain");
+				}
+			);
+		}
+
+		/* 获取TP-LINK ID信息 */
+		function getTplinkIdInfo()
+		{
+			if (uciCloudConfig.optValue.bindStatusBind == TpLinkIdBindStatus)
+			{
+				var data = {};
+				data[uciCloudConfig.fileName] = {};
+				data[uciCloudConfig.fileName][KEY_NAME] = uciCloudConfig.secName.bind;
+
+				$.queryP(data, function(result){/* 获取TP-LINK ID信息 */
+					if (ENONE == result[ERR_CODE])
+					{
+						tplinkId.innerHTML = result[uciCloudConfig.fileName][uciCloudConfig.secName.bind][uciCloudConfig.optName.username];
+						bindBtn.style.display = "none";
+						unbindBtn.style.display = "inline-block";
+						showDetailCon();
+						pageInit();
+					}
+				});
+			}
+			else
+			{
+				tplinkId.innerHTML = label.none;
+				unbindBtn.style.display = "none";
+				bindBtn.style.display = "inline-block";
+				domainName.value = "";
+				showDetailCon();
+				pageInit();
+			}
+		}
+
+		/* 处理列表，使其正确显示 */
+		function setDdnsList(srcObj, dstObj)
+		{
+			var len = srcObj.length;
+			dstObj.length = len;
+
+			for (var i = 0; i < len; i++)
+			{
+				dstObj[i] = {};
+				dstObj[i]["domain"] = srcObj[i]["domain"];
+				dstObj[i]["fullDomain"] = srcObj[i]["domain"] + firDomain;
+				dstObj[i][uciDdns.optName.status] = srcObj[i][uciDdns.optName.status];
+				dstObj[i][uciDdns.optName.isCurhost] = srcObj[i][uciDdns.optName.isCurhost];
+
+				if ("00-00-00-00-00-00" == srcObj[i]["mac"] || 0 == srcObj[i]["mac"].length)
+				{
+					dstObj[i]["user"] = label.noUser;
+					dstObj[i]["options"] = btn.login;
+				}
+				else
+				{
+					if (1 == parseInt(srcObj[i][uciDdns.optName.isCurhost]))
+					{
+						dstObj[i]["user"] = label.loginPreTip + label.currentDevice + label.loginBehindTip + srcObj[i]["mac"].toUpperCase();
+						dstObj[i]["options"] = btn.logout;
+						bindTpddnsName = dstObj[i]["domain"]
+						domName.innerHTML = label.ddnsLogined + dstObj[i]["fullDomain"];
+					}
+					else
+					{
+						dstObj[i]["user"] = label.loginPreTip + getStrInMax(srcObj[i]["device"], 25) + label.loginBehindTip + srcObj[i]["mac"].toUpperCase();
+						dstObj[i]["options"] = "";
+					}
+				}
+			}
+		}
+
+		/* 重新排序:本地域名-未使用域名-其他设备使用域名 */
+		function sortList()
+		{
+			var curHost, loginList = [], idleList = [];
+
+			for (var index in showTpddnsList)
+			{
+				var item = showTpddnsList[index];
+
+				if (item["is_cur_host"] == "1")
+				{
+					curHost = item;
+				}
+				else if (item["status"] == "1")
+				{
+					loginList.push(item);
+				}
+				else
+				{
+					idleList.push(item);
+				}
+			}
+
+			loginList.sort(function (b, a){
+				return b["domain"].localeCompare(a["domain"]);
+			});
+
+			idleList.sort(function (b, a){
+				return b["domain"].localeCompare(a["domain"]);
+			});
+
+			showTpddnsList.length = 0;
+
+			if (curHost != null)
+			{
+				showTpddnsList.push(curHost);
+			}
+
+			for (var index in idleList)
+			{
+				showTpddnsList.push(idleList[index]);
+			}
+
+			for (var index in loginList)
+			{
+				showTpddnsList.push(loginList[index]);
+			}
+		}
+
+		function refreshList()
+		{
+			showTrueEle();
+			if (null == dataGridDdns)
+			{
+				emptyNodes(id("TpddnsListTable"));
+				ddnsLeaseInit();
+			}
+			else 
+			{
+				setDdnsList(tpddnsList, showTpddnsList);
+				sortList();
+				dataGridDdns.refresh();
+			}
+			showToast("success");
+		}
+
+		/* 从服务器获取域名列表，刷新列表 */
+		function refreshTable(str)
+		{
+			if (undefined == str)
+			{
+				str = errStr.TPDDNSRefreshFail;
+			}
+
+			showToast("loading");
+			tpddnsListFromSer(function(){
+				getTpddnsList(refreshList, 
+					function(){
+						showAlert(str);
+						closeToast();
+					}
+				);
+			}, function(){
+				closeToast();
+				showAlert(str);
+			});
+		}
+
+		/* 为列表中的按钮添加点击函数 */
+		function listBtnAction(index, obj)
+		{
+			if (btn.login == showTpddnsList[index]["options"])
+			{
+				if ("" != bindTpddnsName)
+				{
+					showAlert(errStr.TPDDNSBinded);
+					return;
+				}
+
+				showToast("loading", {noteStr:label.TPDDNSLogining});
+				bindTpddns(showTpddnsList[index]["domain"], undefined, function(){
+					bindTpddnsName = showTpddnsList[index]["domain"];
+					bindTpddnsStatus = BINDED;
+					domName.innerHTML = label.ddnsLogined + bindTpddnsName + firDomain;
+					closeToast();
+					refreshTable();
+				}, function(errCode){
+					closeToast();
+					errHandle(errCode);
+					/*showAlert(errStr.invNetworkErr);*/
+				});
+			}
+			else if (btn.logout == showTpddnsList[index]["options"])
+			{
+				showConfirmIpc(label.TPDDNSUnbind, function(sign){
+					if (true == sign)
+					{
+						showToast("loading", {noteStr:label.TPDDNSLoging});
+						unbindTpddns(showTpddnsList[index]["domain"], function(){
+							domName.innerHTML = "---";
+							bindTpddnsName = "";
+							bindTpddnsStatus = UNBINDED;
+							refreshTable();
+						}, function(){
+							closeToast();
+							showAlert(errStr.invNetworkErr);
+						});
+					}
+				});
+			}
+			else
+			{
+				return;
+			}
+		}
+
+		/* 初始化域名列表 */
+		function ddnsLeaseInit()
+		{
+			dataGridDdns = new DataGrid();
+			setDdnsList(tpddnsList, showTpddnsList);
+			sortList();
+			dataGridDdns.init({
+				max:32,
+				id:"TpddnsListTable",				// table ID
+				data:showTpddnsList,		// 数据源
+				hasSelBox:false,
+				edit:false,
+				paging:{num:6, page:1},	// 分页选项
+				classCol:{gridClassName:"dataGrid"},
+				head:[{field:label.ddnsName, width:90, className:"TAC"},
+					  {field:label.curStatus, width:165, className:"TAC"},
+					  {field:label.sysTypeAction, width:40, className:"TAC"}],
+				list:[{name:"fullDomain", type:"str", className:"TAC", maxSize:20},
+					  {name:"user", type:"str", className:"TAC", maxSize:90},
+					  {name:"options", type:"str", className:"TAC", maxLength:9, click:listBtnAction, tdStyles:{cursor:"pointer"}}],
+				checkIndex:1
+			});
+		}
+
+		/* 根据域名列表显示页面的具体元素 */
+		function showTrueEle()
+		{
+			if (0 == tpddnsList.length)
+			{
+				crtDomainLi.style.display = "inline-block";
+				saveBtn.style.display = "inline-block";
+				crtTpddnsBtn.style.display = "none";
+				domainStateLi.style.display = "none";
+				refreshBtn.style.display = "none";
+				tableDiv.style.display = "none";
+			}
+			else
+			{
+				crtDomainLi.style.display = "none";
+				saveBtn.style.display = "none";
+				crtTpddnsBtn.style.display = "inline-block";
+				domainStateLi.style.display = "inline-block";
+				refreshBtn.style.display = "inline-block";
+				tableDiv.style.display = "block";
+			}
+		}
+
+		function pageFail()
+		{
+			closeToast();
+			showTrueEle();
+		}
+
+		function pageInit()
+		{
+			/* 判断是否连上云服务器 */
+			var reqData = {};
+			var ccs = cloudClientStatus;
+
+			reqData[ccs.fileName] = {};
+			reqData[ccs.fileName][KEY_NAME] = ccs.secName.clientInfo;
+
+			showToast("loading");
+			$.queryP(reqData, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					var connectStatus = result[ccs.fileName][ccs.secName.clientInfo][ccs.optName.connectStatus];
+
+					if (connectStatus == ccs.optValue.connectStatus.connected)/* 连上云服务器 */
+					{
+						if (uciCloudConfig.optValue.bindStatusBind == TpLinkIdBindStatus) /* 绑定TP-LINK ID */
+						{
+							tpddnsListFromSer(		/* 向云服务器获取域名列表 */
+								function(){			/* 成功 */
+									getTpddnsList(	/* 页面向设备获取列表 */
+										function()
+										{
+											showTrueEle();
+											if (0 != tpddnsList.length)
+											{
+												ddnsLeaseInit();
+											}
+											closeToast();
+										}, 
+										pageFail
+									);
+								}, 
+								pageFail
+							);
+							return;
+						}
+					}
+				}
+				pageFail();
+			});
+		}
+
+		domainName.onblur = function(){
+			var tpName = domainName.value;
+			checkDdns(tpName, "domain");
+		}
+
+		saveBtn.onclick = function(){
+			var tpName = domainName.value;
+			
+			if (false == checkDdns(tpName, "domain"))
+			{
+				return;
+			}
+
+			if (TpLinkIdBindStatus == UNBINDED) /* 未绑定TP-LINK ID */
+			{
+				showAlert(label.TPDDNSNoLogin);
+				return;
+			}
+			
+			showToast("loading", {noteStr:label.TPDDNSCrting});
+			crtAndLoginTpddns(tpName);
+		};
+
+		refreshBtn.onclick = function(){
+			showToast("loading");
+			refreshTable(label.refreshFail);
+		};
+
+		crtTpddnsBtn.onclick = function(){
+			crtTpddnsDiv.style.top = "0px";
+		};
+
+		crtBtn.onclick = function(){
+			var tpName = newDomain.value;
+			
+			if (false == checkDdns(tpName, "newDomain"))
+			{
+				return;
+			}
+
+			showToast("loading");
+			createTpddns(tpName, firDomain, 
+				function() /* 创建成功 */
+				{
+					refreshTable();
+					crtTpddnsDiv.style.top = "-9999px";
+					newDomain.value = "";
+				}, 
+				function(errCode) /* 创建失败 */
+				{
+					errHandle(errCode, "newDomain");
+				}
+			);
+		};
+
+		cancelBtn.onclick = function(){
+			crtTpddnsDiv.style.top = "-9999px";
+			newDomain.value = "";
+			closeNote("newDomain");
+		};
+
+		function basicBRGoBackHandle(result)
+		{
+			var binded = result["binded"];
+			var account = result["account"];
+
+			if (true == binded)
+			{
+				TpLinkIdBindStatus = BINDED;
+				tplinkId.innerHTML = account;
+				bindBtn.style.display = "none";
+				unbindBtn.style.display = "inline-block";
+				refreshTable();
+			}
+
+			showDetailCon();
+		}
+
+		/* 注销TP-LINK ID*/
+		function unbindAccount(unbindConfirm)
+		{
+			if (true == unbindConfirm)
+			{
+				showToast("loading");
+				cloudAccountUnind(function(code){
+					if (true == errHandle(code))
+					{
+						tplinkId.innerHTML = label.none;
+						unbindBtn.style.display = "none";
+						bindBtn.style.display = "inline-block";
+						domainName.value = "";
+						bindTpddnsName = "";
+						domName.innerHTML = "---";
+						TpLinkIdBindStatus = UNBINDED;
+						tpddnsList.length = 0;
+						showTrueEle();
+						showToast("success");
+					}
+				});
+			}
+		}
+
+		bindBtn.onclick = function(){
+			cloudSetBackBRHd(basicBRGoBackHandle);
+			showCloudPage("CloudBindCfg.htm");
+		};
+
+		unbindBtn.onclick = function(){
+			showConfirm(label.cloudUnbindConfirm, unbindAccount);
+		};
+
+		if (true == $.local)
+		{
+			tpddnsList = [{domain:"11242", status:"0", mac:"00-00-00-00-00-00", is_cur_host:"0", device:""}, {domain:"dsaggsdgdfsgdsgdsgsdgdfshdsfhddshsdhsdhsdhdfddsaggsdgdfsgdsgdsgsdgdfshdsfhddshsdhsdhsdhdfd", status:"1", mac:"02-44-00-00-b0-00", is_cur_host:"1", device:"equipment1"}, {domain:"d1", status:"1", mac:"02-44-00-cc-b0-00", is_cur_host:"0", device:"equipment3"}];
+			//tpddnsList = [];
+			showTrueEle();
+			ddnsLeaseInit();
+			return;
+		}
+
+		crtDomainLi.style.display = "none";
+		saveBtn.style.display = "none";
+		crtTpddnsBtn.style.display = "none";
+		domainStateLi.style.display = "none";
+		refreshBtn.style.display = "none";
+		tableDiv.style.display = "none";
+
+		getTplinkIdInfo();
+	}
+	init();
+</script>
+<div class="detailConRs">
+	<ul class="line">
+		<li class="line lineG">
+			<label class="des desA">{%label.tpLinkID%}</label>
+			<label id="tplinkId" class="des">{%label.none%}</label>
+			<input type="button" value="{%btn.bindTpIdNow%}" id="bindTpId" class="subBtn btnA" />
+			<input type="button" value="{%btn.unbindTpId%}" id="unbindTpId" class="subBtn btnA" />
+		</li>
+		<li class="line lineG" id="domainStateLi">
+			<label class="des desA">{%label.domainInfo%}</label>
+			<label class="des" id="domName">---</label>
+		</li>
+		<li class="line lineG" id="crtDomainLi">
+			<label class="des desA">{%label.domain%}</label>
+			<input type="text" value="" id="domain" class="text textA1" maxLength="63"/>
+			<label class="des suffix">{%label.tpLinkDdnsSuffix%}</label>
+		</li>
+	</ul>
+	<div class="funcBtnCon" id="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+		<input type="button" value="{%label.createTPDDNS%}" id="crtTpddns" class="subBtn btnA" />
+		<input type="button" value="{%btn.refresh%}" id="refreshList" class="subBtn btnA " />
+	</div>
+	<div class="tableBorderCon" id="tableDiv">
+		<div id="crtTpddnsDiv" class="crtTpddnsDiv">
+			<div class="crtCon">
+				<h3 class="title">{%label.createTPDDNS%}</h3>
+				<ul class="line">
+					<li class="line lineG">
+						<input type="text" value="" id="newDomain" class="text textB8" maxLength="63"/>
+						<label class="des suffix">{%label.tpLinkDdnsSuffix%}</label>
+					</li>
+					<li class="line lineG">
+						<input type="button" value="{%btn.cancel%}" id="cancelBtn" class="subBtn btnA" />
+						<input type="button" value="{%btn.ok%}" id="crtBtn" class="subBtn btnA " />
+					</li>
+				</ul>
+			</div>	
+		</div>
+		<table id="TpddnsListTable" class="dataGrid"></table>
+	</div>
+</div>

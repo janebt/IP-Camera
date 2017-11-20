@@ -1,0 +1,222 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var folder = id("folder");
+		var videoFolder = id("videoFolder");
+		var playbackFolder = id("playbackFolder");
+		var downloadFolder = id("downloadFolder");
+		var capturePicFolder = id("capturePicFolder");
+		var playbackPicFolder = id("playbackPicFolder");
+		var downloadPicFolder = id("downloadPicFolder");
+		var VEDIO_FILE = "\\videofiles\\";
+		var PLAYBACK_FILE = "\\playbackfiles\\";
+		var DOWNLOAD_FILE = "\\downloadfiles\\";
+		var CAPTURE_PIC = "\\picfiles\\";
+		var PLAYBACK_PIC = "\\playbackpics\\";
+		var DOWNLOAD_PIC = "\\downloadpics\\";
+		var plugin = new Plugin({id:"localStoragePluginCon"});
+		var timeoutHd;
+		var folderIsDisplay = false;
+
+		function setDirectory(folderStr)
+		{
+			var folderStrSub;
+
+			if (typeof folderStr == "string" && folderStr.length > 0)
+			{
+				folderStrSub = folderStr = folderStr.replace("/", "\\");
+				if (folderStrSub.indexOf("\\") == (folderStrSub.length - 1))
+				{
+					folderStrSub = folderStrSub.substring(0, folderStrSub.length - 1);
+				}
+
+				videoFolder.innerHTML = folderStrSub + VEDIO_FILE;
+				videoFolder.title = folderStrSub + VEDIO_FILE;
+				playbackFolder.innerHTML = folderStrSub + PLAYBACK_FILE;
+				playbackFolder.title = folderStrSub + PLAYBACK_FILE;
+				downloadFolder.innerHTML = folderStrSub + DOWNLOAD_FILE;
+				downloadFolder.title = folderStrSub + DOWNLOAD_FILE;
+				capturePicFolder.innerHTML = folderStrSub + CAPTURE_PIC;
+				capturePicFolder.title = folderStrSub + CAPTURE_PIC;
+				playbackPicFolder.innerHTML = folderStrSub + PLAYBACK_PIC;
+				playbackPicFolder.title = folderStrSub + PLAYBACK_PIC;
+				downloadPicFolder.innerHTML = folderStrSub + DOWNLOAD_PIC;
+				downloadPicFolder.title = folderStrSub + DOWNLOAD_PIC;
+				folder.value = folderStr;
+				folder.title = folderStr;
+			}
+
+			showDetailCon();
+
+			folderIsDisplay = false;
+		}
+
+		function pageInit()
+		{
+			if (true == $.local)
+			{
+				setDirectory(" C:\\Users\\admin\\AppData\\Roaming\\Web");
+				$.find("label.vedioInstallTip")[0].style.visibility = "hidden";
+				return;
+			}
+
+			id("browseBtn").onclick = function(){
+				if (folderIsDisplay)
+				{
+					return;
+				}
+				folderIsDisplay = true;
+				setDirectory(plugin.selectStorageFolder());
+			};
+
+			folder.onclick = function(){
+				if (folderIsDisplay)
+				{
+					return;
+				}
+				folderIsDisplay = true;
+				setDirectory(plugin.selectStorageFolder());
+			};
+
+			id("save").onclick = function(){
+				if (GROUP_GUEST == $.group)
+				{
+					showAlert(errStr.guestPermissionDenied);
+					return ;
+				}
+				plugin.saveStoragePath(function(){
+					showToast("success");
+				});
+			};
+
+			if (false == plugin.checkInstalled())
+			{
+				var link = $.find("label.vedioInstallTip")[0];
+				link.style.visibility = "hidden";
+				showDetailCon();
+				showAlert(errStr.sLclPluginInstallTip);
+			}
+			else
+			{
+				setDirectory(plugin.getStorageFolder());
+			}
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	#browseBtn{
+		margin-left:10px;
+	}
+	#localStoragePluginCon{
+		visibility:hidden;
+		height:0px;
+	}
+	#localStoragePluginCon object{
+		width:0px;
+		height:0px;
+	}
+	span.storagePathlimit{
+		overflow:hidden;
+		text-overflow:ellipsis;
+		width:474px;
+	}
+	ul.line label.desC1{
+		font-size: 13px;
+		color:#666666;
+		line-height:32px;
+		width:146px;
+	}
+	ul.line label.desC2{
+		font-size: 16px;
+		color:#7A8599;
+		line-height:32px;
+		width:146px;
+	}
+	ul.line label.desC3{
+		font-size: 13px;
+		color:#666666;
+		line-height:16px;
+		width:146px;
+	}
+	input.textA1{
+		width:380px;
+	}
+	ul.line span.text{
+		vertical-align:top;
+	}
+	ul.line li.lineE1{
+		margin-bottom: 50px;
+	}
+	ul.line li.lineE2{
+		margin-top: 10px;
+		margin-bottom: 20px;
+	}
+	ul.line li.lineE3{
+		margin-bottom: 20px;
+	}
+	div.lineCon{
+		background:url(../../web-static/images/line.png) repeat-x 0px 10px;
+		clear:both;
+		padding-top:20px;
+		font-size:0px;
+		width:620px;
+	}
+	ul.line span.textA{
+		font-size: 13px;
+		color:#333333;
+		line-height:16px;
+	}
+	.menuLessMT{
+		padding-top: 24px !important;
+	}
+</style>
+<div class="detailCon menuLessMT">
+	<div id="localStoragePluginCon"></div>
+	<ul class="line">
+		<li class="line lineE1">
+			<label class="des desC1">{%label.localStorageDirectory%}</label>
+			<input id="folder" type="text" class="text textA1" readonly="true" />
+			<input id="browseBtn" type="button" value="{%btn.fwBrowse%}" class="subBtnB btnA" />
+		</li>
+		<li class="line">
+			<label class="des desC2">{%label.localVideoDirectory%}</label>
+		</li>
+		<div class="lineCon">
+			<li class="line lineE2">
+				<label class="des desC3">{%label.localPreviewVideoDirectory%}</label>
+				<span id="videoFolder" class="text textA storagePathlimit"></span>
+			</li>
+			<li class="line lineE3">
+				<label class="des desC3">{%label.localPlaybackVideoDirectory%}</label>
+				<span id="playbackFolder" class="text textA storagePathlimit"></span>
+			</li>
+			<li class="line lineE1">
+				<label class="des desC3">{%label.localDownloadVideoDirectory%}</label>
+				<span id="downloadFolder" class="text textA storagePathlimit"></span>
+			</li>
+		</div>
+		<li class="line">
+			<label class="des desC2">{%label.localPicDirectory%}</label>
+		</li>
+		<div class="lineCon">
+			<li class="line lineE2">
+				<label class="des desC3">{%label.localCapturePicDirectory%}</label>
+				<span id="capturePicFolder" class="text textA storagePathlimit"></span>
+			</li>
+			<li class="line lineE3">
+				<label class="des desC3">{%label.localPlaybackPicDirectory%}</label>
+				<span id="playbackPicFolder" class="text textA storagePathlimit"></span>
+			</li>
+			<li class="line lineE3">
+				<label class="des desC3">{%label.localDownloadPicDirectory%}</label>
+				<span id="downloadPicFolder" class="text textA storagePathlimit"></span>
+			</li>
+		</div>
+	</ul>
+	<div class="funcBtnCon">
+		<input id="save" class="subBtn btnA" type="button" value="{%btn.save%}" />
+	</div>
+</div>

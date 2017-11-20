@@ -1,0 +1,256 @@
+<script type="text/javascript">
+	function init()
+	{
+		var INPUTERRNULL = -51801;
+		var INPUTERRILL = -51802;
+		var INPUTERROVERFLOW = -51803;
+
+		var minLnErr = 3;
+		var maxLnErr = 10; // TODO, 数值范围，提示语
+
+		var FILE_NAME = uciAbnormalEvents.fileName;
+		var LOGIN_ERR_TIME_SEC = uciAbnormalEvents.secName.loginErr;
+
+		var LOGIN_ERR_ENABLED = uciAbnormalEvents.optName.enabled;
+		var MAX_NUM_ERR = uciAbnormalEvents.optName.maxNumErr;
+		var DEVICE_ENABLED = uciAbnormalEvents.optName.alarmEnabled;
+		var EMAIL_ENABLED = uciAbnormalEvents.optName.emailEnabled;
+		var OP_SND_TO_APP = uciAbnormalEvents.optName.sndToApp;
+		var OP_SND_TO_PC = uciAbnormalEvents.optName.sndToPc;
+
+		var ON = uciAbnormalEvents.optValue.enableVal.on;
+		var OFF = uciAbnormalEvents.optValue.enableVal.off;
+
+		var appCkBox = id("sendToApp");
+		var pcCkBox = id("sendToPc");
+
+		var beFirstLoaded = true;
+		var exSwitch;
+		var exSwitchDes = id("exSwitchDes");
+		var loginErrTimeInput = id("accessFailTime");
+
+		function errorHandle(code, objId)
+		{
+			var str = "";
+			closeNoteAll();
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCABENERR:
+				str = errStr.ipcAbEnErr;
+				break;
+			case IPCABMAXERR:
+				str = errStr.ipcAbMaxErr;
+				break;
+			case IPCABAPPENERR:
+				str = errStr.ipcAbAppenErr;
+				break;
+			case IPCABCLTENERR:
+				str = errStr.ipcAbCltenErr;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+
+			return false;
+		}
+
+		function checkAccessTime(valStr, objId)
+		{
+			if (valStr.length < 1)
+			{
+				showNote(objId, errStr.extLoginTimeNull);
+				return false;
+			}
+
+			if (false == checkNum(valStr))
+			{
+				showNote(objId, errStr.extLoginTimeIll);
+				return false;
+			}
+
+			if (false == checkNumRange(parseInt(valStr, 10), maxLnErr, minLnErr))
+			{
+				showNote(objId, errStr.extLoginTimeOverflow);
+				return false;
+			}
+			return true;
+		}
+
+		function saveHandle()
+		{
+			var reqData = {};
+			var loginErrTime = loginErrTimeInput.value;
+			var appCk, pcCk;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][LOGIN_ERR_TIME_SEC] = {};
+
+			if (false == checkAccessTime(loginErrTime, "accessFailTime"))
+			{
+				return false;
+			}
+
+			reqData[FILE_NAME][LOGIN_ERR_TIME_SEC][MAX_NUM_ERR] = parseInt(loginErrTime, 10);
+			reqData[FILE_NAME][LOGIN_ERR_TIME_SEC][LOGIN_ERR_ENABLED] = (exSwitch.state == 1 ? ON : OFF);
+			reqData[FILE_NAME][LOGIN_ERR_TIME_SEC][EMAIL_ENABLED] = sendEmail.getAttribute("checked") == "true" ? ON : OFF;
+			reqData[FILE_NAME][LOGIN_ERR_TIME_SEC][DEVICE_ENABLED] = triggerAlarmDevice.getAttribute("checked") == "true" ? ON : OFF;
+
+			showToast("loading");
+			$.modify(reqData, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+					loginErrTimeInput.value = parseInt(loginErrTime, 10);
+				}
+			});
+		}
+
+		function setCkBoxValue(objId, value)
+		{
+			var obj;
+			if (objId == undefined || (obj = $("#" + objId)) == undefined)
+			{
+				return;
+			}
+			id(objId).setAttribute("checked", value);
+			if (value == "true")
+			{
+				obj.addClass("chObjCheck");
+			}
+			else if (value == "false")
+			{
+				obj.removeClass("chObjCheck");
+			}
+		}
+
+		function exSwitchHd(state)
+		{
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("accessFailTime")).top + "px";
+			}
+			else
+			{
+				hideobj.style.display = "none";
+			}
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			var enable = 0;
+			var appCk, pcCk;
+
+			initCheckInput("hd");
+			id("save").onclick = saveHandle;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [LOGIN_ERR_TIME_SEC];
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						exSwitch = new Switch("exSwitch", 0, exSwitchHd);
+						loginErrTimeInput.value = 10;
+						showDetailCon();
+						return;
+					}
+
+					enable = (result[FILE_NAME][LOGIN_ERR_TIME_SEC][LOGIN_ERR_ENABLED] == ON) ? 1 : 0;
+					exSwitch = new Switch("exSwitch", enable, exSwitchHd);
+
+					loginErrTimeInput.value = result[FILE_NAME][LOGIN_ERR_TIME_SEC][MAX_NUM_ERR];
+					changeCheckInput(sendEmail, result[FILE_NAME][LOGIN_ERR_TIME_SEC][EMAIL_ENABLED] == ON);
+					changeCheckInput(triggerAlarmDevice, result[FILE_NAME][LOGIN_ERR_TIME_SEC][DEVICE_ENABLED] == ON);
+					showDetailCon();
+				}
+			});
+		}
+		pageInit();
+		initCheckInput("showInfo", null);
+	}
+	init();
+</script>
+<div class="detailCon">
+	<ul class="line firUl">
+		<li class="line lineD">
+			<label id="exSwitchDes" class="des desF">{%label.accessExceDetect%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+	</ul>
+	<div style="position:relative;z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desF" for="accessFailTime">{%label.accessLoginTime%}</label>
+			<input class="text textA4" id="accessFailTime" maxlength="2" />
+			<span class="tip">{%label.accessFailTime%}</span><span class="tip">{%label.lBrackets%}{%label.accessTimeRange%}{%label.rBrackets%}</span>
+		</li>
+	</ul>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="sendEmail" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="triggerAlarmDevice" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

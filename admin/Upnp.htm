@@ -1,0 +1,536 @@
+﻿<style type="text/css">
+	div.tableEditConA{
+		width:480px;
+	}
+	div.authorityListFunCon{
+		margin:20px 24px 5px 128px;
+	}
+	div.authorityListFunCon input{
+		margin-right:10px;
+	}
+	div.authorityListFunCon input{
+		*padding-left:18px;
+		*padding-right:18px;
+	}
+	div.tableBorderCon{
+		margin-top:40px;
+	}
+	ul.line label.desK{
+		font-size:13px;
+		line-height:32px;
+		width:128px;
+		text-align: right;
+		margin-right: 20px;
+	}
+	ul.line li.lineM{
+		margin-top: 5px;
+		margin-bottom: 5px;
+	}
+	ul.line li.lineD{
+		display: block;
+	}
+	ul.line label.desH1{
+		font-size:13px;
+		color:#333333;
+		line-height:32px;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		function errHandle(errCode)
+		{
+			closeToast();
+
+			switch(parseInt(errCode, 10))
+			{
+			case ENONE:
+				return true;
+			case IPCUPCENERR:
+				showStr = errStr.paraErr;
+				break;
+			case IPCUPCMDERR:
+				showStr = errStr.upnpMapMethodErr;
+				break;
+			case IPCUPCPROERR:
+				showStr = errStr.paraErr;
+				break;
+			case IPCUPCIPRTERR:
+				showStr = errStr.upnpInnerPortErr;
+				break;
+			case IPCUPCEPRTERR:
+				showStr = errStr.upnpExtPortErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCUPCDESCERR:
+				showStr = errStr.paraErr;
+				break;
+			case IPCSYSRPARAERR:
+			case IPCSYSRCONFERR:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			showAlert(showStr);
+
+			return false;
+		}
+
+		function UPnPSwitchHd(state)
+		{
+			upnpState = state;
+		}
+
+		function editCheck(index) //添加失焦点检测函数
+		{
+			var extPort = extPrt.value;
+
+			switch (index)
+			{
+			case 0:
+				if (extPort == upnpList[1][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			case 1:
+				if (extPort == upnpList[0][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			case 2:
+				if (extPort == upnpList[0][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			default:
+				return;
+			}
+
+			if (false == checkNumRange(extPort, 65535, 1024))
+			{
+				showNote("extPrt", errStr.upnpPortExtRan);
+				return;
+			}
+		}
+
+		function editUpnpSave(type, index, funcCbk)
+		{
+			var extPort = extPrt.value;
+			var secNameVal;
+			var cfg = {}, cfgSecPara = {};
+
+			switch (index)
+			{
+			case 0:
+				if (extPort == upnpList[1][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			case 1:
+				if (extPort == upnpList[0][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			case 2:
+				if (extPort == upnpList[0][uciOptExtPort] || extPort == upnpList[2][uciOptExtPort])
+				{
+					showNote("extPrt", errStr.upnpSamePortErr);
+					return;
+				}
+				break;
+			default:
+				return;
+			}
+
+			if (extPort == upnpList[index][uciOptExtPort])
+			{
+				funcCbk(true);
+				return;
+			}
+
+			if (2020 == extPort || 8000 == extPort)
+			{
+				showNote("extPrt", errStr.upnpSamePortErr);
+				return;
+			}
+
+			if (false == checkNumRange(extPort, 65535, 1024))
+			{
+				showNote("extPrt", errStr.upnpPortExtRan);
+				return;
+			}
+
+			if (true == $.local)
+			{
+				upnpList[index][uciOptExtPort] = extPort;
+				funcCbk(true, upnpList[index]);
+				return;
+			}
+
+			secNameVal = upnpList[index][SEC_NAME];
+			cfg[uciUpnp.fileName] = {};
+			cfg[uciUpnp.fileName][secNameVal] = cfgSecPara;
+			cfgSecPara[uciOptExtPort] = extPort;
+
+			showToast();
+			$.modify(cfg, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+					editing = false;
+					getUPnPInfo(false);
+				}
+
+				funcCbk(result[ERR_CODE] == ENONE, cfgSecPara);
+			});
+		}
+
+		function onSave()
+		{
+			var data = {}, cfg = {};
+
+			data[uciUpnp.fileName] = {};
+			data[uciUpnp.fileName][uciUpnp.secName.upnpcInfo] = cfg;
+			cfg[uciUpnp.optName.enabled] = 0 == upnpState? OFF_UPNP : ON_UPNP;
+			cfg[uciUpnp.optName.mode] = UPnPModelSel.value;
+
+			showToast("loading");
+			$.modify(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+					getUPnPInfo(false);
+					upnpMode = UPnPModelSel.value;
+				}
+			});
+		}
+
+		function selectHd(value)
+		{
+			var data = {}, cfg = {};
+
+			data[uciUpnp.fileName] = {};
+			data[uciUpnp.fileName][uciUpnp.secName.upnpcInfo] = cfg;
+			cfg[uciUpnp.optName.mode] = UPnPModelSel.value;
+
+			showToast("loading");
+			$.modify(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					upnpMode = UPnPModelSel.value;
+					getUPnPInfo(false);
+				}
+				else
+				{
+					UPnPModelSel.resetSel(upnpMode);
+				}
+			});
+		}
+
+		function resetCon()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[uciSystem.fileName] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset] = {};
+					data[uciSystem.fileName][uciSystem.actionName.configReset][uciSystem.optName.configName] = [uciUpnp.fileName];
+
+					showToast();
+					$.action(data, function(result){
+						if (true == errHandle(result[ERR_CODE]))
+						{
+							showToast("success");
+							getUPnPInfo(true);
+						}
+					});
+				}
+			});
+		}
+
+		/* 提取、设置Upnp的端口描述 */
+		function formatUpnpData(upnpStatusTable)
+		{
+			var item, pCls, onvifIndex;
+
+			upnpList.length = 0;
+			upnpList = formatTableData(upnpStatusTable);
+
+			for (var i = 0, len = upnpList.length; i < len; i++)
+			{
+				item = upnpList[i];
+				pCls = item[SEC_NAME];
+
+				if (pCls == uciOptUhttpd)
+				{
+					item[lclProlDes] = label.http;
+				}
+				else if (pCls == uciOptVhttpd)
+				{
+					item[lclProlDes] = label.srvPort;
+				}
+				else if (pCls == uciOptRtsp)
+				{
+					item[lclProlDes] = label.rtsp;
+				}
+				else if (pCls == uciOptOnvifSer)
+				{
+					onvifIndex = i;
+				}
+			}
+
+			/* 暂时隐藏掉onvif条目 */
+			upnpList.splice(onvifIndex, 1);
+		}
+
+		/* 获取vhttpdPort的外部端口 */
+		function getVhttpdPort(upnpList)
+		{
+			for (var i = 0, len = upnpList.length; i < len; i++)
+			{
+				if (uciUpnp.secName.vhttpd == upnpList[i][SEC_NAME])
+				{
+					if(upnpList[i][uciUpnp.optName.status] == "on"){
+						$.vhttpdExtPort = parseInt(upnpList[i][uciUpnp.optName.extPort], 10);
+					}
+					else{
+						$.vhttpdExtPort = "0";
+					}
+					break;
+				}
+			}
+		}
+
+		function getUPnPInfo(sign)
+		{
+			var data = {};
+			data[uciUpnp.fileName] = {};
+			data[uciUpnp.fileName][KEY_TABLE] = uciUpnp.secType.upnpStatus;
+
+			clearTimeout(timeHandle);
+			if (true == sign || sign == undefined)
+			{
+				data[uciUpnp.fileName][KEY_NAME] = uciUpnp.secName.upnpcInfo;
+			}
+
+			if (true == bFirstPageLoad && false == $.local)
+			{
+				showToast("loading");
+			}
+
+			$.queryP(data, function(result){
+				if (true == errHandle(result[ERR_CODE]) && false == editing)
+				{
+					formatUpnpData(result[uciUpnp.fileName][uciUpnp.secType.upnpStatus]);
+					switchEnable();
+
+					getVhttpdPort(upnpList);
+
+					UPnPMtch.setDataSource(upnpList);
+					UPnPMtch.refresh();
+
+					if (true == sign || sign == undefined)
+					{
+						upnpState = OFF_UPNP == result[uciUpnp.fileName][uciUpnp.secName.upnpcInfo][uciUpnp.optName.enabled] ? 0 : 1;
+						upnpMode = result[uciUpnp.fileName][uciUpnp.secName.upnpcInfo][uciUpnp.optName.mode];
+						UPnPSwitch = new Switch("UPnPSwitch", upnpState, UPnPSwitchHd);
+						selectInit("UPnPModelSel", UPnPModelOptions, upnpMode, selectHd);
+					}
+
+					if (true == bFirstPageLoad)
+					{
+						bFirstPageLoad = false;
+						closeToast();
+						showDetailCon();
+					}
+
+                    if (1 == upnpState)
+                    {
+					    timeHandle = $.setTimeout(function(){getUPnPInfo(false);}, 2000);
+                    }
+				}
+			});
+		}
+
+		function popUpHd(type, index, para)
+		{
+			if (upnpMode == Auto)
+			{
+				showAlert(label.autoTip);
+				return;
+			}
+
+			editing = true;
+			editUpnpDiv.style.top = "0px";
+			closeNoteAll();
+			prtCls.innerHTML = upnpList[index][lclProlDes];
+			inPrt.innerHTML = upnpList[index][uciOptInPort];
+			extPrt.value = upnpList[index][uciOptExtPort];
+
+			clearTimeout(timeHandle);
+			id("extPrt").onblur = function()
+			{
+				editCheck(index);
+			};
+		}
+
+		function switchEnable()
+		{
+			var upnpLen = upnpList.length;
+			for (var i = 0; i < upnpLen; i++)
+			{
+				if (ON_UPNP == upnpList[i][uciOptStatus])
+				{
+					upnpList[i][uciOptStatus] = label.workIng;
+				}
+				else
+				{
+					upnpList[i][uciOptStatus] = label.notWork;
+				}
+			}
+		}
+
+		function upnpMatchInit()
+		{
+			UPnPMtch = new DataGrid();
+			switchEnable();
+			UPnPMtch.init({
+				max:32,
+				id:"UPnPMacthTable",
+				data:upnpList,
+				hasSelBox:false,
+				hasID:false,
+				classCol:{gridClassName:"dataGrid"},
+				head:[{field:label.portDes, width:140, className:"TAC"},
+					  {field:label.intPort, width:110},
+					  {field:label.extPort, width:110},
+					  {field:label.intIP, width:190},
+					  {field:label.curStatus, width:70}],
+				list:[{name:lclProlDes, type:"str", maxLength:16, className:"TAC"},
+					  {name:uciOptInPort, type:"num", maxSize:30},
+					  {name:uciOptExtPort, type:"num"},
+					  {name:uciOptClientIp, type:"ip", maxSize:30},
+					  {name:uciOptStatus, type:"str"}],
+				toolBar:{popUp:popUpHd, asyn:true},
+				popUpBar:{id:"editUpnpDiv", save:editUpnpSave, cancel:function(type, index, handle){
+					closeNoteAll();
+					handle(true);
+					editing = false;
+					getUPnPInfo(false);
+				}}
+			});
+		}
+
+		var ON_UPNP = "on", OFF_UPNP = "off";
+		var upnpState = 0, Auto = "auto", lclProlDes = "lclProlDes",
+			Manual = "manual", upnpMode = Auto;
+		var UPnPModelOptions = [{str:label.lanIpManual, value:Manual},
+								{str:label.authAuto, value:Auto}];
+		var upnpList = [], UPnPSwitch = null, UPnPMtch = null;
+		var uciOptExtPort = uciUpnp.optName.extPort;
+		var uciOptInPort = uciUpnp.optName.innerPort;
+		var uciOptProtoCls = uciUpnp.optName.proto;
+		var uciOptClientIp = uciUpnp.optName.ipaddr;
+		var uciOptStatus = uciUpnp.optName.status;
+		var uciOptUhttpd = uciUpnp.secName.uhttpd;
+		var uciOptVhttpd = uciUpnp.secName.vhttpd;
+		var uciOptRtsp = uciUpnp.secName.rtsp;
+		var uciOptOnvifSer = uciUpnp.secName.onvifSer;
+		var editUpnpDiv = id("editUpnpDiv"), prtCls = id("prtCls"),
+			inPrt = id("inPrt"), extPrt = id("extPrt");
+		var timeHandle = null;
+		var editing = false;
+		var bFirstPageLoad = true;
+		var UPnPModelSel = id("UPnPModelSel");
+
+		id("save").onclick = onSave;
+		id("resetDefault").onclick = resetCon;
+
+		if (true == $.local)
+		{
+			upnpList= [{lclProlDes:"http",inner_port:80, ext_port:8000, ipaddr:"192.168.1.12",status:1},
+					{lclProlDes:"rtsp",inner_port:554, ext_port:554, ipaddr:"192.168.1.18",status:1},
+					{lclProlDes:"serPort",inner_port:34, ext_port:5674, ipaddr:"192.168.1.13",status:1}];
+			selectInit("UPnPModelSel", UPnPModelOptions, Auto);
+			UPnPSwitch = new Switch("UPnPSwitch", 0, UPnPSwitchHd);
+			upnpMatchInit();
+		}
+		else
+		{
+			upnpMatchInit();
+			getUPnPInfo(true);
+		}
+	}
+	init();
+</script>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desF">{%label.enabled%}{%menuStr.upnp%}</label>
+			<div id="UPnPSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+		<li class="line lineD">
+			<label class="des desF">{%label.UpnpMethod%}</label>
+			<span class="selCon">
+				<span id="UPnPModelSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+	<div id="detailConCFUM" class="">
+		<div class="tableCon">
+			<div class="tableBorderCon">
+				<table id="UPnPMacthTable" class="dataGrid"></table>
+				<div id="editUpnpDiv" class="tableEditLyCon">
+					<div class="tableEditCon tableEditConA">
+						<div class="innerCon">
+							<h4 class="title">{%label.editUPnP%}</h4>
+							<i id="closeTip"></i>
+							<ul class="line">
+								<li class="line lineM">
+									<label class="des desK">{%label.portDes%}</label>
+									<label class="des desH1" id="prtCls">TCP</label>
+								</li>
+								<li class="line lineM">
+									<label class="des desK">{%label.intPort%}</label>
+									<label class="des desH1" id="inPrt">80</label>
+								</li>
+								<li class="line lineM">
+									<label class="des desK">{%label.extPort%}</label>
+									<input class="text textB8" type="text" value="" id="extPrt" maxlength="5" />
+								</li>
+							</ul>
+							<div class="tablePopUpToolBar authorityListFunCon"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input class="subBtnB btnA" type="button" id="resetDefault" value="{%btn.resetDefault%}" />
+		<input class="subBtn btnA" type="button" id="save" value="{%btn.save%}"/>
+	</div>
+</div>

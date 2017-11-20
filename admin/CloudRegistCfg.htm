@@ -1,0 +1,811 @@
+﻿<style type="text/css">
+	body{
+		height:100%;
+	}
+	span.phoneRegist{
+		color:#FFFFFF;
+		font-size:18px;
+		font-weight:bold;
+	}
+	#CAPTCHAGet{
+		margin-right:208px;
+		margin-left:12px;
+		width:124px;
+		*width:122px;
+	}
+	label.agreeAndRead{
+		color:#333333;
+		font-size:13px;
+		margin-left:5px;
+		vertical-align:middle;
+	}
+	a.cloudRegistProtocalA{
+		color:#325FE0;
+		font-size:13px;
+		height:20px;
+		line-height:20px;
+		text-align:left;
+		margin-left:220px;
+		margin-bottom:4px;
+	}
+	li.textConE1 label{
+		color:#FFFFFF;
+		font-size:12px;
+		line-height:36px;
+		vertical-align:middle;
+		margin-left:5px;
+	}
+	i.closeTip{
+		background:url(../web-static/images/closeTip.png);
+		cursor:pointer;
+		height:15px;
+		position:absolute;
+		top:10px;
+		right:15px;
+		width:15px;
+	}
+	#cloudRgProtocalCon{
+		position:relative;
+		z-index:1012;
+		width:715px;
+		margin:0px auto;
+		height:0px;
+		line-height:0px;
+		font-size:0px;
+		visibility:hidden;
+		top:-9999px;
+	}
+	div.cloudRgProtocal{
+		background:#FFFFFF;
+		font-size:12px;
+		line-height:normal;
+		height:485px;
+		position:absolute;
+		top:90px;
+		margin:0 auto;
+		width:715px;
+	}
+	p.cloudRgProtocalTitle{
+		height:35px;
+		background:#5E85C0;
+	}
+	p.cloudRgProtocalTitle span{
+		color:#FFFFFF;
+		line-height:35px;
+		margin-left:20px;
+	}
+	p.cloudRgProtocalTitle i{
+		background:url(../web-static/images/routerBg.png) -422px -108px no-repeat;
+		cursor:pointer;
+		float:right;
+		height:20px;
+		width:20px;
+		margin:7px 7px 0 0;
+	}
+	#cloudRgDetial{
+		font-size:12px;
+		text-align:left;
+	}
+	#resend{
+		margin-right:208px;
+		margin-left:12px;
+		width:124px;
+		*width:122px;
+		padding:0 18px;
+		background-color:#E1E4E6;
+	}
+	#protocol{
+		text-align:left;
+		height:40px;
+	}
+	#agree{
+		margin-left:220px;
+	}
+	#cancelRegistSub{
+		margin-left:220px;
+		margin-right:14px;
+	}
+	span.depSpan{
+		font-size:13px;
+		display:none;
+		vertical-align:middle;
+		position:absolute;
+		top:11px;
+		right:110px;
+	}
+	span.dep{
+		font-size:14px;
+		vertical-align:middle;
+	}
+	span.depStrong{
+		color:#19B68F;
+	}
+	span.depMedia{
+		color:#FF9F00;
+	}
+	span.depWeak{
+		color:#FF5500;
+	}
+	ul.line li.lineF3{
+		position:relative;
+	}
+	div.coverLoadCon{
+		margin:400px auto 0;
+	}
+</style>
+<script type="text/javascript">
+	function gCloudAccountRegstErrHandle(errNo, objOrId)
+	{
+		var showStr = "";
+		var cloudErrRel;
+
+		switch (parseInt(errNo))
+		{
+		case ENONE:
+			gCloudAccountBR["success"] = true;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindSuccess;
+			return true;
+		case EINVACCOUNTREGISTED:
+			showStr = label.cloudAcccountRegisted;
+			break;
+		case EINVACCOUNTNOTEXIST:
+			showStr = errStr.invCloudAccountNotExist;
+			break;
+		case EINVPASSWORDFMT:
+		case EINVACCOUNTPWDFMT:
+			showStr = errStr.pwdInvalid;
+			break;
+		case EINVACCOUNTPWDERR:
+			showStr = label.passwdErr;
+			break;
+		case EINVACCOUNTPHONENUMFMT:
+			showStr = errStr.invCloudAccountPhoneErr;
+			break;
+		case IPCUMGUESTNAUTH:
+			showStr = errStr.invPermissionDenied;
+			break;
+		case EINVCLOUDUSRCOUNTFORMAT:
+		case EINVACCOUNTEMAILFMT:
+			showStr = errStr.invCloudAccountEmailErr;
+			break;
+		case EINVACCOUNTRESETPWDCAPTCHAERR:
+		case EINVVERICODEFORMAT:
+			showStr = errStr.CAPTCHAErrorTip;
+			break;
+		case EINVCLOUDERRORCAPTCHAINVAL:
+			showStr = errStr.invCloudCAPTCHAInval;
+			break;
+		default:
+			cloudErrRel = cloudErrHandle(errNo)
+			if (cloudErrRel.result == false)
+			{
+				showStr = cloudErrRel.tip;
+			}
+			else
+			{
+				showStr = errStr.invRequestFail;
+			}
+			break;
+		}
+
+		gCloudAccountBR["success"] = false;
+		showAlert(showStr, objOrId);
+		return false;
+	}
+
+	function gCloudAccountBRHd(callBack, timeoutCallBack, closeHandle)
+	{
+		showLoading(label.cloudAccoundRegistWaiting, closeHandle, undefined, false);
+		cloudAccountRegist(gCloudAccountBR["account"], gCloudAccountBR["accountType"], gCloudAccountBR["pwd"], gCloudAccountBR["CAPTCHAR"], function(code){
+			closeLoading();
+			if (true == gCloudAccountRegstErrHandle(code))
+			{
+				typeof callBack == "function" && callBack();
+			}
+		}, function(){
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountRegistFail;
+			gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+			typeof timeoutCallBack == "function" && timeoutCallBack();
+		});
+	}
+
+	function gCloudAccountBindErrHandle(errNo, objOrId)
+	{
+		var showStr = "";
+		var cloudErrRel;
+
+		switch (parseInt(errNo))
+		{
+		case ENONE:
+			gCloudAccountBR["success"] = true;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindSuccess;
+			return true;
+		case EINVACCOUNTBINDED:
+		case EINDEVICEALREADYBOUND:
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindFail;
+			gCloudAccountBR["noteS"] = label.cloudAccountBindedTip;
+			return true;
+		case EINVDEVICEIDNOTEXIST:
+		case EINVERRORDEVICEIDFORMATERROR:
+			showStr = label.cloudDeviceInfoExpt;
+			break;
+		case EINVACCOUNTNOTEXIST:
+			showStr = errStr.invCloudAccountNotExist;
+			break;
+		case EINVACCOUNTPWDERR:
+			showStr = label.passwdErr;
+			break;
+		case EINVACCOUNTPHONENUMFMT:
+			showStr = errStr.invCloudAccountPhoneErr;
+			break;
+		default:
+			cloudErrRel = cloudErrHandle(errNo)
+			if (cloudErrRel.result == false)
+			{
+				showStr = cloudErrRel.tip;
+			}
+			else
+			{
+				showStr = errStr.invRequestFail;
+			}
+			break;
+		}
+
+		gCloudAccountBR["success"] = false;
+		showAlert(showStr, objOrId);
+		return false;
+	}
+
+	function gCloudAccountBindHd(callBack, timeoutCallBack, closeHandle)
+	{
+		showLoading(label.cloudAccoundBindWaiting, closeHandle, undefined, false);
+		cloudAccountBind(gCloudAccountBR["account"], gCloudAccountBR["pwd"], function(code){
+			closeLoading();
+			if (true == gCloudAccountBindErrHandle(parseInt(code)))
+			{
+				gCloudAccountBR["success"] = true;
+				gCloudAccountBR["noteF"] = label.cloudAccountBindSuccess;
+				gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+				typeof callBack == "function" && callBack();
+			}
+		}, function(){
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindFail;
+			gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+			typeof timeoutCallBack == "function" && timeoutCallBack();
+		});
+	}
+
+	function cloudRegistBindLoadPage()
+	{
+		if (true == $.local)
+		{
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountRegistFail;
+			gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+		}
+
+		loadPage("CloudBindRegistResult.htm", "cloudMgtDetial", undefined, {bClearPageTickArray:false});
+	}
+
+	function cloudRegistSubHd(checkSub)
+	{
+		if (true == checkSub())
+		{
+			gCloudAccountBRHd(function(){
+				/* 创建成功则登录 */
+				$.setTimeout(function(){
+					gCloudAccountBindHd(cloudRegistBindLoadPage, cloudRegistBindLoadPage, cloudAccountQueryStop);
+				}, 10);
+			}, cloudRegistBindLoadPage, cloudAccountQueryStop);
+		}
+	}
+
+	function init()
+	{
+		var data = {};
+		var idStr = "cloudPwd";
+		var depId = "pwdDep";
+		var depDeId = "pwdDepSp";
+		var account = id("cloudAccount");
+		var cloudPwd = id("cloudPwd");
+		var cloudConfPwd = id("cloudConfPwd");
+		var lgAgreeNote = id("lgAgreeNote");
+		var pwdDep = id(depId);
+		var pwdDepSp = id(depDeId);
+		var chgPwdDep = id("chgPwdDep");
+		var CAPTCHAGet = id("CAPTCHAGet");
+		var resend = id("resend");
+		var CAPTCHASendTip = id("CAPTCHASendTip");
+		var cloudRegistSub = id("cloudRegistSub");
+		var closeTip = id("close");
+		var cancelBtn = id("cancelRegistSub");
+		var agree = id("agree");
+		var WAITING_CLOUD_RESPONSE_CAPTCHA = 2000;
+		var CAPTCHA_TIME = 1000;
+		var CAPTCHA_MAX_TIME = 120;
+		var DEP_STRONG = 0;
+		var DEP_MEDIA = 1;
+		var DEP_WEAK = 2;
+		var bGettingCAPTCHA = false;
+		var accountType = uciCloudConfig.optValue.accountTypePhoneNum;
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (parseInt(errNo))
+			{
+			case ENONE:
+				return true;
+			case EINVERICODEEMPTY:
+				objOrId = "CAPTCHA";
+				showStr = errStr.invVericodeNULL;
+				break;
+			case EINVACCOUNTRESETPWDCAPTCHAERR:
+			case EINVVERICODEFORMAT:
+				objOrId = "CAPTCHA";
+				showStr = errStr.CAPTCHAErrorTip;
+				break;
+			case EINVCLOUDUSRCOUNTFORMAT:
+			case EINVACCOUNTPHONENUMFMT:
+				objOrId = account;
+				showStr = errStr.invCloudAccountPhoneErr;
+				break;
+			case EINVACCOUNTREGISTED:
+				objOrId = account;
+				showStr = label.cloudAcccountRegisted;
+				break;
+			case EINVACCOUNTTYPEERR:
+				objOrId = account;
+				showStr = errStr.invCloudAccountType;
+				break;
+			case EINVDEVICELOCKED:
+				showStr = errStr.invCloudDeviceLocked;
+				break;
+			case EINVCLOUDERRORCAPTCHAINVAL:
+				showStr = errStr.invCloudCAPTCHAInval;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function chkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+		function pwdConfFocus()
+		{
+			pwdDep.style.display = "none";
+		}
+		function pwdFocus()
+		{
+			closeNote("cloudConfPwd");
+		}
+		function pwdConfCheck()
+		{
+			pwdConfFocus();
+
+			if (cloudConfPwd.value == cloudPwd.value)
+			{
+				closeNote("cloudConfPwd");
+				return true;
+			}
+			else
+			{
+				showNote("cloudConfPwd", label.chgPwdDif);
+				return false;
+			}
+		}
+		function pwdBlur()
+		{
+			var len = cloudPwd.value.length;
+
+			if (len >= 0 && len < 6)
+			{
+				showNote(idStr, label.chgPwdLess);
+			}
+		}
+		function pwdCheckMixChars(str)
+		{
+			var hasNum = false;
+			var hasLetter = false;
+			var hasSymbol = false;
+
+			hasNum = /\d/g.test(str);
+			hasLetter = /[a-zA-Z]/g.test(str);
+			hasSymbol = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]/g.test(str);
+
+			return hasNum&&hasSymbol&&hasLetter;
+		}
+		function externInputFocusHandle(input)
+		{
+			$(input.parentNode).find("label.desInner").css("display", "none");
+		}
+		function externInputBlurHandle(input)
+		{
+			if (input.value.length == 0)
+			{
+				$(input.parentNode).find("label.desInner").css("display", "inline");
+			}
+			else
+			{
+				$(input.parentNode).find("label.desInner").css("display", "none");
+			}
+		}
+		function checkPwdDep(pwdValue)
+		{
+			var dep = DEP_WEAK;
+			var len = pwdValue.length;
+
+			if (/^\d+$/.test(pwdValue) ||
+					/^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]+$/.test(pwdValue) ||
+					/^[a-zA-Z]+$/.test(pwdValue))
+			{
+				if (len <= 10)
+				{
+					dep = DEP_WEAK;
+				}
+				else
+				{
+					dep = DEP_MEDIA;
+				}
+			}
+			else if (true == pwdCheckMixChars(pwdValue))
+			{
+				dep = DEP_STRONG;
+			}
+			else
+			{
+				if (len <= 10)
+				{
+					dep = DEP_MEDIA;
+				}
+				else
+				{
+					dep = DEP_STRONG;
+				}
+			}
+
+			return dep;
+		}
+		function getPwdDepStr(dep)
+		{
+			var str = {};
+
+			if (dep == DEP_STRONG)
+			{
+				str["str"] = "<span class='dep depStrong'>" + label.strong + "</span>";
+				str["orgStr"] = label.strong;
+			}
+			else if (dep == DEP_MEDIA)
+			{
+				str["str"] = "<span class='dep depMedia'>" + label.media + "</span>";
+				str["orgStr"] = label.media;
+			}
+			else
+			{
+				str["str"] = "<span class='dep depWeak'>" + label.weak + "</span>";
+				str["orgStr"] = label.weak;
+			}
+
+			return str;
+		}
+		function pwdCheck()
+		{
+			var tip = "";
+			var dep = id(depId);
+			var depDe = id(depDeId);
+			var pwdValue = cloudPwd.value;
+			var len = pwdValue.length;
+			var result = true;
+			var lgPwdInVal = false;
+			var lgPwdless = false;
+
+			closeNoteAll();
+
+			if (len >= 0 && len < 6 || len > 32)
+			{
+				showNote(idStr, label.chgPwdChar);
+				dep.style.display = "none";
+				result = false;
+			}
+			else if (!chkPswVal(pwdValue))
+			{
+				showNote(idStr, errStr.pwdCharValid);
+				dep.style.display = "none";
+				result = false;
+			}
+			else
+			{
+				tip = getPwdDepStr(checkPwdDep(pwdValue))["orgStr"];
+				if (tip == label.weak)
+				{
+					depDe.style.color = "#FF5500";
+				}
+				else if (tip == label.media)
+				{
+					depDe.style.color = "#FF9F00";
+				}
+				else
+				{
+					depDe.style.color = "#19B68F";
+				}
+
+				depDe.innerHTML = label.chgPwdDep + label.colon + tip;
+				dep.style.display = "inline";
+			}
+
+			return result;
+		}
+		function checkAccount()
+		{
+			var accountVal = account.value;
+
+			if (0 == accountVal.length)
+			{
+				showNote("cloudAccount", label.cloudAccountPhoneMumNull);
+				return false;
+			}
+
+			if (false == checkNum(accountVal))
+			{
+				if(false == checkEmail(accountVal))
+				{
+					showNote("cloudAccount", label.cloudAccountEmailFmtErr);
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+			else if (false == checkPhoneNum(accountVal))
+			{
+				showNote("cloudAccount", label.cloudAccountPhoneNumFmtErr, "twoLine");
+				return false;
+			}
+			else
+			{
+				closeNote("cloudAccount");
+				return true;
+			}
+			return true;
+		}
+		function checkSub()
+		{
+			var accountVal = account.value;
+			var pwdValue = cloudPwd.value;
+			var CAPTCHAVal = id("CAPTCHA").value;
+
+			/* 检查帐号信息 */
+			if (false == checkAccount())
+			{
+				return false;
+			}
+
+			/* 检查密码 */
+			if (false == pwdCheck() || false == pwdConfCheck())
+			{
+				return false;
+			}
+			else
+			{
+				gCloudAccountBR["pwd"] = pwdValue;
+			}
+
+			/* 检查验证码 */
+			if (0 == CAPTCHAVal.length)
+			{
+				errHandle(EINVERICODEEMPTY);
+				return false;
+			}
+
+			if (agree.getAttribute("checked").toString() == "false")
+			{
+				showNote("agree", label.agreeAndReadTip, null, {"changeBW":0});
+				return false;
+			}
+
+			gCloudAccountBR["account"] = accountVal;
+			gCloudAccountBR["CAPTCHAR"] = CAPTCHAVal;
+
+			return true;
+		}
+
+		/* 获取验证码 */
+		function getCAPTCHA()
+		{
+			var captchaHd;
+			var accountVal = account.value;
+			var emailAddr = null;
+
+			if (true == bGettingCAPTCHA)
+			{
+				return;
+			}
+
+			CAPTCHASendTip.style.display = "none";
+
+			if (true == checkAccount())
+			{
+				bGettingCAPTCHA = true;
+				captchaHd = $.setTimeout(function(){
+					showLoading(label.cloudServerWaitingResp, function(){
+						bGettingCAPTCHA = false;
+						cloudAccountQueryStop();
+					}, undefined, false);
+				}, WAITING_CLOUD_RESPONSE_CAPTCHA);
+
+				cloudAccountGetRegistAC(accountVal, accountType, function(code){
+					closeLoading();
+					clearTimeout(captchaHd);
+
+					if (true == errHandle(code))
+					{
+						showCAPTCHABtn(CAPTCHA_MAX_TIME);
+						CAPTCHASendTip.style.display = "block";
+					}
+
+					bGettingCAPTCHA = false;
+				}, function(){
+					clearTimeout(captchaHd);
+					bGettingCAPTCHA = false;
+				});
+			}
+			else
+			{
+				bGettingCAPTCHA = false;
+			}
+		}
+
+		/* 设置验证码剩余的时间 */
+		function showCAPTCHABtn(time)
+		{
+			time = parseInt(time);
+
+			if (time <= 0)
+			{
+				CAPTCHAGet.style.display = "inline";
+				resend.style.display = "none";
+				resend.time = -1;
+				CAPTCHASendTip.style.display = "none";
+			}
+			else
+			{
+				CAPTCHAGet.style.display = "none";
+				resend.value = btn.resend + "(" + time + ")";
+				resend.time = --time;
+				resend.style.display = "inline";
+			}
+		}
+
+		/* 验证码剩余的时间的守护函数 */
+		function CAPTCHATime()
+		{
+			if (resend.style.display != "none")
+			{
+				showCAPTCHABtn(resend.time);
+			}
+
+			$.setTimeout(arguments.callee, CAPTCHA_TIME);
+		}
+
+		initCheckInput("agree", function(checked){
+			if (true == checked)
+			{
+				closeNote("agree");
+			}
+			else
+			{
+				showNote("agree", label.agreeAndReadTip, null, {"changeBW":0});
+			}
+		});
+		changeCheckInput("agree", true, function(){
+			closeNote("agree");
+		});
+		cloudPageSetNodes(true);
+		CAPTCHAGet.onclick = getCAPTCHA;
+		CAPTCHATime();
+
+		data[cloudClientStatus.fileName] = {};
+		data[cloudClientStatus.fileName][KEY_NAME] = cloudClientStatus.secName.regVeriCodeTimer;
+		$.query(data, function(result){
+			if (true == $.local)
+			{
+				showCAPTCHABtn(5);
+				return;
+			}
+
+			if (errHandle(result[ERR_CODE]))
+			{
+				var regTimerObj = result[cloudClientStatus.fileName][cloudClientStatus.secName.regVeriCodeTimer];
+
+				showCAPTCHABtn(parseInt(regTimerObj[cloudClientStatus.optName.regVeriCodeTimer]));
+			}
+
+			showDetailCon();
+		});
+		cloudRegistSub.onclick = function(){
+			cloudRegistSubHd(checkSub);
+		};
+		closeTip.onclick = cancelBtn.onclick = function(){
+			cloudGoBackBR({binded:false});
+		};
+		account.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		account.onfocus = function(){
+			externInputFocusHandle(this);
+		};
+		cloudConfPwd.onkeyup = pwdConfCheck;
+		cloudConfPwd.onfocus = function(){
+			pwdConfFocus();
+			externInputFocusHandle(this);
+		};
+		cloudConfPwd.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		cloudPwd.onkeyup = pwdCheck;
+		cloudPwd.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		cloudPwd.onfocus = function(){
+			pwdFocus();
+			externInputFocusHandle(this);
+		};
+		$.setTimeout(function(){
+			cloudAccount.value = "";
+			cloudPwd.value = "";
+			cloudConfPwd.value = "";
+		}, 0);
+	}
+	init();
+</script>
+<div class="cloudAccountLogo"></div>
+<div class="cloudManageCon">
+	<div id="cloudMgtDetial" class="cloudMgtDetial">
+		<i id="close" class="closeTip"></i>
+		<p class="title">{%label.cloudAccountRegist%}</p>
+		<p class="cloudTip">{%label.tpLinkID%}</p>
+		<ul class="line">
+			<li class="line lineF3">
+				<label class="des desE" for="cloudAccount">{%label.tpLinkID%}</label>
+				<input id="cloudAccount" class="text textC imeModeN" maxLength="64" />
+				<label class="desInner" for="cloudAccount">{%label.cloudAccountPhoneMumNull%}</label>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudPwd">{%label.loginSetPwd%}</label>
+				<input id="cloudPwd" class="text textC imeModeN" type="password" maxLength="32" />
+				<label class="desInner" for="cloudPwd">{%label.cloudPwdTip%}</label>
+				<span id="pwdDep" class="depSpan"><span id="pwdDepSp"></span></span>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudConfPwd">{%label.loginPwdConf%}</label>
+				<input id="cloudConfPwd" type="password" class="text textC imeModeN" />
+				<label class="desInner" for="cloudConfPwd">{%label.cloudConfPwdTip%}</label>
+			</li>
+			<li class="line lineF4">
+				<label class="des desE" for="CAPTCHA">{%label.loginCAPTCHA%}</label>
+				<input id="CAPTCHA" class="text textC1 imeModeN"  maxLength="6" />
+				<input id="resend" type="button" value="{%btn.resend%}" disabled="true" class="subBtnB btnA disNone" />
+				<input id="CAPTCHAGet" type="button" value="{%btn.CAPTCHAGet%}" class="subBtn btnA disNone" />
+			</li>
+			<p id="CAPTCHASendTip" class="inputTip disNone">{%label.CAPTCHASentPhTip%}</p>
+			<a class="cloudRegistProtocalA" href="http://src.tplinkcloud.com.cn/agreement.html" target="_blank">{%label.cloudRegistProtocal%}</a>
+			<li class="line lineF3" id="protocol">
+				<i id="agree" name="agree"></i>
+				<label class="agreeAndRead" for="agree">{%label.agreeAndRead%}</label>
+			</li>
+		</ul>
+		<input id="cancelRegistSub" type="button" value="{%btn.cancel%}" class="subBtnB btnA" />
+		<input id="cloudRegistSub" type="button" value="{%btn.RegistAndBind%}" class="subBtn btnA" />
+	</div>
+</div>

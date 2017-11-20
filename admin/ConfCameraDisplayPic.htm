@@ -1,0 +1,1703 @@
+<script type="text/javascript">
+	function init()
+	{
+		var pluginObj;
+		var controlDayNight; /* 日夜转换 */
+		var brightDragLine;
+		var contrastDragLine;
+		var saturationDragLine;
+		var sharpnessDragLine;
+		var chromaDragLineNight;
+		var curProfileMode = uciImage.secName.common; /* common, day, night */
+		var lastProfile = uciImage.secName.day;
+		var $cdn = $("#controlDayNight");
+		var $dayNightBlockCon = $("#dayNightBlockCon");
+		var $csd = $(".commonSetDiv");
+		var $dayNightMode = id("dayNightMode");
+		var $exposeManualSet = $(".exposeManualSet");
+		var $infCloAutoSet = $(".infCloAutoSet");
+		var $infTimmingSet = $(".infTimmingSet");
+		var $basicSet = $(".basicSet");
+		var $advanceSet = $(".advanceSet");
+		var $dynamicWidthSet = $(".dynamicWidthSet");
+		var $AreaComSet = $(".AreaComSet");
+		var $wbCustomizeSet = $(".customizeSet");
+		var $infDN = $("#infDN");
+		var $comSet = $("#comSet");
+		var $sepSet = $("#sepSet");
+		var blGainDragLine;
+		var expGainDragLine;
+		var blGainDragLine;
+		var wbRedGainDragLine;
+		var wbBlueGainDragLine;
+		var resetBtn = id("reset");
+		//var rotateSel = id("rotateSel");
+		var mirrorSel = id("mirrorSel");
+		var exposeSel = id("exposeSel");
+		var shutterSel = id("shutterSel");
+		var infraredSel = id("infraredSel");
+		var infraredSelB = id("infraredSelB");
+		var sensiSel = id("sensiSel");
+		var infSensitivity;
+		var dynaWidthSel = id("dynaWidthSel");
+		var areaComSel = id("areaComSel");
+		var whiteBalanceSel = id("whiteBalanceSel");
+		var infraredDelay = id("infraredDelay");
+		var infDN, infDNType = 0;
+		var switchSchedule;
+		var switchScheBT, switchScheET;
+		var flipType, rotateType;
+		var secInHour = 3600;
+		var secInMinus = 60;
+
+		/* 下拉列表选项 */
+		var imgFile = uciImage.fileName;
+		var uciImgOptVal = uciImage.optValue;
+		var uciImgSensiOptVal = uciImgOptVal.sensitivity;
+		var uciImgOptName = uciImage.optName;
+		var MODECOMMMON = DEFAULTMODEOPT = uciImgOptVal.modCom;
+		var MODEAUTO = uciImgOptVal.modAuto;
+		var MODESCHEDULE = uciImgOptVal.modSche;
+		var PROFILECOMMON = DEFAULTPROFILEOPT = uciImage.secName.common;
+		var EXPOSEAUTO = DEFAULTEXPOSEOPT = uciImgOptVal.expAuto;
+		var EXPOSEMANUAL = uciImgOptVal.expManual;
+		var INFAUTO = DEFAULTINFOPT = uciImgOptVal.infAuto;
+		var INFTIMING = uciImgOptVal.infSche;
+		var INFON = uciImgOptVal.infOn;
+		var INFOFF = uciImgOptVal.infOff;
+		var SENSHIGH = uciImgOptVal.infSenH;
+		var SENSMEDIUM = DEFAULTSENSOPT = uciImgOptVal.infSenM;
+		var SENSLOW = uciImgOptVal.infSenL;
+		var BLCLOSE = DEFAULTBLOPT = uciImgOptVal.blOff;
+		var WDROPEN = uciImgOptVal.wdrOn;
+		var WDRClOSE = uciImgOptVal.wdrOff;
+		var BLREGMAKEUP = uciImgOptVal.blReg;
+		var BLDYNAWIDTH = uciImgOptVal.blWD;
+		var AREACOMTOP = uciImgOptVal.areaComTop;
+		var AREACOMBOTTOM = uciImgOptVal.areaComBottom;
+		var AREACOMLEFT = uciImgOptVal.areaComLeft;
+		var AREACOMRIGHT = uciImgOptVal.areaComRight;
+		var AREACOMCENTER = uciImgOptVal.areaComCenter;
+		var AREACOMCLOSE = uciImgOptVal.areaComClose;
+		var WBALAUTO = DEFAULTWBALOPT = uciImgOptVal.wbAuto;
+		var WBALLOCKED = uciImgOptVal.wbLck;
+		var WBALDAYLIGHT = uciImgOptVal.wbDayLig;
+		var WBALNATURE = uciImgOptVal.wbNature;
+		var WBALINCAN = uciImgOptVal.wbInc;
+		var WBALWARM = uciImgOptVal.wbWarm;
+		var WBALCUSTOMIZE = uciImgOptVal.wbManual;
+		var sysFile = uciSystem.fileName;
+		var RESETCONFIG = uciSystem.actionName.configReset;
+		var CONFIGNAME = uciSystem.optName.configName;
+		var bFirstPageLoad = true;
+		var moreSensiDegree = false;
+		var cData, infSche, infSens, dynawidthV, areacom, infScheBt, infScheEt;
+		var luma, contrast, saturation, sharpness;
+		var mode, expose, expGain, shutter, comInfT, sepInfT;
+		var wdGain, wbRGain, wbBGain, wbType, infDelay;
+		var shutterValArr = ["1/25", "1/50", "1/100", "1/125", "1/150", "1/250", "1/500"];
+		var shutterSelOpt = [];
+		var tmp;
+
+		function errorHandler(code, objOrId)
+		{
+			var str = "";
+			closeNoteAll();
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCIMSWMERR:
+				str = errStr.ipcImSwmErr;
+				break;
+			case IPCIMSCHERR:
+				str = errStr.ipcImSchErr;
+				break;
+			case IPCIMFLPERR:
+				str = errStr.ipcImFlpErr;
+				break;
+			case IPCIMRTTERR:
+				str = errStr.ipcImRttErr;
+				break;
+			case IPCIMINFTERR:
+				str = errStr.ipcImInftErr;
+				break;
+			case IPCIMINFDERR:
+				str = errStr.ipcImInfdErr;
+				break;
+			case IPCIMINFSERR:
+				str = errStr.ipcImInfsErr;
+				break;
+			case IPCIMLUMAERR:
+				str = errStr.ipcImLumaErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCIMCNTRERR:
+				str = errStr.ipcImCntrErr;
+				break;
+			case IPCIMCHRERR:
+				str = errStr.ipcImChrErr;
+				break;
+			case IPCIMSHRERR:
+				str = errStr.ipcImShrErr;
+				break;
+			case IPCIMSATERR:
+				str = errStr.ipcImSatErr;
+				break;
+			case IPCIMEXPTERR:
+				str = errStr.ipcImExptErr;
+				break;
+			case IPCIMSHTERR:
+				str = errStr.ipcImShtErr;
+				break;
+			case IPCIMEXPGERR:
+				str = errStr.ipcImExpgErr;
+				break;
+			case IPCIMWDERR:
+				str = errStr.ipcImWdErr;
+				break;
+			case IPCIMWDGERR:
+				str = errStr.ipcImWdgErr;
+				break;
+			case IPCIMWBTERR:
+				str = errStr.ipcImWbtErr;
+				break;
+			case IPCIMWBRERR:
+				str = errStr.ipcImWbrErr;
+				break;
+			case IPCIMWBGERR:
+				str = errStr.ipcImWbgErr;
+				break;
+			case IPCIMWBBERR:
+				str = errStr.ipcImWbbErr;
+				break;
+			case IPCIMWBSERR:
+				str = errStr.ipcImWbsErr;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			case IPCIMAREACOMPENERR:
+				str = errStr.ipcImAreaCompenErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function constructData(path, optName, value)
+		{
+			var pre = data = {};
+
+			for (var i = 0; i < path.length; i++)
+			{
+				pre[path[i]] = {};
+				pre = pre[path[i]];
+			}
+
+			if (undefined != optName && undefined != value)
+			{
+				pre[optName] = value;
+			}
+
+			return data;
+		}
+
+		function strToArry(str)
+		{
+			return str.match(/\d{4}/g);
+		}
+
+		function timeToStr(ti)
+		{
+			var minus;
+			var hour = parseInt(ti / secInHour, 10).toString();
+			ti = ti % secInHour;
+			minus = parseInt(ti / secInMinus, 10).toString();
+
+			if (hour.length < 2)
+			{
+				hour = "0" + hour;
+			}
+
+			if (minus.length < 2)
+			{
+				minus = "0" + minus;
+			}
+
+			return hour + ":" + minus;
+		}
+
+		function constructDom()
+		{
+			luma = 0;
+			contrast = 0;
+			saturation =0;
+			sharpness = 0;
+			expose = DEFAULTEXPOSEOPT;
+			expGain = 0;
+			shutter = shutterValArr[0];
+			comInfT = DEFAULTINFOPT;
+			sepInfT = INFON;
+			infScheBt = 18 * secInHour;
+			infScheEt = 6 * secInHour;
+			infSens = 4;
+			dynawidthV = WDRClOSE;
+			areacom = AREACOMCLOSE;
+			wdGain = 0;
+			wbRGain = 0;
+			wbBGain = 0;
+			wbType = DEFAULTWBALOPT;
+			infDelay = 1;
+			/* 灵敏度是3档还是更多档 */
+			if (infSens && -1 == $.inArray(infSens, [SENSLOW, SENSMEDIUM, SENSHIGH]))
+			{
+				moreSensiDegree = true;
+			}
+			/* bind event */
+			resetBtn.onclick = onReset;
+			infraredDelay.onchange = infraredDelayHd;
+			id("dayNightChange").onmouseover = function(){
+				this.style.border = "1px solid #5A92FF";
+			}
+			id("dayNightChange").onmouseout = function(){
+				this.style.border = "";
+			}
+			id("dayNightChange").onclick = function(){
+				this.style.border = "1px solid #C8CDD9";
+				infDNType = 1 - infDNType;
+				if (infDNType == 0)
+				{
+					$infDN.removeClass("DNSNightSelected");
+					$infDN.addClass("DNSDaySelected");
+				}
+				else
+				{
+					$infDN.removeClass("DNSDaySelected");
+					$infDN.addClass("DNSNightSelected");
+				}
+
+				infTimeCb();
+			};
+			var plugin = new Plugin({id:"videoPluginCon", className:"vedioActiveX"});
+			plugin.playVideo();
+			new BlockSwitch({id:"dayNightBlockSwitch",
+				blockList: [{key:label.night}, {key:label.day}],
+				click: function(key, value){
+					if (key == label.day)
+					{
+						switchToDay();
+					}
+					else
+					{
+						switchToNight();
+					}
+				}
+			});
+
+			/* 旋转
+					selectInit("rotateSel", [{str:label.close, value:uciImgOptVal.rotOff},
+											{str:label.acwRotate90, value:uciImgOptVal.rotAcw90},
+											{str:label.acwRotate180, value:uciImgOptVal.rotAcw180},
+											{str:label.acwRotate270, value:uciImgOptVal.rotAcw270}],
+							rotateType, rotateChange);*/
+			/* 镜像 */
+			selectInit("mirrorSel", [{str:label.close, value:uciImgOptVal.flipOff},
+									{str:label.leftRight, value:uciImgOptVal.flipLR},
+									{str:label.upDown, value:uciImgOptVal.flipUD},
+									{str:label.center, value:uciImgOptVal.flipCen}],
+					flipType, flipChange);
+
+			/* 日夜切换 */
+			selectInit("dayNightMode", [{str:label.dayNightCommon, value:MODECOMMMON},
+									{str:label.dayNightTimeChange, value:MODESCHEDULE},
+									{str:label.dayNightAutoChange, value:MODEAUTO}],
+					mode, ISPSwitchModeChange);
+
+			/* 模式 日夜定时切换 */
+			controlDayNight = new DayNightSwitch({id:"controlDayNight", timeChangeCbk:timeChange, leftCbk:switchToDay, rightCbk:switchToNight, unit:30});
+
+			/* 亮度、对比度、饱和度、色度 */
+			brightDragLine = new DragLine({id:"brightDragLine", name:label.luma, cb:brightChange, errFix:true});
+			contrastDragLine = new DragLine({id:"contrastDragLine", name:label.contrast, cb:contrastChange, errFix:true});
+			saturationDragLine = new DragLine({id:"saturationDragLine", name:label.saturation, cb:saturationChange, errFix:true});
+			sharpnessDragLine = new DragLine({id:"sharpnessDragLine", name:label.sharpness, cb:sharpnessChange, errFix:true});
+
+			/* 曝光 */
+			selectInit("exposeSel", [{str:label.auto, value:EXPOSEAUTO}, {str:label.manual, value:EXPOSEMANUAL}], expose, selExpose);
+			expGainDragLine = new DragLine({id:"expGainDragLine", name:label.gain, cb:expGainChange, errFix:true});
+
+			for (var i = 0; i < shutterValArr.length; i++)
+			{
+				tmp = {};
+				tmp["str"] = shutterValArr[i];
+				tmp["value"] = shutterValArr[i];
+				shutterSelOpt.push(tmp);
+			}
+			selectInit("shutterSel", shutterSelOpt, shutter, selShutter, 20, {type:"up"});
+
+			selectInit("infraredSel",
+					  [{str:label.auto, value:INFAUTO},
+					   {str:label.timing + label.open, value:INFTIMING},
+					   {str:label.alwaysOn, value:INFON},
+					   {str:label.alwaysOff, value:INFOFF}],
+				comInfT, selInfrared);
+
+			if (moreSensiDegree)
+			{
+				selectInit("sensiSel",
+						  [{str:"0", value:uciImgSensiOptVal.degree0},
+						   {str:"1", value:uciImgSensiOptVal.degree1},
+						   {str:"2", value:uciImgSensiOptVal.degree2},
+						   {str:"3", value:uciImgSensiOptVal.degree3},
+						   {str:"4", value:uciImgSensiOptVal.degree4},
+						   {str:"5", value:uciImgSensiOptVal.degree5},
+						   {str:"6", value:uciImgSensiOptVal.degree6},
+						   {str:"7", value:uciImgSensiOptVal.degree7}],
+					infSens, selSensi);
+			}
+			else
+			{
+				infSensitivity = new DragLine({id:"infSensitivity", needLabel:"n", needInput:"n", cb:selSens, needScale:"y", upperBound:2, errFix:true});
+			}
+			infDN = new DayNightSwitch({id:"infDN", timeChangeCbk:infTimeCb, intTime:"y", unit:60, equalStartEndTime:"n"});
+
+			selectInit("infraredSelB",
+					  [{str:label.alwaysOn, value:INFON},
+					   {str:label.alwaysOff, value:INFOFF}],
+				sepInfT, selInfraredB);
+
+			/* 宽动态 */
+			selectInit("dynaWidthSel", [{str:label.open, value:WDROPEN},
+						{str:label.close, value:WDRClOSE}], dynawidthV, selDynaWidth);
+
+			blGainDragLine = new DragLine({id:"blGainDragLine", name:label.gain, cb:blGainChange, errFix:true});
+
+			/*  背光区域补偿 */
+			selectInit("areaComSel",
+						[{str:label.regMakeClose, value:AREACOMCLOSE},
+						 {str:label.regMakeTop, value:AREACOMTOP},
+						 {str:label.regMakeBottom, value:AREACOMBOTTOM},
+						 {str:label.regMakeLeft, value:AREACOMLEFT},
+						 {str:label.regMakeRight, value:AREACOMRIGHT},
+						 {str:label.regMakeCenter, value:AREACOMCENTER}],
+						areacom, selAreaCom);
+
+			/* 白平衡 */
+			wbRedGainDragLine = new DragLine({id:"wbRedGainDragLine", name:label.redGain, cb:redGainChange, errFix:true});
+			wbBlueGainDragLine = new DragLine({id:"wbBlueGainDragLine", name:label.blueGain, cb:blueGainChange, errFix:true});
+			selectUpInit("whiteBalanceSel", [{str:label.auto, value:WBALAUTO},
+					   {str:label.locked, value:WBALLOCKED},
+					   {str:label.daylightLamp, value:WBALDAYLIGHT},
+					   {str:label.natureLamp, value:WBALNATURE},
+					   {str:label.incandescentlight, value:WBALINCAN},
+					   {str:label.warmlight, value:WBALWARM},
+					   {str:label.customize, value:WBALCUSTOMIZE}], wbType, selWhiteBal);
+		}
+		/* 根据服务器的响应数据设置控件*/
+		function fillDom(resp)
+		{
+			if (true != errorHandler(resp[ERR_CODE]))
+			{
+				return;
+			}
+
+			if (true == $.local)
+			{
+				luma = 0;
+				contrast = 0;
+				saturation =0;
+				sharpness = 0;
+				expose = DEFAULTEXPOSEOPT;
+				expGain = 0;
+				shutter = shutterValArr[0];
+				comInfT = DEFAULTINFOPT;
+				sepInfT = INFON;
+				infScheBt = 18 * secInHour;
+				infScheEt = 6 * secInHour;
+				infSens = 4;
+				dynawidthV = WDRClOSE;
+				areacom = AREACOMCLOSE;
+				wdGain = 0;
+				wbRGain = 0;
+				wbBGain = 0;
+				wbType = DEFAULTWBALOPT;
+				infDelay = 1;
+			}
+			else
+			{
+				cData = resp[imgFile][curProfileMode];
+				luma = cData[uciImgOptName.luma];
+				contrast = cData[uciImgOptName.contrast];
+				saturation = cData[uciImgOptName.saturation];
+				sharpness = cData[uciImgOptName.sharpness];
+				expose = cData[uciImgOptName.exp_type];
+				expGain = cData[uciImgOptName.exp_gain];
+				shutter = cData[uciImgOptName.shutter];
+				comInfT = cData[uciImgOptName.infType];
+				sepInfT = cData[uciImgOptName.infType];
+				//infSche = cData[uciImgOptName.infSche];
+				infScheBt = cData[uciImgOptName.infStartTime];
+				infScheEt = cData[uciImgOptName.infEndTime];
+				infSens = cData[uciImgOptName.infSens];
+				dynawidthV = cData[uciImgOptName.wide_dynamic];
+				areacom = cData[uciImgOptName.area_com];
+				wdGain = cData[uciImgOptName.wd_gain];
+				wbRGain = cData[uciImgOptName.wb_R_gain];
+				wbBGain = cData[uciImgOptName.wb_B_gain];
+				wbType = cData[uciImgOptName.wb_type];
+				infDelay = cData[uciImgOptName.infDelay];
+			}
+
+			/* 红外灯*/
+			if (curProfileMode == MODECOMMMON)
+			{
+				sepInfT = INFON;
+			}
+			else
+			{
+				comInfT = DEFAULTINFOPT;
+			}
+
+			$comSet.show();
+
+			if (dayNightMode.value != MODECOMMMON)
+			{
+				$comSet.hide();
+			}
+
+			//rotateSel.resetSel(rotateType);
+			mirrorSel.resetSel(flipType);
+			exposeSel.resetSel(expose);
+			shutterSel.resetSel(shutter);
+			if (curProfileMode == MODECOMMMON)
+			{
+				infraredSel.resetSel(comInfT);
+			}
+			else
+			{
+				infraredSelB.resetSel(sepInfT);
+			}
+			dynaWidthSel.resetSel(dynawidthV);
+			areaComSel.resetSel(areacom);
+			whiteBalanceSel.resetSel(wbType);
+			if (moreSensiDegree)
+			{
+				sensiSel.resetSel(infSens);
+			}
+
+			/* 亮度、对比度、饱和度、色度 */
+			brightDragLine.setValue(luma);
+			contrastDragLine.setValue(contrast);
+			saturationDragLine.setValue(saturation);
+			sharpnessDragLine.setValue(sharpness);
+
+			/* 曝光 */
+			expGainDragLine.setValue(expGain);
+			applyExpose(expose);
+
+			/* 红外灯 */
+			if (curProfileMode == MODECOMMMON)
+			{
+				infraredDelay.value = infDelay;
+
+				if (!moreSensiDegree)
+				{
+					if (infSens == uciImgOptVal.infSenH)
+					{
+						infSensitivity.setValue(2);
+					}
+					else if (infSens == uciImgOptVal.infSenM)
+					{
+						infSensitivity.setValue(1);
+					}
+					else if (infSens == uciImgOptVal.infSenL)
+					{
+						infSensitivity.setValue(0);
+					}
+				}
+
+				$infDN.show();
+				if (infScheBt > infScheEt)
+				{
+					infDN.setSunrise(timeToStr(infScheEt));
+					infDN.setSunset(timeToStr(infScheBt));
+					infDNType = 1;
+				}
+				else
+				{
+					infDN.setSunrise(timeToStr(infScheBt));
+					infDN.setSunset(timeToStr(infScheEt));
+					infDNType = 0;
+				}
+				if (infDNType == 0)
+				{
+					$infDN.removeClass("DNSNightSelected");
+					$infDN.addClass("DNSDaySelected");
+				}
+				else
+				{
+					$infDN.removeClass("DNSDaySelected");
+					$infDN.addClass("DNSNightSelected");
+				}
+
+				$infDN.hide();
+			}
+			applyInf(curProfileMode == MODECOMMMON ? comInfT : sepInfT);
+
+			/* 背光 */
+			blGainDragLine.setValue(wdGain);
+
+			/* 白平衡 */
+			wbRedGainDragLine.setValue(wbRGain);
+			wbBlueGainDragLine.setValue(wbBGain);
+
+			/* set value */
+			applyExpose(expose);
+			applyDW(dynawidthV);
+			applyWB(wbType);
+		}
+
+		/* 获取image配置文件中的profileName section */
+		function getConfig(profileName, callBack)
+		{
+			var data = {};
+			data[imgFile] = {};
+			data[imgFile][NAME] = profileName;
+
+			$.query(data, function(result){
+				fillDom(result);
+				typeof callBack == "function" && callBack();
+
+				if (true == bFirstPageLoad)
+				{
+					bFirstPageLoad = false;
+					showDetailCon();
+				}
+			});
+		}
+
+		function applyMode(mode)
+		{
+			/* 自动切换 */
+			if (mode == MODEAUTO)
+			{
+				$cdn.hide();
+				$dayNightBlockCon.show();
+				$comSet.hide();
+				$sepSet.show();
+
+				if (lastProfile == uciImage.secName.day)
+				{
+					switchToDay();
+				}
+				else if (lastProfile == uciImage.secName.night)
+				{
+					switchToNight();
+				}
+			}
+
+			/* 通用 */
+			else if (mode == MODECOMMMON)
+			{
+				$cdn.hide();
+				$dayNightBlockCon.hide();
+				$comSet.show();
+				$sepSet.hide();
+
+				switchToCommon();
+			}
+
+			/* 定时切换 */
+			else
+			{
+				$cdn.show();
+				$dayNightBlockCon.show();
+				$comSet.hide();
+				$sepSet.show();
+
+				if (lastProfile == uciImage.secName.day)
+				{
+					switchToDay();
+				}
+				else if (lastProfile == uciImage.secName.night)
+				{
+					switchToNight();
+				}
+			}
+		}
+		function ISPSwitchModeChange(mode)
+		{
+			var path = new Array(imgFile, uciImage.secName.para_switch);
+			var data = constructData(path, uciImage.optName.switch_mode, mode);
+
+			applyMode(mode);
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+				}
+			});
+		}
+		function switchToCommon()
+		{
+			curProfileMode = uciImage.secName.common;
+			getConfig(curProfileMode);
+		}
+		function switchToDay()
+		{
+			lastProfile = curProfileMode = uciImage.secName.day;
+			$cdn.removeClass("DNSNightSelected");
+			$cdn.addClass("DNSDaySelected");
+			$("#dayNightBlockSwitch li.night")[0].style.background = "url(../web-static/images/moon_normal.png) no-repeat #FFFFFF 20px 4px";
+			$("#dayNightBlockSwitch li.day")[0].style.background = "url(../web-static/images/sun_selected.png) no-repeat #578FFF 20px 4px";
+			getConfig(curProfileMode);
+		}
+		function switchToNight()
+		{
+			lastProfile = curProfileMode = uciImage.secName.night;
+			$cdn.removeClass("DNSDaySelected");
+			$cdn.addClass("DNSNightSelected");
+			$("#dayNightBlockSwitch li.night")[0].style.background = "url(../web-static/images/moon_selected.png) no-repeat #578FFF 20px 4px";
+			$("#dayNightBlockSwitch li.day")[0].style.background = "url(../web-static/images/sun_normal.png) no-repeat #FFFFFF 20px 4px";
+			getConfig(curProfileMode);
+		}
+
+		function selProfile()
+		{
+			var path = [imgFile, uciImage.secName.para_switch];
+			var data = constructData(path, uciImage.optName.para_set, type);
+
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+				}
+			});
+		}
+
+		function timeChange(opt, value)
+		{
+			var bt = controlDayNight.getSunrise().split(":"); // TODO
+			var et = controlDayNight.getSunset().split(":");
+			var startTime = parseInt(bt[0], 10) * secInHour + parseInt(bt[1], 10) * secInMinus;
+			var endTime = parseInt(et[0], 10) * secInHour + parseInt(et[1], 10) * secInMinus;
+			var data = {};
+			data[imgFile] = {};
+			data[imgFile][uciImage.secName.para_switch] = {};
+			data[imgFile][uciImage.secName.para_switch][uciImgOptName.scheStartTime] = startTime;
+			data[imgFile][uciImage.secName.para_switch][uciImgOptName.scheEndTime] = endTime;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		/* 拖动条回调函数begin */
+		function brightChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.luma, value);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function contrastChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.contrast, value);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function saturationChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.saturation, value);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function sharpnessChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.sharpness, value);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function expGainChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.exp_gain, value);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function blGainChange(value)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.wd_gain, value);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function redGainChange(val)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.wb_R_gain, val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function blueGainChange(val)
+		{
+			var path = new Array(imgFile, curProfileMode);
+			var data = constructData(path, uciImage.optName.wb_B_gain, val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function applyExpose(val)
+		{
+			switch (val)
+			{
+			case EXPOSEAUTO:
+				$exposeManualSet.hide();
+				break;
+			case EXPOSEMANUAL:
+				$exposeManualSet.show();
+				break;
+			default:
+				break;
+			}
+		}
+		function selExpose(val)
+		{
+			var data = constructData([imgFile, curProfileMode], uciImage.optName.exp_type, val);
+
+			applyExpose(val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function selShutter(val)
+		{
+			var data = constructData([imgFile, curProfileMode], uciImage.optName.shutter, val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function infTimeCb(opt, val)
+		{
+			if (curProfileMode == uciImage.secName.common)
+			{
+				var startTime, endTime;
+				var bt = infDN.getSunrise();
+				var et = infDN.getSunset();
+				var tStr, data;
+				data = {};
+				data[imgFile] = {};
+				data[imgFile][curProfileMode] = {};
+				if (1 == infDNType)
+				{
+					var tmp = bt;
+					bt = et;
+					et = tmp;
+				}
+				startTime = parseInt(bt, 10) * secInHour;
+				endTime = parseInt(et, 10) * secInHour;
+				data[imgFile][curProfileMode][uciImgOptName.infStartTime] = startTime;
+				data[imgFile][curProfileMode][uciImgOptName.infEndTime] = endTime;
+
+				showToast("loading");
+				$.modify(data, function(resp){
+					if (true == errorHandler(resp[ERR_CODE]))
+					{
+						showToast("success");
+					}
+					else
+					{
+						closeToast();
+					}
+				});
+			}
+		}
+
+		function applyInf(val)
+		{
+			switch (val)
+			{
+			case INFAUTO:
+				$infTimmingSet.hide();
+				$infCloAutoSet.show();
+				if (moreSensiDegree)
+				{
+					$basicSet.hide();
+					$advanceSet.show();
+				}
+				else
+				{
+					$basicSet.show();
+					$advanceSet.hide();
+				}
+				break;
+			case INFTIMING:
+				$infTimmingSet.show();
+				$infCloAutoSet.hide();
+				break;
+			case INFON:
+				$infTimmingSet.hide();
+				$infCloAutoSet.hide();
+				break;
+			case INFOFF:
+				$infTimmingSet.hide();
+				$infCloAutoSet.hide();
+				break;
+			default:
+				break;
+			}
+		}
+
+		function selSensi(val)
+		{
+			var data;
+			data = constructData([imgFile, curProfileMode], uciImgOptName.infSens, val);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function selInfrared(val)
+		{
+			var data;
+			data = constructData([imgFile, curProfileMode], uciImgOptName.infType, val);
+
+			applyInf(val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function selInfraredB(val)
+		{
+			var data;
+			data = constructData([imgFile, curProfileMode], uciImgOptName.infType, val);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function selSens(val)
+		{
+			var senOpt = [uciImgOptVal.infSenL, uciImgOptVal.infSenM, uciImgOptVal.infSenH];
+			var data = constructData([imgFile, curProfileMode], uciImgOptName.infSens, senOpt[val]);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function infraredDelayHd()
+		{
+			var data = constructData([imgFile, curProfileMode], uciImgOptName.infDelay, this.value);
+			//closeNoteAll();
+
+			if ((true == checkNum(this.value)) &&
+				(true == checkNumRange(parseInt(this.value), 60, 1)))
+			{
+				showToast("loading");
+				$.modify(data, function(resp){
+					if (true == errorHandler(resp[ERR_CODE]))
+					{
+						showToast("success");
+					}
+					else
+					{
+						closeToast();
+					}
+				});
+			}
+			else
+			{
+				showNote("infraredDelay", errStr.infDelayTimeErr);
+				//this.focus();
+			}
+
+		}
+		function applyDW(val)
+		{
+			switch (val)
+			{
+			case WDROPEN:
+				$dynamicWidthSet.show();
+				break;
+			case WDRClOSE:
+			default:
+				$dynamicWidthSet.hide();
+				break;
+			}
+		}
+
+		function selDynaWidth(val)
+		{
+			var data = constructData([imgFile, curProfileMode], uciImgOptName.wide_dynamic, val);
+
+			applyDW(val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					if (val == BLREGMAKEUP)
+					{
+						// TODO 区域补偿的时候需要在控件上有所体现
+					}
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function selAreaCom(val)
+		{
+			var data = constructData([imgFile, curProfileMode], uciImgOptName.area_com, val);
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function applyWB(val)
+		{
+			switch (val)
+			{
+			case WBALCUSTOMIZE:
+				$wbCustomizeSet.show();
+				break;
+			case WBALAUTO:
+			case WBALLOCKED:
+			case WBALDAYLIGHT:
+			case WBALNATURE:
+			case WBALINCAN:
+			case WBALWARM:
+			default:
+				$wbCustomizeSet.hide();
+			}
+		}
+		function selWhiteBal(val)
+		{
+			var data = {}, cfg = {};
+			data[imgFile] = {};
+			data[imgFile][curProfileMode] = cfg;
+			cfg[uciImage.optName.wb_type] = val;
+
+			switch (val)
+			{
+			case WBALLOCKED:
+				cfg[uciImage.optName.wb_source] = "web";
+				break;
+			default:
+			}
+
+			applyWB(val);
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function flipChange(val)
+		{
+			var data = constructData([imgFile, uciImage.secName.para_switch], uciImgOptName.flip_type, val);
+			flipType = val;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+		function rotateChange(val)
+		{
+			var data = constructData([imgFile, uciImage.secName.para_switch], uciImgOptName.rotate_type, val);
+			rotateType = val;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function onReset()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+					data[sysFile] = {};
+					data[sysFile][RESETCONFIG] = {};
+					data[sysFile][RESETCONFIG][CONFIGNAME] = [imgFile];
+
+					showToast("loading");
+					$.action(data, function(resp){
+						if (true == errorHandler(resp[ERR_CODE]))
+						{
+							showToast("success");
+							id("info_conf_camera_image_rsMenu").onclick();
+						}
+					});
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			var data = {};
+			var tmp;
+			var switchObj, mode;
+
+			data[imgFile] = {};
+			data[imgFile][NAME] = uciImage.secName.para_switch;
+			constructDom();
+			$.query(data, function(result){
+				if (true == errorHandler(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						flipType = uciImgOptVal.flipOff;
+						rotateType = uciImgOptVal.rotOff;
+
+						/* 旋转
+						rotateSel.resetSel(rotateType);*/
+
+						/* 镜像 */
+						mirrorSel.resetSel(flipType);
+
+						/* 日夜切换 */
+						$dayNightMode.resetSel(DEFAULTMODEOPT);
+
+						controlDayNight.setSunrise("06:00");
+						controlDayNight.setSunset("18:00");
+
+						applyMode(DEFAULTMODEOPT);
+						return;
+					}
+
+					switchObj = result[imgFile][uciImage.secName.para_switch];
+					flipType = switchObj[uciImgOptName.flip_type];
+					rotateType = switchObj[uciImgOptName.rotate_type];
+					switchScheBT = switchObj[uciImgOptName.scheStartTime];
+					switchScheET = switchObj[uciImgOptName.scheEndTime];
+					if (switchScheBT > switchScheET)
+					{
+						tmp = switchScheBT;
+						switchScheBT = switchScheET;
+						switchScheET = tmp;
+					}
+
+					mode = switchObj[uciImage.optName.switch_mode];
+
+					/* 旋转
+					rotateSel.resetSel(rotateType);*/
+
+					/* 镜像 */
+					mirrorSel.resetSel(flipType);
+
+					/* 日夜切换 */
+					$dayNightMode.resetSel(mode);
+
+					/* 模式 日夜定时切换 */
+					controlDayNight.setSunrise(timeToStr(switchScheBT));
+					controlDayNight.setSunset(timeToStr(switchScheET));
+
+					/* 如果不是日夜通用，默认获取白天的配置 */
+					if (mode != MODECOMMMON)
+					{
+						curProfileMode = uciImage.secName.day;
+					}
+
+					applyMode(mode);
+				}
+			})
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	ul.dayNightBlockCon{
+		margin-bottom:12px;
+		height:40px;
+		line-height:40px;
+	}
+	ul.dayNightBlockCon i{
+		border-top:1px solid #CED7E0;
+		display:inline-block;
+		width:299px;
+		vertical-align:middle;
+	}
+	ul.dayNightBlockSwitch{
+		border:1px solid #C8CDD9;
+		border-radius:2px;
+		display:inline-block;
+		_display:inline;
+		list-style:none;
+		font-size:0px;
+		vertical-align:middle;
+		_zoom:1;
+	}
+	ul.dayNightBlockSwitch li{
+		background:#FFFFFF;
+		cursor:pointer;
+		width:60px;
+		height:28px;
+		float:left;
+	}
+	ul.dayNightBlockSwitch li.night{
+		background:url(../web-static/images/moon_selected.png) no-repeat #578FFF 20px 4px;
+	}
+	ul.dayNightBlockSwitch li.day{
+		background:url(../web-static/images/sun_normal.png) no-repeat #FFFFFF 20px 4px;
+	}
+	ul.dayNightBlockSwitch li.hitLi{
+		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+	}
+	div.secPanel{
+		margin-left:6px;
+		width:660px;
+	}
+	div.secPanel span{
+		display: inline-block;
+	}
+	span.imageFirstSpan{
+		float:left;
+		width:130px;
+		padding-left: 10px;
+		white-space: nowrap;
+	}
+	div.imagetype {
+		padding-bottom:2px;
+	}
+	div.imagetypetitle{
+		font-weight: bold;
+		cursor:pointer;
+	}
+	div.imagetypetitle label{
+		cursor:pointer;
+	}
+	#controlDayNight{
+		width:720px;
+		margin:0 auto;
+		height:40px;
+		margin-top:8px;
+		margin-bottom:16px;
+	}
+	ul.lineL{
+		margin-bottom:21px;
+	}
+	ul.lineR{
+		text-align:right;
+		margin-bottom:21px;
+	}
+	ul.line li.lineC{
+		margin-bottom:4px;
+	}
+	#infDN{
+		width:144px;
+		margin-right:4px;
+	}
+	hr.daySetDiv{
+		height:3px;
+		background-color:#556;
+	}
+	div.secondSpan{
+		display:inline-block;
+	}
+	div.configBlock{
+		margin-bottom:20px;
+		border-bottom:solid 1px;
+	}
+	li.ml{
+		margin-left:58px;
+		margin-bottom:4px;
+		padding:5px 0;
+		float:right;
+	}
+	.infTimmingSet{
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+		margin-top:15px;
+		vertical-align:middle !important;
+	}
+	input.dayNightChange{
+		border:none;
+		padding:0px;
+		background:url(../web-static/images/exchange_normal.png) no-repeat 3px 3px;
+		cursor:pointer;
+		width:24px;
+		height:24px;
+		border:1px solid #D3DDE6;
+	}
+	div.infCloAutoSet{
+		margin-top:9px;
+	}
+	div.infCloAutoSet div.lineSub{
+		margin-top:4px;
+		margin-bottom:4px;
+		height:40px;
+	}
+	div.infCloAutoSet input.text{
+		height:24px;
+		line-height:24px;
+	}
+	div.infCloAutoSet span.tip{
+		color:#7A8999;
+	}
+	div.basicSet{
+		margin-bottom:4px;
+	}
+	/* 灵敏度拖动条 */
+	div.lineSub label.title{
+		display: inline-block;
+		height:30px;
+		line-height:30px;
+		font-size:12px;
+		color:#7A8999;
+		width:66px;
+		margin-right:4px;
+		text-align:left;
+	}
+	div.lineSub label.firTip{
+		display: inline-block;
+		height:26px !important;
+		font-size:14px;
+		margin-top: -25px;
+		color: #707070;
+		width: 25px !important;
+		text-align: left;
+	}
+	div.lineSub label.secTip{
+		display: inline-block;
+		height:26px !important;
+		font-size:14px;
+		margin-top: -25px;
+		color: #707070;
+		width: 25px !important;
+		text-align: right;
+	}
+	div.pdTop10{
+		padding-top:5px;
+		margin-right:83px;
+		margin-right:82px \9;
+		_margin-right:77px;
+	}
+	div.pdTop10 label.desA{
+		width:66px;
+	}
+	#dynaWidthDrag{
+		float:right;
+	}
+	#blGainDragLineDragLineLabel{
+		width:66px;
+		margin-left:4px;
+	}
+	div.exposeManualSet{
+		margin-left:4px;
+	}
+	.exposeManualSet label{
+		width:66px !important;
+		padding-left:4px;
+	}
+	a.exposeManualSet label{
+		_width:66px !important;
+		_padding-left:4px;
+	}
+	#wbRedGainDragLine label{
+		width:66px;
+		margin-left:4px;
+	}
+	#wbBlueGainDragLine label{
+		width:66px;
+		margin-left:4px;
+	}
+	label.infTimmingSet{
+		width:40px !important;
+	}
+	#exposeChild{
+		float:right;
+	}
+	div.advanceSet{
+		padding:5px 0;
+		margin-bottom:4px;
+	}
+	div.advanceSet label.title{
+		vertical-align:middle;
+	}
+</style>
+<div class="detailCon">
+	<div id="videoPluginCon"></div>
+	<ul class="line IEPZD">
+		<li class="line ml">
+			<label class="des desB">{%label.mirror%}</label>
+			<span class="selCon">
+				<span id="mirrorSel" class="select">
+					<span class="value hsValueB"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+	<!-- 模式 -->
+		<li class="line lineA">
+			<label class="des desA">{%label.mode%}</label>
+			<span class="selCon">
+				<span id="dayNightMode" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+
+	<!-- 日夜转换 -->
+	<div id="controlDayNight" class="DNSSelected DNSDaySelected"></div>
+
+	<!-- 日夜切换Switch -->
+	<ul id="dayNightBlockCon" class="line dayNightBlockCon">
+		<li class="line lineB textAC">
+			<i></i>
+			<ul id="dayNightBlockSwitch" class="dayNightBlockSwitch">
+				<li class="night"></li>
+				<li class="day hitLi"></li>
+			</ul>
+			<i></i>
+		</li>
+	</ul>
+
+	<ul class="line lineL">
+		<li class="line lineA">
+			<div id="brightDragLine" class="ipcDragLineDiv"></div>
+		</li>
+		<li class="line lineA">
+			<div id="contrastDragLine" class="ipcDragLineDiv"></div>
+		</li>
+		<li class="line lineA">
+			<div id="saturationDragLine" class="ipcDragLineDiv"></div>
+		</li>
+		<li class="line lineA">
+			<div id="sharpnessDragLine" class="ipcDragLineDiv"></div>
+		</li>
+
+		<!-- 白平衡 -->
+		<li class="line lineA">
+			<label class="des desA">{%label.whiteBalance%}</label>
+			<span class="selCon IEPZD">
+				<span id="whiteBalanceSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			<div class="lineSub">
+				<div id="wbRedGainDragLine" class="ipcDragLineDiv top10 customizeSet"></div>
+				<div id="wbBlueGainDragLine" class="ipcDragLineDiv top10 customizeSet"></div>
+			</div>
+		</li>
+	</ul>
+	<ul class="line lineR">
+		<!-- 红外灯 -->
+		<li class="line lineC" id="comSet">
+			<label class="des desA">{%label.infrared%}</label>
+			<span class="selCon IEPZD">
+				<span id="infraredSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+
+			<div class="lineSub">
+				<label class="des desB infTimmingSet">00:00</label>
+				<div id="infDN" class="DNSSelected infTimmingSet"></div>
+				<label class="des desB infTimmingSet">24:00</label>
+				<input id="dayNightChange" type="button" class="dayNightChange infTimmingSet" />
+				<div class="infCloAutoSet">
+					<!-- 拖动条设置灵敏度 -->
+					<div class="basicSet">
+						<label class="title">{%label.sensitivity%}</label>
+						<div id="infSensitivity" class="ipcDragLineDiv DragLineSimple"></div>
+					</div>
+					<!-- 下拉框设置灵敏度 -->
+					<div class="advanceSet">
+						<label class="title">{%label.sensitivity%}</label>
+						<span class="selCon IEPZD">
+							<span id="sensiSel" class="select">
+								<span class="value hsValueA"></span>
+								<i class="arrow"></i>
+							</span>
+						</span>
+					</div>
+					<div class="pdTop10">
+						<label class="des desA">{%label.infraredDelay%}</label>
+						<input id="infraredDelay" class="text textA4" maxLength="2" type="text" /><span class="tip">1 - 60{%label.second%}</span>
+					</div>
+				</div>
+			</div>
+		</li>
+
+		<!-- 红外灯 -->
+		<li class="line lineC" id="sepSet">
+			<label class="des desA">{%label.infrared%}</label>
+			<span class="selCon">
+				<span id="infraredSelB" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+		<!-- 宽动态 -->
+		<li class="line lineC">
+			<label class="des desA">{%label.dynaWidth%}</label>
+			<span class="selCon IEPZD">
+				<span id="dynaWidthSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			<div class="lineSub" id="dynaWidthDrag">
+				<div id="blGainDragLine" class="ipcDragLineDiv top10 dynamicWidthSet"></div>
+			</div>
+
+		</li>
+
+		<!-- 区域补偿 -->
+		<li class="line lineC">
+			<label class="des desA">{%label.regMakeSub%}</label>
+			<span class="selCon IEPZD">
+				<span id="areaComSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+
+		<!-- 曝光 -->
+		<li class="line lineC">
+			<label class="des desA">{%label.expose%}</label>
+			<span class="selCon IEPZD">
+				<span id="exposeSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			<div class="lineSub" id="exposeChild">
+				<div id="expGainDragLine" class="ipcDragLineDiv top10 exposeManualSet"></div>
+				<a class="lineSubA top10 exposeManualSet">
+					<label class="des desA">{%label.shutter%}</label>
+					<span class="selCon">
+						<span id="shutterSel" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</a>
+			</div>
+		</li>
+	</ul>
+
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="reset" class="subBtnB btnA" type="button" value="{%btn.resetDefault%}" />
+	</div>
+</div>

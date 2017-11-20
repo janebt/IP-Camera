@@ -1,0 +1,1043 @@
+<script type="text/javascript">
+	function init()
+	{
+		var pluginObj = "";
+		var mainRoiSwitch = "";
+		var minorRoiSwitch = "";
+		var thirdRoiSwitch = "";
+		var mainDiv = $(".mainStream");
+		var minorDiv = $(".minorStream");
+		var thirdDiv = $(".thirdStream");
+		var mainLevelSel = id("mainLevelUp");
+		var	minorLevelSel = id("minorLevelUp");
+		var	thirdLevelSel = id("thirdLevelUp");
+		var mainLevel = [1, 1, 1, 1];
+		var minorLevel = [1, 1, 1, 1];
+		var thirdLevel = [1, 1, 1, 1];
+		var btnReset = id("reset");
+		var btnSave = id("save");
+		var btnDel = id("del");
+		var STREAM_MAIN = "main";
+		var STREAM_MINOR = "minor";
+		var STREAM_THIRD = "third";
+		var streams = new Array(STREAM_MAIN, STREAM_MINOR, STREAM_THIRD);
+		var maRoiEnableTips = id("maRoiEnableTips");
+		var miRoiEnableTips = id("miRoiEnableTips");
+		var thdRoiEnableTips = id("thdRoiEnableTips");
+		var curStreamType = STREAM_MAIN;
+		var DEF_STREAM_TYPE = STREAM_MAIN;
+		var CLEANALL = -1;
+		var CLEANCUR = 1;
+		var bFirstPageLoaded = true;
+		var num = 0;
+		var len = 1;
+		var hideobj = document.getElementById("hidebg");
+
+		var roiFN = uciRoi.fileName;
+		var roiOptV = uciRoi.optValue;
+		var roiAN = uciRoi.actionName;
+		var roiSN = uciRoi.secName;
+		var roiST = uciRoi.secType;
+		var devFile = uciDeviceInfo.fileName;
+
+		var illegalRect = {
+				x_coor:PLUGIN_STATE_MINUS,
+				y_coor:PLUGIN_STATE_MINUS,
+				width:PLUGIN_STATE_MINUS,
+				height:PLUGIN_STATE_MINUS};
+		var activeData = {
+			main:{
+				maxRoi:len,
+				roiEnable:"on",
+				roiRegion:[{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				}]
+			},
+			minor:{
+				maxRoi:len,
+				roiEnable:"on",
+				roiRegion:[{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				}]
+			},
+			third:{
+				maxRoi:len,
+				roiEnable:"on",
+				roiRegion:[{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				},
+				{
+					level:1,
+					x_coor:PLUGIN_STATE_MINUS,
+					y_coor:PLUGIN_STATE_MINUS,
+					width:PLUGIN_STATE_MINUS,
+					height:PLUGIN_STATE_MINUS
+				}]
+			}
+		};
+		var sysFile = uciSystem.fileName;
+		var RESETCONFIG = uciSystem.actionName.configReset;
+		var CONFIGNAME = uciSystem.optName.configName;
+		var roiStateOn = 1;
+		var roiStateOff = -1;
+		var roiStateReset = 0;
+		var firstChange = true;
+		var visit = {
+			STREAM_MAIN:false,
+			STREAM_MINOR:false,
+			STREAM_THIRD:false
+		}
+		var delData;
+		var delType;
+		var gRoiInfo;
+
+		var mainRoiNum = 0;
+		var minorRoiNum = 0;
+		var thirdRoiNum = 0;
+
+		var arr = ["x", "y", "width", "height"];
+		var streamOpt = [{str:label.mCodeStream, value:STREAM_MAIN},
+			   {str:label.cCodeStream, value:STREAM_MINOR}/*,
+			   {str:label.thdCodeStream, value:STREAM_THIRD}*/];
+		var levelOpt = [{str:1, value:roiOptV.lev1},
+			   {str:2, value:roiOptV.lev2},
+			   {str:3, value:roiOptV.lev3},
+			   {str:4, value:roiOptV.lev4},
+			   {str:5, value:roiOptV.lev5},
+			   {str:6, value:roiOptV.lev6}
+		];
+		var DEF_LEVEL = 1;
+
+		function errorHandler(code)
+		{
+			var str = "";
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCROINUMERR:
+				str = errStr.ipcRoiNumErr;
+				break;
+			case IPCROIMAENERR:
+				str = errStr.ipcRoiMaenErr;
+				break;
+			case IPCROIMIENERR:
+				str = errStr.ipcRoiMienErr;
+				break;
+			case IPCROITHDENERR:
+				str = errStr.ipcRoiThdenErr;
+				break;
+			case IPCROIADDINVP:
+				str = errStr.ipcRoiAddInvp;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			case IPCROISIZEERR:
+				str = errStr.ipcRoiSizeErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function rmLeadingSpace(str)
+		{
+			while (str.length > 0 && str[0] == " ")
+			{
+				str = str.substring(1);
+			}
+			return str;
+		}
+
+		function genRect(secInfo)
+		{
+			var res = {x:"-1", y:"-1", width:"-1", height:"-1"};
+			var roiON = uciRoi.optName;
+			var valIdx = [roiON.xCoor, roiON.yCoor, roiON.width, roiON.height];
+
+			if (secInfo != undefined)
+			{
+				for (var i = 0; i < 4; i++)
+				{
+					res[arr[i]] = secInfo[valIdx[i]];
+				}
+			}
+
+			return res;
+		}
+
+		function streamChange(value)
+		{
+			var retInf;
+			var preStreamType = curStreamType;
+			var curRoiInfo = [];
+			var data = {};
+			var codeStream;
+
+			data[roiFN] = {};
+			visit[value] = true;
+
+			if (value == STREAM_MAIN)
+			{
+				mainDiv.show();
+				minorDiv.hide();
+				thirdDiv.hide();
+				curStreamType = value;
+				data[roiFN][KEY_TABLE] = uciRoi.secType.mainRoi;
+				codeStream = PLUGIN_STREAM_MAIN;
+				maRoiSwiCbk(mainRoiSwitch.state);
+			}
+			else if (value == STREAM_MINOR)
+			{
+				mainDiv.hide();
+				minorDiv.show();
+				thirdDiv.hide();
+				curStreamType = value;
+				data[roiFN][KEY_TABLE] = uciRoi.secType.minorRoi;
+				codeStream = PLUGIN_STREAM_MINOR;
+				miRoiSwiCbk(minorRoiSwitch.state);
+			}
+			else if (value == STREAM_THIRD)
+			{
+				mainDiv.hide();
+				minorDiv.hide();
+				thirdDiv.show();
+				curStreamType = value;
+				data[roiFN][KEY_TABLE] = uciRoi.secType.thirdRoi;
+				codeStream = PLUGIN_STREAM_THIRD;
+				thdRoiSwiCbk(thirdRoiSwitch.state);
+			}
+
+			if (firstChange == true)
+			{
+				firstChange = false;
+				return;
+			}
+
+			for (var i = 0; i < activeData[curStreamType].maxRoi; i++)
+			{
+				curRoiInfo[i] = pluginObj.getRoiInfo(i);
+
+				if (curRoiInfo[i].x == PLUGIN_STATE_MINUS)
+				{
+					activeData[preStreamType]["roiRegion"][i] = $.extend(activeData[preStreamType]["roiRegion"][i], illegalRect);
+				}
+				else
+				{
+					activeData[preStreamType]["roiRegion"][i].level = (preStreamType == STREAM_MAIN ? mainLevelSel.value : (preStreamType == STREAM_MINOR ? minorLevelSel.value : thirdLevelSel.value));
+					activeData[preStreamType]["roiRegion"][i].x_coor = curRoiInfo[i].x;
+					activeData[preStreamType]["roiRegion"][i].y_coor = curRoiInfo[i].y;
+					activeData[preStreamType]["roiRegion"][i].width = curRoiInfo[i].width;
+					activeData[preStreamType]["roiRegion"][i].height = curRoiInfo[i].height;
+				}
+			}
+
+			/* 删除原有的ROI信息 */
+			pluginObj.delRoiInfo(CLEANALL);
+
+			$.queryP(data, function(resp){
+				if (resp[ERR_CODE] == ENONE)
+				{
+					var objD;
+
+					if (value == STREAM_MAIN && resp[roiFN][uciRoi.secType.mainRoi].length > 0)
+					{
+						//objD = resp[roiFN][uciRoi.secType.mainRoi][0][uciRoi.secName.main_r1];
+						objD = resp[roiFN][uciRoi.secType.mainRoi];
+						//activeData[value]["roiRegion"][0] = $.extend(activeData[value]["roiRegion"][0], objD);
+					}
+					else if (value == STREAM_MINOR && resp[roiFN][uciRoi.secType.minorRoi].length > 0)
+					{
+						objD = resp[roiFN][uciRoi.secType.minorRoi];
+					}
+					else if (value == STREAM_THIRD && resp[roiFN][uciRoi.secType.thirdRoi].length > 0)
+					{
+						objD = resp[roiFN][uciRoi.secType.thirdRoi];
+					}
+
+					gRoiInfo = formatTableData(objD);
+					for (var index in gRoiInfo)
+					{
+						var item = gRoiInfo[index];
+						activeData[value]["roiRegion"][index] = $.extend(activeData[value]["roiRegion"][index], item);
+					}
+					pluginObj.stopVideo();
+					$("#reset").css({"opacity":"0.3"});
+					$("#reset").attr("disabled", true);
+					$("#save").css({"opacity":"0.3"});
+					$("#save").attr("disabled", true);
+					pluginObj.setStreamCode(codeStream);
+					pluginObj.playVideo();
+				}
+			});
+		}
+
+		function maRoiSwiCbk(val)
+		{
+			if (1 == val)
+			{
+				maRoiEnableTips.innerHTML = label.enabled;
+
+				pluginObj.setOSDStatus(1);
+				hideobj.style.display = "none";
+			}
+			else
+			{
+				maRoiEnableTips.innerHTML = label.close;
+
+				pluginObj.setOSDStatus(0);
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top + "px";
+			}
+		}
+
+		function miRoiSwiCbk(val)
+		{
+			if (1 == val)
+			{
+				miRoiEnableTips.innerHTML = label.enabled;
+
+				pluginObj.setOSDStatus(1);
+				hideobj.style.display = "none";
+			}
+			else
+			{
+				miRoiEnableTips.innerHTML = label.close;
+
+				pluginObj.setOSDStatus(0);
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top + "px";
+			}
+		}
+
+		function thdRoiSwiCbk(val)
+		{
+			if (1 == val)
+			{
+				thdRoiEnableTips.innerHTML = label.enabled;
+
+				pluginObj.setOSDStatus(1);
+				hideobj.style.display = "none";
+			}
+			else
+			{
+				thdRoiEnableTips.innerHTML = label.close;
+
+				pluginObj.setOSDStatus(0);
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top + "px";
+			}
+		}
+
+		function showRoi(arg)
+		{
+			pluginObj.setRoiStatus(roiStateOn);
+			pluginObj.setRectArrLen(len);
+
+			for (var index in gRoiInfo)
+			{
+				var item = gRoiInfo[index];
+				pluginObj.showRoiInfo({x:item["x_coor"], y:item["y_coor"], width:item["width"], height:item["height"]});
+			}
+			if (arg == PLUGIN_STATE_ON)
+			{
+				$("#reset").css({"opacity":"1"});
+				$("#reset").attr("disabled", false);
+				$("#save").css({"opacity":"1"});
+				$("#save").attr("disabled", false);
+			}
+
+			var curRoiSta;
+			switch(curStreamType)
+			{
+				case STREAM_MAIN:
+					curRoiSta = mainRoiSwitch.state;
+					break;
+				case STREAM_MINOR:
+					curRoiSta = minorRoiSwitch.state;
+					break;
+				case STREAM_THIRD:
+					curRoiSta = thirdRoiSwitch.state;
+					break;
+				default:
+					curRoiSta = mainRoiSwitch.state;
+					break;
+			}
+
+			pluginObj.setOSDStatus(curRoiSta);
+		}
+
+		function showRoiCheckAlert(valueStr, con)
+		{
+			//var curRoiInfo = [];
+
+			if (curStreamType == STREAM_MAIN)
+			{
+				mainLevel[num] = valueStr;
+			}
+			else if (curStreamType == STREAM_MINOR)
+			{
+				minorLevel[num]= valueStr;
+			}
+			else if (curStreamType == STREAM_THIRD)
+			{
+				thirdLevel[num]= valueStr;
+			}
+			/*for (var i = 0; i < activeData[curStreamType].maxRoi; i++)
+			{
+				curRoiInfo[i] = pluginObj.getRoiInfo(i);
+
+				if (curRoiInfo[i].x == PLUGIN_STATE_MINUS)
+				{
+					showAlert(errStr.ipcRoiNoRectErr);
+					con.resetOptions(levelOpt, DEF_LEVEL);
+				}
+			}*/
+		}
+
+		function fillDom(resp)
+		{
+			var roiEnable, mainD, minorD, thirdD;
+			var mainEn;
+			var minorEn;
+			var thirdEn;
+			var maRoiSta;
+			var miRoiSta;
+			var thdRoiSta;
+			var retInf;
+			var iframeBg = $(".roiIframe");
+			var maxSize;
+			var classObj = {
+				optHideHd:function(){
+					iframeBg.hide();
+				},
+				optHideAllHd:function(){
+					iframeBg.hide();
+				},
+				optShowHd:function(){
+					iframeBg.show();
+				}
+			};
+			//var mainLevel = [], minorLevel = [], thirdLevel = [];
+
+			if (false == errorHandler(resp[ERR_CODE]))
+			{
+				return ;
+			}
+			else if (true == $.local)
+			{
+				selectInit("streamType", streamOpt, DEF_STREAM_TYPE, streamChange, maxSize,classObj);
+				selectInit("mainLevelUp", levelOpt, DEF_LEVEL, showRoiCheckAlert);
+				selectInit("minorLevelUp", levelOpt, DEF_LEVEL, showRoiCheckAlert);
+				pluginObj = new Plugin({id:"videoPluginCon", className:"vedioActiveX", readyHd:showRoi});
+				mainRoiSwitch = new Switch("mainRoiSwitch", 1, maRoiSwiCbk);
+				minorRoiSwitch = new Switch("minorRoiSwitch", 0, miRoiSwiCbk);
+				streamChange(DEF_STREAM_TYPE);
+				return;
+			}
+
+			len = resp[devFile][uciDeviceInfo.secName.info]["roi_reg_num"];
+			activeData["main"].maxRoi = len;
+			activeData["minor"].maxRoi = len;
+			activeData["third"].maxRoi = len;
+			if (resp[roiFN][uciRoi.secType.mainRoi].length > 0)
+			{
+				mainRoiNum = resp[roiFN][uciRoi.secType.mainRoi].length;
+				//mainD = resp[roiFN][uciRoi.secType.mainRoi][0][uciRoi.secName.main_r1]; // 目前最多只有一个roi区域
+				mainD = resp[roiFN][uciRoi.secType.mainRoi];
+				var regionArray = formatTableData(mainD);
+				for (var index in regionArray)
+				{
+					var item = regionArray[index];
+					mainLevel[index] = item["level"];
+					activeData["main"]["roiRegion"][index] = $.extend(activeData["main"]["roiRegion"][index], item);
+				}
+
+			}
+
+			if (resp[roiFN][uciRoi.secType.minorRoi].length > 0)
+			{
+				minorRoiNum = resp[roiFN][uciRoi.secType.minorRoi].length;
+				//minorD = resp[roiFN][uciRoi.secType.minorRoi][0][uciRoi.secName.minor_r1];
+				minorD = resp[roiFN][uciRoi.secType.minorRoi];
+				var regionArray = formatTableData(minorD);
+				for (var index in regionArray)
+				{
+					var item = regionArray[index];
+					minorLevel[index] = item["level"];
+					activeData["minor"]["roiRegion"][index] = $.extend(activeData["minor"]["roiRegion"][index], item);
+				}
+			}
+
+			if (resp[roiFN][uciRoi.secType.thirdRoi].length > 0)
+			{
+				thirdRoiNum = resp[roiFN][uciRoi.secType.thirdRoi].length;
+				//thirdD = resp[roiFN][uciRoi.secType.thirdRoi][0][uciRoi.secName.third_r1];
+				thirdD = resp[roiFN][uciRoi.secType.thirdRoi];
+				var regionArray = formatTableData(thirdD);
+				for (var index in regionArray)
+				{
+					var item = regionArray[index];
+					thirdLevel[index] = item["level"];
+					activeData["third"]["roiRegion"][index] = $.extend(activeData["third"]["roiRegion"][index], item);
+				}
+			}
+
+			roiEnable = resp[roiFN][uciRoi.secName.roi_enable];
+			mainEn = roiEnable[uciRoi.optName.main_enabled];
+			minorEn = roiEnable[uciRoi.optName.minor_enabled];
+			thirdEn = roiEnable[uciRoi.optName.third_enabled];
+			maRoiSta = (mainEn == uciRoi.optValue.roiOn ? 1 : 0);
+			miRoiSta = (minorEn == uciRoi.optValue.roiOn ? 1 : 0);
+			thdRoiSta = (thirdEn == uciRoi.optValue.roiOn ? 1 : 0);
+
+			if (curStreamType == STREAM_MAIN && mainRoiNum > 0)
+			{
+				//gRoiInfo = genRect(mainD);
+				gRoiInfo = formatTableData(mainD);
+			}
+			else if (curStreamType == STREAM_MINOR && minorRoiNum > 0)
+			{
+				//gRoiInfo = genRect(minorD);
+				gRoiInfo = formatTableData(minorD);
+			}
+			else if (curStreamType == STREAM_THIRD && thirdRoiNum > 0)
+			{
+				//gRoiInfo = genRect(thirdD);
+				gRoiInfo = formatTableData(thirdD);
+			}
+
+			if (bFirstPageLoaded == true)
+			{
+				bFirstPageLoaded = false;
+				selectInit("streamType", streamOpt, DEF_STREAM_TYPE, streamChange, maxSize,classObj);
+				//selectInit("mainLevelUp", levelOpt, mainD == undefined ? DEF_LEVEL : mainD.level, showRoiCheckAlert);
+				selectInit("mainLevelUp", levelOpt, mainD == undefined ? DEF_LEVEL : mainLevel[0], showRoiCheckAlert);
+				//selectInit("minorLevelUp", levelOpt, minorD == undefined ? DEF_LEVEL : minorD.level, showRoiCheckAlert);
+				selectInit("minorLevelUp", levelOpt, minorD == undefined ? DEF_LEVEL : minorLevel[0], showRoiCheckAlert);
+				//selectInit("thirdLevelUp", levelOpt, thirdD == undefined ? DEF_LEVEL : thirdD.level, showRoiCheckAlert);
+				selectInit("thirdLevelUp", levelOpt, thirdD == undefined ? DEF_LEVEL : thirdLevel[0], showRoiCheckAlert);
+
+				pluginObj = new Plugin({id:"videoPluginCon", className:"vedioActiveX", readyHd:showRoi});
+				mainRoiSwitch = new Switch("mainRoiSwitch", maRoiSta, maRoiSwiCbk);
+				minorRoiSwitch = new Switch("minorRoiSwitch", miRoiSta, miRoiSwiCbk);
+				thirdRoiSwitch = new Switch("thirdRoiSwitch", thdRoiSta, thdRoiSwiCbk);
+				pluginObj.playVideo();
+				roiCallback();
+			}
+			else
+			{
+				mainRoiSwitch.setState(maRoiSta);
+				minorRoiSwitch.setState(miRoiSta);
+				thirdRoiSwitch.setState(thdRoiSta);
+
+				if (mainRoiNum > 0)
+				{
+					//mainLevelSel.resetSel(mainD.level);
+					mainLevelSel.resetSel(mainLevel[0]);
+				}
+				if (minorRoiNum > 0)
+				{
+					//minorLevelSel.resetSel(minorD.level);
+					minorLevelSel.resetSel(minorLevel[0]);
+				}
+				if (thirdRoiNum > 0)
+				{
+					//thirdLevelSel.resetSel(thirdD.level);
+					thirdLevelSel.resetSel(thirdLevel[0]);
+				}
+			}
+
+			activeData["main"][uciRoi.optName.roiEnable] = mainEn;
+			activeData["minor"][uciRoi.optName.roiEnable] = minorEn;
+			activeData["third"][uciRoi.optName.roiEnable] = thirdEn;
+
+			streamChange(DEF_STREAM_TYPE);
+			showDetailCon();
+		}
+
+		function getConfig()
+		{
+			var data = {};
+
+			data[roiFN] = {};
+			data[roiFN][NAME] = [uciRoi.secName.roi_enable];
+			data[roiFN][KEY_TABLE] = [uciRoi.secType.mainRoi, uciRoi.secType.minorRoi, uciRoi.secType.thirdRoi];
+
+			data[devFile] = {};
+			data[devFile][NAME] = uciDeviceInfo.secName.info;
+
+			$.queryP(data, fillDom);
+		}
+
+		/*选中区域后进行相关操作*/
+		function roiCallback()
+		{
+			pluginObj.intelligentCallback(function(result){
+
+				switch(parseInt(result))
+				{
+				case 0:
+					num = 0;
+					id("regionName").innerHTML = label.regionOne;
+					break;
+				case 1:
+					num = 1;
+					id("regionName").innerHTML = label.regionTwo;
+					break;
+				case 2:
+					num = 2;
+					id("regionName").innerHTML = label.regionThree;
+					break;
+				case 3:
+					num = 3;
+					id("regionName").innerHTML = label.regionFour;
+					break;
+				}
+				if (curStreamType == STREAM_MAIN)
+				{
+					mainLevelSel.resetSel(mainLevel[num]);
+				}
+				else if (curStreamType == STREAM_MINOR)
+				{
+					minorLevelSel.resetSel(minorLevel[num]);
+				}
+				else if (curStreamType == STREAM_THIRD)
+				{
+					thirdLevelSel.resetSel(thirdLevel[num]);
+				}
+			});
+		}
+
+		function onReset()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[sysFile] = {};
+					data[sysFile][RESETCONFIG] = {};
+					data[sysFile][RESETCONFIG][CONFIGNAME] = [roiFN];
+
+					showToast("loading");
+					$.action(data, function(resp){
+						if (true == errorHandler(resp[ERR_CODE]))
+						{
+							showToast("success");
+							id("info_conf_stream_ROI_rsMenu").onclick();
+						}
+					});
+				}
+			});
+		}
+
+		function onSave()
+		{
+			var mainR1, minorR1, thirdR1;
+			var onOff;
+			var curRoiInfo = [];
+			var otherStream;
+			var otherObj;
+			var data = {};
+			var mData = {};
+
+			data[roiFN] = {};
+			data[roiFN][roiAN.addRoi] = {};
+			if (curStreamType == STREAM_MAIN)
+			{
+				data[roiFN][roiAN.addRoi][roiST.mainRoi] = [];
+			}
+			else if (curStreamType == STREAM_MINOR)
+			{
+				data[roiFN][roiAN.addRoi][roiST.minorRoi] = [];
+			}
+			else if (curStreamType == STREAM_THIRD)
+			{
+				data[roiFN][roiAN.addRoi][roiST.thirdRoi] = [];
+			}
+			//otherStream = (curStreamType == STREAM_MAIN ? STREAM_MINOR : STREAM_MAIN);
+
+			for (var i = 0; i < activeData[curStreamType].maxRoi; i++)
+			{
+				curRoiInfo[i] = pluginObj.getRoiInfo(i);
+
+				//if (curRoiInfo[i].x == PLUGIN_STATE_MINUS)
+				//{
+					/* 删除当前码流对应的ROI */
+					/*if (curStreamType == STREAM_MAIN)
+					{
+						data[roiFN][roiAN.addRoi][roiST.mainRoi]= [];
+					}
+					else if (curStreamType == STREAM_MINOR)
+					{
+						data[roiFN][roiAN.addRoi][roiST.minorRoi] = [];
+					}
+					else if (curStreamType == STREAM_THIRD)
+					{
+						data[roiFN][roiAN.addRoi][roiST.thirdRoi] = [];
+					}
+				}
+				else*/
+				if (curRoiInfo[i].x >=0)
+				{
+					/* 更改当前码流对应的ROI */
+					//activeData[curStreamType]["roiRegion"][i].level = (curStreamType == STREAM_MAIN ? mainLevelSel.value : (curStreamType == STREAM_MINOR ? minorLevelSel.value : thirdLevelSel.value));
+					activeData[curStreamType]["roiRegion"][i].level = (curStreamType == STREAM_MAIN ? mainLevel[i] : (curStreamType == STREAM_MINOR ? minorLevel[i] : thirdLevel[i]));
+					activeData[curStreamType]["roiRegion"][i].x_coor = curRoiInfo[i].x;
+					activeData[curStreamType]["roiRegion"][i].y_coor = curRoiInfo[i].y;
+					activeData[curStreamType]["roiRegion"][i].width = curRoiInfo[i].width;
+					activeData[curStreamType]["roiRegion"][i].height = curRoiInfo[i].height;
+					if (curStreamType == STREAM_MAIN)
+					{
+						//data[roiFN][roiAN.addRoi][roiST.mainRoi] = [];
+						data[roiFN][roiAN.addRoi][roiST.mainRoi].push(activeData[curStreamType]["roiRegion"][i]);
+						//data[roiFN][roiAN.addRoi][roiST.mainRoi].push(activeData[curStreamType]["roiRegion"]);
+					}
+					else if (curStreamType == STREAM_MINOR)
+					{
+						//data[roiFN][roiAN.addRoi][roiST.minorRoi] = [];
+						data[roiFN][roiAN.addRoi][roiST.minorRoi].push(activeData[curStreamType]["roiRegion"][i]);
+					}
+					else if (curStreamType == STREAM_THIRD)
+					{
+						//data[roiFN][roiAN.addRoi][roiST.thirdRoi] = [];
+						data[roiFN][roiAN.addRoi][roiST.thirdRoi].push(activeData[curStreamType]["roiRegion"][i]);
+					}
+				}
+				/* 只有访问过该码流对应的页面才需要提交其对应的数据 */
+				for (otherStream in streams)
+				{
+					if (curStreamType != otherStream && visit[otherStream])
+					{
+						if (otherStream == STREAM_MAIN)
+						{
+							otherObj = data[roiFN][roiAN.addRoi][roiST.mainRoi] = [];
+						}
+						else if (otherStream == STREAM_MINOR)
+						{
+							otherObj = data[roiFN][roiAN.addRoi][roiST.minorRoi] = [];
+						}
+						else if (otherStream == STREAM_THIRD)
+						{
+							otherObj = data[roiFN][roiAN.addRoi][roiST.thirdRoi] = [];
+						}
+
+						if (activeData[otherStream]["roiRegion"][i].x_coor != PLUGIN_STATE_MINUS)
+						{
+							otherObj.push(activeData[otherStream]["roiRegion"][i]);
+						}
+					}
+
+					visit[otherStream] = false;
+				}
+			}
+			mData[roiFN] = {};
+			onOff = mData[roiFN][uciRoi.secName.roi_enable] = {};
+			onOff[uciRoi.optName.main_enabled] = (mainRoiSwitch.state == 1 ? uciRoi.optValue.roiOn : uciRoi.optValue.roiOff);
+			onOff[uciRoi.optName.minor_enabled] = (minorRoiSwitch.state == 1 ? uciRoi.optValue.roiOn : uciRoi.optValue.roiOff);
+			onOff[uciRoi.optName.third_enabled] = (thirdRoiSwitch.state == 1 ? uciRoi.optValue.roiOn : uciRoi.optValue.roiOff);
+
+			showToast("loading");
+			$.modify(mData, function(mResp){
+				if (true == errorHandler(mResp[ERR_CODE]))
+				{
+					$.action(data, function(resp){
+						if (true == errorHandler(resp[ERR_CODE]))
+						{
+							showToast("success");
+						}
+					});
+				}
+			});
+		}
+
+		function onDel()
+		{
+			pluginObj.delRoiInfo(CLEANCUR);
+			mainLevelSel.resetOptions(levelOpt, DEF_LEVEL);
+			minorLevelSel.resetOptions(levelOpt, DEF_LEVEL);
+			thirdLevelSel.resetOptions(levelOpt, DEF_LEVEL);
+		}
+
+		btnReset.onclick = onReset;
+		btnSave.onclick = onSave;
+		btnDel.onclick = onDel;
+		window.onscroll = function(){
+			if(id("selOptsUlstreamType") && (id("selOptsUlstreamType").style.top == "0px"))
+			{
+				document.body.click();
+			}
+		}
+		getConfig();
+		//roiCallback();
+	}
+
+	init();
+</script>
+<style type="text/css">
+	ul.lineF
+	{
+		height:32px;
+		text-align:right;
+	}
+	#maRoiEnableTips, #miRoiEnableTips, #thdRoiEnableTips{
+		margin-left:0px;
+		margin-right:0px;
+		text-align:right;
+		width:43px;
+	}
+	span.levelUpSelCon ul.selOptsUl{
+		height:98px;
+	}
+	ul.lineL3
+	{
+		float:left;
+		width:100%;
+	}
+	ul.line label.desR
+	{
+		margin-left:244px;
+		*margin-left:244px;
+		width:35px;
+	}
+	.roiIframe
+	{
+		/*height:99px;*/
+		height:90px;
+		width:190px;
+		border:0px;
+		position:absolute;
+		opacity:0;
+		filter:alpha(opacity=0);
+		top:0px;
+		left:0px;
+		z-index:0;
+		display:none;
+	}
+	.IESW{
+		*width: 194px;
+	}
+	.IESZ{
+		*z-index: 2;
+	}
+	div.desDiv{
+		width: 660px;
+	}
+	div.configDiv li.areaLevel{
+		display:inline-block;
+		font-size:0px;
+		vertical-align:middle;
+		height:30px;
+		padding:5px 0;
+		width:300px;
+	}
+	div.cl{
+		clear:both;
+	}
+	.vedioActiveX{
+		margin-bottom:20px;
+	}
+	ul.lineF{
+		margin-bottom:15px;
+	}
+	ul.line li.lineD{
+		width:360px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line lineL3">
+		<li class="line lineD">
+			<label class="des desA">{%label.codeStreamType%}</label>
+			<span class="selCon IESW IESZ">
+				<span id="streamType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+				<iframe frameborder="0" class="roiIframe IESW"></iframe>
+			</span>
+		</li>
+
+		<li class="line lineD mainStream">
+			<label class="des desA desR">{%menuStr.ROI%}</label>
+			<div id="mainRoiSwitch" class="switchCon switchConHs">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desA desR" id="maRoiEnableTips"></label>
+		</li>
+		<li class="line lineD minorStream">
+			<label class="des desA desR">{%menuStr.ROI%}</label>
+			<div id="minorRoiSwitch" class="switchCon switchConHs">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desA desR" id="miRoiEnableTips"></label>
+		</li>
+		<li class="line lineD thirdStream">
+			<label class="des desA desR">{%menuStr.ROI%}</label>
+			<div id="thirdRoiSwitch" class="switchCon switchConHs">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desA desR" id="thdRoiEnableTips"></label>
+		</li>
+	</ul>
+	<div class="cl"></div>
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div id="videoPluginCon"></div>
+	<ul class="line lineF">
+		<li class="line">
+			<input type="button" value={%btn.del%} class="subBtnB btnA delIcon" id="del" />
+		</li>
+	</ul>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle" id="regionName">{%label.regionOne%}</label>
+	</div>
+	<div class="configDiv">
+		<ul class="line">
+			<li class="areaLevel mainStream">
+				<label class="des desA">{%label.levelUp%}</label>
+				<span class="selCon">
+					<span id="mainLevelUp" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="areaLevel minorStream">
+				<label class="des desA">{%label.levelUp%}</label>
+				<span class="selCon">
+					<span id="minorLevelUp" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="areaLevel thirdStream">
+				<label class="des desA">{%label.levelUp%}</label>
+				<span class="selCon">
+					<span id="thirdLevelUp" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+		</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="reset" type="button" value="{%btn.resetDefault%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+	<!-- 填充 -->
+	<div style="height:50px;">
+	</div>
+</div>

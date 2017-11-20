@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>demo</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+		
+		#VideoStatus {
+			color: red;
+			font-size: 1.3em;
+		}
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> demo </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+		</p>
+		<p>
+			<input type="button" value="开始绘制" id="regionCoverBtn" class="off">
+			<input type="button" value="添加矩形" id="addRect" onclick="pluginObj.addRegionCover();">
+			<input type="button" value="控制台打印信息" id="print" onclick="pluginObj.getRegionArrInfo();">
+
+        </p>   
+		<p>当前视频是否准备好：<span id="VideoReady"></span></p>
+		<p>当前视频状态：<span id="VideoStatus"></span></p>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	pluginObj.startRegionCover = function(){
+		obj.bRegionCoverOn = 1;                             //开启区域覆盖  
+	};
+	
+	pluginObj.addRegionCover = function(){
+		obj.addRegionCoverRect(1562, 2777, 1562, 4861);   
+	};
+			
+	pluginObj.stopRegionCover = function(){
+		obj.bRegionCoverOn = 0;               
+	};
+	
+	pluginObj.getRegionArrInfo = function(){     
+		var startPoint = {};  
+		var width, height;    
+		var pos = [-1, -1, -1, -1];
+		for(var i=0; i<obj.RegionCoverArrLen; i++)    
+		{
+			obj.getRegionCoverPos(i, pos);                 
+			startPoint.x = pos[0];                         
+			startPoint.y = pos[1];
+			width = pos[2];
+			height = pos[3];
+			console.log("ROI Rect "+ i + ": startPoint(" +  startPoint.x + ", " + startPoint.y + ")    " + "width = " +  width + ", height = " + height );
+		}
+	};
+	
+	pluginObj.isVideoReadyCB = function(arg){    
+		if(arg == 1)     //该回调函数可以带一个参数，当检测到该参数值为 1 时，说明视频开始播放
+		{
+			document.getElementById("VideoReady").innerHTML = "准备好，开始播放";
+		}
+		else if(arg == 0)      //当检测到该参数值为 0 时，说明视频停止播放
+		{
+			document.getElementById("VideoReady").innerHTML = "停止播放";
+		}
+		else
+		{
+			console.log("isVideoReadyCB - " + arg);
+		}
+	};
+	
+	pluginObj.isVideoConnectCB = function(arg){    
+		if(arg == 0)     //该回调函数可以带一个参数，当检测到该参数值为 0 时，正常接收视频数据。
+		{
+			document.getElementById("VideoStatus").innerHTML = "播放中...";
+		}
+		else if(arg == 1)      //当检测到该参数值为 1 时，说明视频连接超时，网络连接有问题
+		{
+			document.getElementById("VideoStatus").innerHTML = "网络连接超时";
+		}
+		else if(arg == 2)         //插件向服务器发起的http request用户名和密码有误，这个不应由用户输入，理论上不应出现这个错误
+		{
+			document.getElementById("VideoStatus").innerHTML = "用户名密码有误";  
+		}
+		else 
+		{
+			document.getElementById("VideoStatus").innerHTML = "未知错误";  
+		}	
+	};
+
+	(function(){
+		obj.videoReadyCallback( pluginObj.isVideoReadyCB );    //注册视频播放准备完毕的回调函数，一旦插件完成准备工作开始播放视频，既调用这个回调函数		
+		
+		obj.videoConnectCallback( pluginObj.isVideoConnectCB );  //网络状态改变的回调函数。网络连接出错，或者从出错状态切换回正常播放时被回调。 
+		
+		document.getElementById("regionCoverBtn").onclick = function(){
+			if(this.className == "off")
+			{
+				this.className = "on"; this.value = "结束绘制";
+				obj.bRegionCoverOn = 1;
+			}
+			else if(this.className == "on")
+			{
+				this.className = "off"; this.value = "开始绘制";
+				obj.bRegionCoverOn = 0; 
+			}
+		};
+		
+		pluginObj.play();       //可以直接播放啦~
+
+	})();
+	
+
+</script>
+
+<div>
+<h2>视频播放状态改变的回调函数</h2>
+<p>该例子演示预览中的抓图和录像功能。另外与其相关的是设置中的存储，该存储路径仅给预览中的抓图和录像功能使用；而设置&gt;摄像头&gt;码流&gt;图片 中的设置与预览中的抓图录像完全无关，只用于配制NVR。</p>
+
+
+<h5>videoPlayingCallback(function)</h5>
+<p>
+	接口方法：注册视频播放状态改变时调用的JS回调函数。<br>
+	当视频从停止播放切换成播放中，或者从播放中切换成停止时会触发注册的JS函数。<br>
+	可用于判断是否该调用其他接口属性或者方法！因为在视频还没有准备好前就对某些属性或者方法进行调用，插件会什么都不做直接返回。<br>
+</p>
+
+<h5>补充说明：</h5>
+<p>不能直接开始播放的BUG已解，可以直接调用playvideo接口了~</p>
+<p>
+	在这个例子中出现了接口属性 bRegionCoverOn 和 RegionCoverArrLen、方法 addRegionCoverRect 和 getRegionCoverPos。<br>
+	
+	到底什么时候可以访问哪些属性，情况比较多。以这个demo为例，做说明。<br>
+	
+	第一次点击播放并完成部分准备工作后就可以访问 bRegionCoverOn 和 RegionCoverArrLen 了。<br>
+	
+	但是必须等插件接收到视频数据并开始播放后才能访问 addRegionCoverRect 和 getRegionCoverPos，因为这两个接口涉及分辨率相关计算，别的接口也可能是其它原因。<br>
+	
+	这时如果点击停止播放，bRegionCoverOn 和 RegionCoverArrLen 仍然可以访问，但是 addRegionCoverRect 和 getRegionCoverPos 不可以，原因同上。<br>
+	
+	当然，不管访问哪个属性，最保险的就是在视频状态“播放中”时进行访问。
+
+</p>
+
+</div>
+
+</body>

@@ -1,0 +1,176 @@
+﻿<script type="text/javascript">
+function init() {
+	function errorHandle(code, objOrId) {
+		var showStr = "";
+		switch (parseInt(code)) {
+			case ENONE:
+				return true;
+			case IPCSMDENABLEERR:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case EINVARG:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCSMDSENSITIVITYERR:
+				showStr = errStr.ipcImInfsErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCNOTIFYEMAILENERR:
+			case IPCNOTIFYALARMENERR:
+			case IPCNOTIFYRECORDENERR:
+				showStr = errStr.IPCHandleInalid;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+		}
+		closeToast();
+		showAlert(showStr, objOrId);
+		return false;
+	}
+	function saveHandle() {
+		var reqData = {};
+		reqData[FILE_NAME] = {};
+		reqData[FILE_NAME][DETECTION] = {};
+		reqData[FILE_NAME][NOTIFY_LIST] = {};
+		reqData[FILE_NAME][DETECTION][SENSITIVITY] = sensitivityValue;
+		reqData[FILE_NAME][DETECTION][ENABLED] = switchState;
+		reqData[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] = emailCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+		reqData[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] = deviceCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+		reqData[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] = recordCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+		showToast();
+		$.modify(reqData, function (result) {
+			if (true == errorHandle(result[ERR_CODE])) {
+				showToast("success");
+			}
+		});
+	}
+	function intelligentDetectionSwitchHd(state) {
+		intelligentDetectionSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+		switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+		var hideobj = document.getElementById("hidebg");
+
+		if(0 == state)
+		{
+			hideobj.style.display = "block";
+			hideobj.style.height = getoffset(id("save")).top - getoffset(id("sensitivityDragLine")).top + "px";
+		}
+		else
+		{
+			hideobj.style.display = "none";
+		}
+	}
+
+	function sensitivityChange(val) {
+		sensitivityValue = val;
+		sensitivityDragLine.setValue(val);
+		if ((true == checkNum(val)) &&
+				(true == checkNumRange(parseInt(val), 100, 1)))
+		{
+			sensitivityErr = false;
+		}
+		else
+		{
+			showNote("sensitivityDragLineDragLineInput", errStr.sensitivityErr);
+			sensitivityErr = true;
+		}
+	}
+
+	function pageInit() {
+		var reqData = {};
+		enable = 0;
+		reqData[FILE_NAME] = {};
+		reqData[FILE_NAME][NAME] = [DETECTION, NOTIFY_LIST];
+
+		sensitivityDragLine = new DragLine({id:"sensitivityDragLine", name:label.sensitivity, cb:sensitivityChange, lowerBound:1});
+
+		$.query(reqData, function (result) {
+			if (true == errorHandle(result[ERR_CODE])) {
+				if (true == $.local) {
+					intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", 0, intelligentDetectionSwitchHd);
+					return;
+				}
+				switchState = result[FILE_NAME][DETECTION][ENABLED];
+				enable = (switchState == ENABLED_ON) ? 1 : 0;
+				intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", enable, intelligentDetectionSwitchHd);
+				sensitivityValue = result[FILE_NAME][DETECTION][SENSITIVITY];
+				sensitivityDragLine.setValue(sensitivityValue);
+				enable = (result[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] == ENABLED_ON);
+				changeCheckInput(emailCheck, enable);
+				enable = (result[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] == ENABLED_ON);
+				changeCheckInput(deviceCheck, enable);
+				enable = (result[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] == ENABLED_ON);
+				changeCheckInput(recordCheck, enable);
+
+				showDetailCon();
+			}
+		});
+		id("save").onclick = saveHandle;
+	}
+	var FILE_NAME = uciDefocusDetection.fileName;
+	var DETECTION = uciDefocusDetection.secName.detection;
+	var NOTIFY_LIST = uciDefocusDetection.secName.notifyList;
+	var ENABLED = uciDefocusDetection.optName.enabled;
+	var SENSITIVITY = uciDefocusDetection.optName.sensitivity;
+	var EMAIL_ENABLED = uciDefocusDetection.optName.emailEnabled;
+	var ALARM_ENABLED = uciDefocusDetection.optName.alarmEnabled;
+	var RECORD_ENABLED = uciDefocusDetection.optName.recordEnabled;
+	var ENABLED_ON = uciDefocusDetection.optValue.enableVal.on;
+	var ENABLED_OFF = uciDefocusDetection.optValue.enableVal.off;
+	var enable;
+	var intelligentDetectionSwitch;
+	var switchState;
+	var intelligentDetectionSwitchDes = id("intelligentDetectionSwitchDes");
+	var sensitivityDragLine;
+	var sensitivityValue;
+	var emailCheck = id("emailCheck");
+	var deviceCheck = id("deviceCheck");
+	var recordCheck = id("recordCheck");
+	var sensitivityErr = false;
+	pageInit();
+	initCheckInput("showInfo", null);
+}
+init();
+</script>
+<div class="detailCon">
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="configDiv">
+			<ul class="line">
+				<li class="dragLine">
+					<div id="sensitivityDragLine" class="ipcDragLineDiv"></div>
+				</li>
+			</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="recordCheck" class="chObj" value="1"></i>
+					<label class="des desA">{%label.triggerRecord%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="emailCheck" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="deviceCheck" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>

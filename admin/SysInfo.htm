@@ -1,0 +1,326 @@
+<script type="text/javascript">
+	function init()
+	{
+		var sysTime = id("sysTime");
+		var devType = id("deviceType");
+		var devName = id("devName");
+		var swVersion = id("swVersion");
+		var nwIp = id("nwIp");
+		var nwMac = id("nwMac");
+		var streamReso = id("streamResolution");
+		var streamFrameRate = id("streamFrameRate");
+		var nwAlarmInNum = id("nwAlarmInNum");
+		var nwAlarmOutNum = id("nwAlarmOutNum");
+		var sysFile = uciSystem.fileName;
+		var devFile = uciDeviceInfo.fileName;
+		var nwFile = uciNetwork.fileName;
+		var proFile = uciProto.fileName;
+		var vedioFile = uciVideo.fileName;
+		var alarmInFile = uciAlarmIn.fileName;
+		var alarmOutFile = uciAlarmOut.fileName;
+
+		var nowSec;
+		var getInfoInterval = 60000;	// 请求数据间隔
+		var nowTime = new Date();	// 初始化为当前管理设备时间
+		var firHit = true;
+
+		function errHandle(errNo)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showAlert(str);
+			return false;
+		}
+
+		/* 补全时间格式所需要的“0” */
+		function modifyTimeStr(value)
+		{
+			if (value < 10)
+			{
+				value = "0" + value;
+			}
+
+			return value;
+		}
+
+		function formateDate(msecs)
+		{
+			var now = new Date(msecs);
+			var year = now.getFullYear();
+			var mon = now.getMonth() + 1;
+			var day = now.getDate();
+			var hour = now.getHours();
+			var minus = now.getMinutes();
+			var sec = now.getSeconds();
+
+			/* 补全时间格式所需要的“0” */
+			var res = year + "-" + modifyTimeStr(mon) + "-" + modifyTimeStr(day) + " " +
+								   modifyTimeStr(hour) + ":" + modifyTimeStr(minus) + ":" +
+								   modifyTimeStr(sec);
+			return res;
+		}
+
+		function secIncrease()
+		{
+			nowSec += 1000;
+			sysTime.innerHTML = formateDate(nowSec);
+			$.setTimeout(secIncrease, 1000);
+		}
+
+		function htmlEncode(html)
+		{
+			var temp = document.createElement("div");
+			(temp.textContent != null) ? (temp.textContent = html) : (temp.innerText = html);
+			var text = temp.innerHTML;
+			temp = null;
+			return text;
+		}
+
+		function fillDevInfo(resp)
+		{
+			if (false == errHandle(resp[ERR_CODE]))
+			{
+				return ;
+			}
+
+			var sysInfo = resp[sysFile];
+			var devInfo = resp[devFile][uciDeviceInfo.secName.info];
+			var nwInfo = resp[nwFile][uciNetwork.dynData.wanStatus];
+			var proInfo = resp[proFile][uciProto.secName.wan];
+			var streamInfo = resp[vedioFile][uciVideo.secName.main];
+			var fr, hiBit, lowBit, macAddr, alarmInDevNum, alarmOutDevNum;
+			var alarmInInfo = resp[alarmInFile][uciAlarmIn.secName.alarmInDevInfo];
+			var alarmOutInfo = resp[alarmOutFile][uciAlarmOut.secName.alarmOutDevInfo];
+
+			nowSec = sysInfo[uciSystem.secName.clockStatus][uciSystem.optName.seconds];
+			nowSec *= 1000;
+			sysTime.innerHTML = formateDate(nowSec);
+
+			devName.innerHTML = "<pre>" + htmlEncode(getStrInMax(sysInfo[uciSystem.secName.clockStatus][uciSystem.optName.devAlias], 52)) + "</pre>";
+			devName.title = sysInfo[uciSystem.secName.clockStatus][uciSystem.optName.devAlias];
+
+			devType.innerHTML = devInfo[uciDeviceInfo.optName.devName];
+			swVersion.innerHTML = devInfo[uciDeviceInfo.optName.swVer];
+			nwIp.innerHTML = nwInfo[uciNetwork.optName.ip];
+
+
+			try
+			{
+				macAddr = proInfo[uciProto.optName.macaddr] != undefined ? proInfo[uciProto.optName.macaddr] : proInfo[uciProto.optName.facMac];
+				nwMac.innerHTML = macAddr.toUpperCase();
+			}
+			catch(ex)
+			{}
+
+			streamReso.innerHTML = streamInfo[uciVideo.optName.resolution];
+			fr = streamInfo[uciVideo.optName.frame_rate];
+			hiBit = parseInt((parseInt(fr) / 65536), 10);
+			lowBit = parseInt((parseInt(fr) % 65536), 10);
+			fr = lowBit / hiBit;
+			streamFrameRate.innerHTML = fr;
+
+			nwAlarmInNum.innerHTML = alarmInInfo[uciAlarmIn.optName.alarmInDevNum];
+			nwAlarmOutNum.innerHTML = alarmOutInfo[uciAlarmOut.optName.alarmOutDevNum];
+
+			showDetailCon();
+		}
+
+		function getData()
+		{
+			var data = {};
+			data[sysFile] = {};
+			data[sysFile][NAME] = uciSystem.secName.clockStatus;
+			data[devFile] = {};
+			data[devFile][NAME] = uciDeviceInfo.secName.info;
+
+			data[nwFile] = {};
+			data[nwFile][KEY_NAME] = uciNetwork.dynData.wanStatus;
+			data[proFile] = {};
+			data[proFile][NAME] = uciProto.secName.wan;
+
+			data[vedioFile] = {};
+			data[vedioFile][NAME] = uciVideo.secName.main;
+
+			data[alarmInFile] = {};
+			data[alarmInFile][NAME] = uciAlarmIn.secName.alarmInDevInfo;
+
+			data[alarmOutFile] = {};
+			data[alarmOutFile][NAME] = uciAlarmOut.secName.alarmOutDevInfo;
+
+			if (firHit)
+			{
+				firHit = false;
+				$.query(data, fillDevInfo);
+			}
+			else
+			{
+				$.queryP(data, fillDevInfo);
+			}
+			$.setTimeout(getData, getInfoInterval);
+		}
+
+		nowSec = nowTime.getTime();
+		sysTime.innerHTML = formateDate(nowSec);
+		$.setTimeout(secIncrease, 1000);
+		getData();
+		$(".dcImg").attr("src","../web-static/images/qrcode.png?t=" + Math.random());
+	}
+	init();
+</script>
+<style type="text/css">
+	div.infoDiv{
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+	}
+	div.itemCon{
+		margin:40px 0px 0px 0px;
+	}
+	div.firItemCon{
+		margin-top:0px;
+	}
+	div.item{
+		padding:5px 0;
+		margin-bottom:8px;
+	}
+	label.firstSpan{
+		display:inline-block;
+		color: #666666;
+		width:130px;
+		font-size:13px;
+	}
+	label.subTitle{
+		display:block;
+		font-size:16px;
+		color:#7a8599;
+		height: 40px;
+		line-height: 40px;
+	}
+	label.info{
+		display:inline-block;
+		color:#333333;
+		font-size:13px;
+		white-space:pre;
+	}
+	ul.lineCon{
+		background:url(../../web-static/images/line.png) repeat-x 0px 0px;
+		clear:both;
+		padding-top:12px;
+		font-size:0px;
+	}
+	img.dcImg{
+		display:inline-block;
+		height:171px;
+		width:171px;
+	}
+</style>
+<div class="detailCon">
+	<div class="infoDiv">
+		<div class="itemCon firItemCon">
+			<label class="subTitle">{%label.deviceInfo%}</label>
+			<ul class="line lineCon"></ul>
+			<div class="item itemF">
+				<label class="firstSpan">{%label.curSysTime%}</label>
+				<label id="sysTime" class="info">1970-1-1 00:00</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">{%label.deviceType%}</label>
+				<label id="deviceType" class="info">IPC</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">{%label.eptName%}</label>
+				<label id="devName" class="info">Name</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">{%label.swVersion%}</label>
+				<label id="swVersion" class="info">1.0.0</label>
+			</div>
+		</div>
+
+		<div class="itemCon">
+			<label class="subTitle">{%label.networkInfo%}</label>
+			<ul class="line lineCon"></ul>
+			<div class="item">
+				<label class="firstSpan">IP</label>
+				<label id="nwIp" class="info">192.168.0.1</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">MAC</label>
+				<label id="nwMac" class="info">00:00:00:00:00:00</label>
+			</div>
+		</div>
+
+		<div class="itemCon">
+			<label class="subTitle">{%label.codeStreamInfo%}</label>
+			<ul class="line lineCon"></ul>
+			<div class="item">
+				<label class="firstSpan">{%label.resolution%}</label>
+				<label id="streamResolution" class="info">1280*720</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">{%label.frameRate%}</label>
+				<label id="streamFrameRate" class="info">25</label>
+			</div>
+		</div>
+
+		<div class="itemCon">
+			<label class="subTitle">{%label.alarmInfo%}</label>
+			<ul class="line lineCon"></ul>
+			<div class="item">
+				<label class="firstSpan">{%label.alarmInNum%}</label>
+				<label id="nwAlarmInNum" class="info">1</label>
+			</div>
+			<div class="item">
+				<label class="firstSpan">{%label.alarmOutNum%}</label>
+				<label id="nwAlarmOutNum" class="info">1</label>
+			</div>
+		</div>
+		<div class="itemCon">
+			<label class="subTitle">{%label.devCode%}</label>
+			<ul class="line lineCon"></ul>
+			<div class="item">
+				<img class="dcImg"/>
+			</div>
+		</div>
+	</div>
+</div>

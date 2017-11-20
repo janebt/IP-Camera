@@ -1,0 +1,342 @@
+<script type="text/javascript">
+	function init()
+	{
+		var modelRadio;
+		var http = id("http");
+		var rtsp = id("rtsp");
+		var srvPort = id("srvPort");
+		var saveBt = id("save");
+
+		var EMPTYPORT = -50415;
+		var MAXHTTPPORT = 65535;
+		var MINHTTPPORT = 1;
+		var MAXRTSPPORT = 65535;
+		var MINRTSPPORT = 1;
+		var MAXSRVPORT = 65535;
+		var MINSRVPORT = 1;
+
+		var cetFN = uciCet.fileName;
+		var cetON = uciCet.optName;
+		var cetSN = uciCet.secName;
+		var uhttpdFN = uciUhttpd.fileName;
+		var uhttpdSN = uciUhttpd.secName;
+		var uhttpdON = uciUhttpd.optName;
+
+		var gHttpPort = DEF_HTTP_PORT = 80;
+		var gRtspPort = DEF_RSTP_PORT = 554;
+		var gSrvPort = DEF_SRV_PORT = 8800;
+		var gResSuc = false;
+		var gActiveHttpPort, gActiveRtspPort, gActiveSrvPort;
+
+		var usedPort = [1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 77, 79, 87, 95,
+									101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 139, 143, 179,
+									220, 389, 465, 512, 513, 514, 515, 526, 530, 531, 532, 540, 556, 563, 587, 601,
+									636, 993, 995, 2020, 2049, 3659, 4045, 6000, 6665, 6666, 6667, 6668, 6669, 8000];
+
+		function errHandle(errNo)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCPRTUPORTERR:
+				str = errStr.ipcPrtUportErr;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showAlert(str);
+			return false;
+		}
+
+		function checkPort(val, max, min, objOrId)
+		{
+			var i = 0;
+
+			if (val.length < 1)
+			{
+				showNote(objOrId, errStr.noPortInputErr);
+				return false;
+			}
+
+			if (false == checkNum(val))
+			{
+				showNote(objOrId, errStr.portIllegalErr);
+				return false;
+			}
+
+			if (false == checkNumRange(parseInt(val, 10), max, min))
+			{
+				showNote(objOrId, errStr.invPortErr);
+				return false;
+			}
+
+			for (i = 0; i < usedPort.length; ++i)
+			{
+				if (val == usedPort[i])
+				{
+					showNote(objOrId, errStr.portUsedErr);
+					return false;
+				}
+			}
+
+			switch (objOrId)
+			{
+			case "http":
+				if (val == rtsp.value || val == srvPort.value)
+				{
+					showNote(objOrId, errStr.portConflictErr);
+					return false;
+				}
+				break;
+			case "rtsp":
+				if (val == http.value || val == srvPort.value)
+				{
+					showNote(objOrId, errStr.portConflictErr);
+					return false;
+				}
+				break;
+			case "srvPort":
+				if (val == http.value || val == rtsp.value)
+				{
+					showNote(objOrId, errStr.portConflictErr);
+					return false;
+				}
+				break;
+			default:
+				return false;
+			}
+			return true;
+		}
+
+		function fillDom(resp)
+		{
+			if (false == errHandle(resp[ERR_CODE]))
+			{
+				return;
+			}
+
+			var uhttpdData = resp[uhttpdFN];
+			var cetData = resp[cetFN];
+
+			gActiveHttpPort = http.value = uhttpdData[uhttpdSN.main][uhttpdON.listenHttpPort];
+			gActiveRtspPort = rtsp.value = cetData[cetSN.rtsp][cetON.port];
+			gActiveSrvPort = srvPort.value = cetData[cetSN.vhttpd][cetON.port];
+			$.domainPort = uhttpdData[uhttpdSN.main][uhttpdON.listenHttpPort];
+
+			showDetailCon();
+		}
+
+		function onReset()
+		{
+			closeNoteAll();
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					gHttpPort = DEF_HTTP_PORT;
+					gRtspPort = DEF_RSTP_PORT;
+					gSrvPort = DEF_SRV_PORT;
+
+					if (gActiveHttpPort != gHttpPort || gActiveRtspPort != gRtspPort || gActiveSrvPort != gSrvPort)
+					{
+						showConfirm(label.portResetWarnning, modifyPort);
+					}
+					else
+					{
+						http.value = gHttpPort;
+						rtsp.value = gRtspPort;
+						srvPort.value = gSrvPort;
+						showToast("success");
+					}
+				}
+			});
+		}
+
+		function onBlur()
+		{
+			closeNoteAll();
+			checkPort(http.value, MAXHTTPPORT, MINHTTPPORT, "http");
+			checkPort(rtsp.value, MAXRTSPPORT, MINRTSPPORT, "rtsp");
+			checkPort(srvPort.value, MAXSRVPORT, MINSRVPORT, "srvPort");
+		}
+
+		function onSave()
+		{
+			if (!checkPort(http.value, MAXHTTPPORT, MINHTTPPORT, "http") ||
+				!checkPort(rtsp.value, MAXRTSPPORT, MINRTSPPORT, "rtsp") ||
+				!checkPort(srvPort.value, MAXSRVPORT, MINSRVPORT, "srvPort"))
+			{
+				return false;
+			}
+
+			gHttpPort = http.value;
+			gRtspPort = rtsp.value;
+			gSrvPort = srvPort.value;
+
+			if (gActiveHttpPort != gHttpPort || gActiveRtspPort != gRtspPort || gActiveSrvPort != gSrvPort)
+			{
+				showConfirm(label.portRestartWarnning, modifyPort);
+			}
+			else
+			{
+				showToast("success");
+			}
+		}
+
+		function navigateToAddr()
+		{
+			var port = "";
+			var orgIpVal = window.location.host.split(":")[0];
+
+			if (gActiveHttpPort != DEF_PORT)
+			{
+				port = ":" + gActiveHttpPort;
+			}
+
+			window.location.href = "http://" + orgIpVal + port;
+		}
+
+		function modifyPort(flag)
+		{
+			if (flag === false)
+			{
+				return;
+			}
+
+			var portChangeFlag = (gActiveHttpPort == gHttpPort ? false : true);
+			var data = {};
+
+			data[uhttpdFN] = {};
+			data[uhttpdFN][uhttpdSN.main] = {};
+			data[uhttpdFN][uhttpdSN.main][uhttpdON.listenHttpPort] = gHttpPort;
+
+			data[cetFN] = {};
+			data[cetFN][cetSN.rtsp] = {};
+			data[cetFN][cetSN.rtsp][cetON.port] = gRtspPort;
+			data[cetFN][cetSN.vhttpd] = {};
+			data[cetFN][cetSN.vhttpd][cetON.port] = gSrvPort;
+
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errHandle(resp[ERR_CODE]))
+				{
+					var orgIpVal = window.location.host.split(":")[0];
+					gActiveRtspPort = gRtspPort;
+					gActiveSrvPort = gSrvPort;
+					gActiveHttpPort = gHttpPort;
+					$.vhttpdPort = gSrvPort;
+					$.domainPort = gHttpPort;
+					showToast("success");
+
+					if (flag === true)
+					{
+						showProgBar(REBOOT_SECONDS, undefined, function(){
+							if (portChangeFlag)
+							{
+								$.changeDomain(orgIpVal + ":" + gActiveHttpPort);
+								lanDetecting(navigateToAddr);
+							}
+							else
+							{
+								window.location.reload();
+							}
+						});
+					}
+					else if (flag == "manual")
+					{
+						if (portChangeFlag)
+						{
+							$.changeDomain(orgIpVal + ":" + gActiveHttpPort);
+							lanDetecting(navigateToAddr);
+						}
+					}
+				}
+				else
+				{
+					closeToast();
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			var data = {};
+
+			saveBt.onclick = onSave;
+			id("reset").onclick = onReset;
+			id("http").onblur = onBlur;
+			id("rtsp").onblur = onBlur;
+			id("srvPort").onblur = onBlur;
+			id("http").onfocus = closeNoteAll;
+			id("rtsp").onfocus = closeNoteAll;
+			id("srvPort").onfocus = closeNoteAll;
+
+			data[cetFN] = {};
+			data[cetFN][NAME] = [cetSN.rtsp, cetSN.vhttpd];
+			data[uhttpdFN] = {};
+			data[uhttpdFN][NAME] = [uhttpdSN.main];
+
+			$.query(data, fillDom);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<div class="detailCon detailConMorePad">
+	<ul class="line lineL">
+		<li class="line lineG1">
+			<label class="des desA">{%label.http%}</label>
+			<input id="http" class="textInput text textA1" maxlength="5"/><i class="tip"></i>
+		</li>
+		<li class="line lineG1">
+			<label class="des desA">{%label.rtsp%}</label>
+			<input id="rtsp" class="textInput text textA1" maxlength="5"/><i class="tip"></i>
+		</li>
+		<li class="line lineG1">
+			<label class="des desA">{%label.srvPort%}</label>
+			<input id="srvPort" class="textInput text textA1" maxlength="5"/><i class="tip"></i>
+		</li>
+	</ul>
+
+	<div class="funcBtnCon">
+		<input id="reset" type="button" value="{%btn.resetDefault%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

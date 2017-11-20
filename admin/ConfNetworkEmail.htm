@@ -1,0 +1,1239 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var list = [];
+		var dataGridLs = new DataGrid();
+		var tableEditCon = id("tableEditCon");
+		var reciverConfH4;
+		var ADD = "add";
+		var EDIT = "edit";
+		var detailCon = $("div.detailCon");
+		var table = id("recriverTbl");
+		var detailConCFUM = id("detailConCFUM");
+		var FILE_NAME = uciEmail.fileName;
+		var SENDER_ADDR = uciEmail.optName.sender_address;
+		var SENDER_NAME = uciEmail.optName.sender_name;
+		var RECEIVER_ADDR = uciEmail.optName.receiver_address;
+		var RECEIVER_NAME = uciEmail.optName.receiver_name;
+		var SMTP_SERVER = uciEmail.optName.smtp_server;
+		var SMTP_PORT = uciEmail.optName.smtp_port;
+		var ENCRYPT_TYPE = uciEmail.optName.encrypt_type;
+		var STARTTLS_ENABLED = uciEmail.optName.enabled_starttls;
+		var SERVER_AUTH = uciEmail.optName.server_auth;
+		var ACCOUNT_NAME = uciEmail.optName.account_name;
+		var ACCOUNT_PASSWD = uciEmail.optName.account_passwd;
+		var PICTURE_ACCESSORIES = uciEmail.optName.picture_accessories;
+		var PICTURE_INTERVAL = uciEmail.optName.picture_interval;
+		var PICTURE_NUMBER = uciEmail.optName.picture_number;
+		var RECEIVER_TABLE = uciEmail.secType.receiver_info;
+		var TEST_EMAIL = uciEmail.actionName.email_test;
+		var SERVER_INFO = uciEmail.secName.server_info;
+		var SENDER_INFO = uciEmail.secName.sender_info;
+		var ACCESSORIES_INFO = uciEmail.secName.accessories_info;
+		var SWITCH_ON = uciEmail.optValue.on;
+		var SWITCH_OFF = uciEmail.optValue.off;
+		var MAX_RECEIVER_NUM = 3;
+		var pwdChgFlg = 0;
+		var listReceiver, receiverAddress, receiverName;
+		var enabledStarttls, serverAuth, pictureAccessories, exSwitchState;
+		var emailTypeList = [{str:label.emailQQ, value:"smtp.qq.com"},
+			{str:label.email163, value:"smtp.163.com"},
+			{str:label.email126, value:"smtp.126.com"},
+			{str:label.emailSina, value:"smtp.sina.com.cn"},
+			{str:label.exmailQQ, value:"smtp.exmail.qq.com"},
+			{str:label.emailYeah, value:"smtp.yeah.net"},
+			{str:label.email10086, value:"smtp.10086.cn"},
+			{str:label.email263, value:"smtp.263.net"},
+			{str:label.emailSohu, value:"smtp.sohu.com"},
+			{str:label.email163ym, value:"smtp.ym.163.com"},
+			{str:label.other, value:"-1"}];
+		var emailList = ["smtp.qq.com","smtp.163.com","smtp.126.com","smtp.sina.com.cn",
+			"smtp.exmail.qq.com","smtp.yeah.net","smtp.10086.cn","smtp.263.net","smtp.sohu.com","smtp.ym.163.com"];
+		var pictureIntervalList = [{str:"2"+label.second, value:"2"},{str:"3"+label.second, value:"3"},{str:"4"+label.second, value:"4"},{str:"5"+label.second, value:"5"}];
+		var smtpServer = "";
+		var bAdvanceParaShow = false;
+		var advancedParaDetail = id("advancedParaDetail");
+		var enabledStarttlsStatus;
+		var pictureAccessoriesStatus;
+		var get_status_times = 0;
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+				showStr = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				showStr = errStr.ipcUbusCallErr;
+				break;
+			case EINVARG:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCEMAILSENAMEERR:
+				showStr = errStr.emailSendNameErr;
+				break;
+			case IPCEMAILSEADDRERR:
+				showStr = errStr.emailSendAddrErr;
+				break;
+			case IPCEMAILSMSERVERR:
+				showStr = errStr.emailSMTPAddrErr;
+				break;
+			case IPCEMAILSMPORTERR:
+				showStr = errStr.emailSMTPPortErr;
+				break;
+			case IPCEMAILENTYPEERR:
+				showStr = errStr.emailEnTypeErr;
+				break;
+			case IPCEMAILENSTLSERR:
+				showStr = errStr.emailSTARTTLSErr;
+				break;
+			case IPCEMAILSEAUTHERR:
+				showStr = errStr.emailServerAuthErr;
+				break;
+			case IPCEMAILACNAMEERR:
+				showStr = errStr.emailServerAccountNameErr;
+				break;
+			case IPCEMAILACPAWDERR:
+				showStr = errStr.emailServerAccounPwdErr;
+				break;
+			case IPCEMAILPIACCEERR:
+				showStr = errStr.emailPicAccessoriesErr;
+				break;
+			case IPCEMAILPIINTEERR:
+				showStr = errStr.emailPicIntervalErr;
+				break;
+			case IPCEMAILPINUMBERR:
+				showStr = errStr.emailPicNumberErr;
+				break;
+			case IPCEMAILRENAMEERR:
+				showStr = errStr.emailRecvNameErr;
+				break;
+			case IPCEMAILREADDRERR:
+				showStr = errStr.emailRecvAddrErr;
+				break;
+			case IPCEMAILTESTERR:
+				showStr = errStr.emailTestErr;
+				break;
+			case IPCEMAILSERERR:
+				showStr = errStr.emailConnectSerErr;
+				break;
+			case IPCEMAILAUTHERR:
+				showStr = errStr.emailAuthErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		/* 显示编辑框 */
+		function showUserConf(type, index, paraObj)
+		{
+			var gp, comment;
+
+			if (undefined == reciverConfH4)
+			{
+				authorityListCon = $("div.authorityListCon")[0];
+				reciverConfH4 = $(tableEditCon).find("h4")[0];
+				receiverAddress = id("receiverAddress");
+				receiverName = id("receiverName");
+			}
+
+			closeNoteAll();
+
+			if (ADD == type)
+			{
+				reciverConfH4.innerHTML = label.addReceiver;
+
+				receiverAddress.value = "";
+				receiverName.value = "";
+			}
+			else
+			{
+				reciverConfH4.innerHTML = label.editReceiver;
+
+				receiverAddress.value = paraObj[RECEIVER_ADDR];
+				receiverName.value = paraObj[RECEIVER_NAME];
+			}
+
+			reciverConfH4.type = type;
+			reciverConfH4.index = index;
+			tableEditCon.style.top = "0px";
+		}
+
+		/* 添加条目 */
+		function addItem(receiverAddress, receiverName, callBack)
+		{
+			var data = {}, para = {};
+			var index;
+
+			index = calcNextIndex(listReceiver)
+
+			data[FILE_NAME] = {};
+
+			data[FILE_NAME][KEY_TABLE] = RECEIVER_TABLE;
+			data[FILE_NAME][KEY_NAME] = RECEIVER_TABLE + "_" + index;
+			data[FILE_NAME][KEY_PARA] = para;
+			para[RECEIVER_ADDR] = receiverAddress;
+			para[RECEIVER_NAME] = receiverName;
+
+
+			$.add(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					requestReceiverTable(reloadReceiverTable);
+					callBack(true, para);
+				}
+				else
+				{
+					callBack(false);
+				}
+			});
+		}
+
+		function testEmail(para, callback)
+		{
+			var data = {};
+			var showStr = "";
+
+			callback();
+			return;
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][TEST_EMAIL] = para;
+
+			$.action(data, function(result){
+				if (ENONE == result[ERR_CODE])
+				{
+					callback();
+				}
+				else
+				{
+					closeToast();
+					showAlert(label.emailTestFail);
+				}
+			})
+		}
+
+		function receiverInfoCheck()
+		{
+			closeNoteAll();
+
+			if (receiverName.value.length == 0)
+			{
+				showNote("receiverName", errStr.emailRecvNameNull);
+				return false
+			}
+
+			if (receiverAddress.value.length == 0)
+			{
+				showNote("receiverAddress", errStr.emailRecvAddrNull);
+				return false
+			}
+
+			if (!checkEmail(receiverAddress.value))
+			{
+				showNote("receiverAddress", errStr.emailRecvAddrFmtErr);
+				return false
+			}
+
+			return true;
+		}
+
+		function saveItem(type, index, callBack)
+		{
+			var data = {}, para = {};
+			var ret;
+
+			if (!receiverInfoCheck())
+			{
+				return;
+			}
+
+			showToast();
+
+			/* 添加 */
+			if (ADD == type)
+			{
+				addItem(receiverAddress.value, receiverName.value, function(result, para){
+					if (true == result)
+					{
+						showToast("success");
+						callBack(true, para);
+						externHd();
+					}
+					else
+					{
+						callBack(false);
+					}
+				});
+			}
+			else
+			{
+				data[FILE_NAME] = {};
+
+				data[FILE_NAME][listReceiver[index][".name"]] = para;
+				para[RECEIVER_ADDR] = receiverAddress.value;
+				para[RECEIVER_NAME] = receiverName.value;
+
+				$.modify(data, function(result){
+					if (true == errHandle(result[ERR_CODE]))
+					{
+						requestReceiverTable(reloadReceiverTable);
+						callBack(true, para);
+					}
+					else
+					{
+						callBack(false);
+					}
+				})
+			}
+		}
+
+		/* 删除所选 */
+		function delItem(index, callBack)
+		{
+			var indexArry = index.toString().split("-");
+			var delList = [], data = {};
+			var secName;
+
+			//排除list数组中的空元素
+			for (var i in indexArry)
+			{
+				secName = listReceiver[indexArry[i]][SEC_NAME];
+				if (!secName)
+				{
+					continue;
+				}
+
+				delList.push(secName);
+			}
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][KEY_NAME] = delList;
+			$.del(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					/* 删除子串中的内容 */
+					for (var i in delList)
+					{
+						for (var j in listReceiver)
+						{
+							if (delList[i] == listReceiver[j][SEC_NAME])
+							{
+								listReceiver.splice(j, 1);
+								break;
+							}
+						}
+					}
+
+					showToast("success");
+					callBack(true);
+					externHd();
+				}
+				else
+				{
+					callBack(false);
+					externHd();
+				}
+			});
+		}
+
+		function senderNameCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.emailSendNameNull);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function senderAddressCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.emailSendAddrNull);
+				result = false;
+			}
+			else if (!checkEmail(value))
+			{
+				showNote(idStr, errStr.emailSendAddrFmtErr);
+				result = false;
+			}
+			return result;
+		}
+
+		function senderPasswordCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (!pwdChgFlg)
+			{
+				return result;
+			}
+
+			closeNoteAll();
+
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.emailServerAccounPwdNull);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function smtpServerCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (id("otherAddr").style.display == "none")
+			{
+				return result;
+			}
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.emailSMTPAddrNull);
+				result = false;
+			}
+			else if (checkDomain(value) != ENONE)
+			{
+				showNote(idStr, errStr.emailSMTPAddrFmtErr);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function smtpPortCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (id("otherPort").style.display == "none")
+			{
+				return result;
+			}
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.emailSMTPPortNull);
+				result = false;
+			}
+			else if (!checkNum(value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (!checkNumRange(value, 65535, 1))
+			{
+				showNote(idStr, errStr.emailSMTPPortRangeErr + "(1-65535)");
+				result = false;
+			}
+
+			return result;
+		}
+
+		function accountNameCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (value.length == 0)
+			{
+				showNote(idStr, errStr.ftpNameEmpty);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function pictureIntervalCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (value.length == 0)
+			{
+				showNote(idStr, label.picNumNull);
+				result = false;
+			}
+			else if (!checkNum(value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (!checkNumRange(value, 5, 2))
+			{
+				showNote(idStr, label.picIntervalOverflow + "(2-5s)。");
+				result = false;
+			}
+
+			return result;
+		}
+
+		function pictureNumberCheck(idStr)
+		{
+			var con = id(idStr);
+			var value = con.value;
+			var result = true;
+
+			if (value.length == 0)
+			{
+				showNote(idStr, label.picNumNull);
+				result = false;
+			}
+			else if (!checkNum(value))
+			{
+				showNote(idStr, errStr.inputNumFormatErr);
+				result = false;
+			}
+			else if (!checkNumRange(value, 5, 2))
+			{
+				showNote(idStr, label.picNumOverflow +"(2-5)。");
+				result = false;
+			}
+
+			return result;
+		}
+
+		function onSave()
+		{
+			var data = {};
+
+			if (!senderNameCheck("senderName") ||
+				!senderAddressCheck("senderAddress") ||
+				!smtpServerCheck("smtpServer") ||
+				!smtpPortCheck("smtpPort")||
+				!senderPasswordCheck("accountPasswd"))
+			{
+				return;
+			}
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][SENDER_INFO] = {};
+			data[FILE_NAME][SENDER_INFO][SENDER_NAME] = id("senderName").value;
+			data[FILE_NAME][SENDER_INFO][SENDER_ADDR] = id("senderAddress").value;
+
+			data[FILE_NAME][SERVER_INFO] = {};
+			if (id("emailType").value == "-1") //发送服务器为“其他”
+			{
+				data[FILE_NAME][SERVER_INFO][SMTP_SERVER] = id("smtpServer").value;
+				data[FILE_NAME][SERVER_INFO][SMTP_PORT] = id("smtpPort").value;
+			}
+			else if ("none" == id("encryptType").value)
+			{
+				data[FILE_NAME][SERVER_INFO][SMTP_PORT] = "25";//不加密，默认使用25端口
+				data[FILE_NAME][SERVER_INFO][SMTP_SERVER] = smtpServer;
+			}
+			else
+			{
+				if (enabledStarttls.state == 0)
+				{
+					data[FILE_NAME][SERVER_INFO][SMTP_PORT] = "465";//加密，未使能Starttls，默认使用465端口
+				}
+				else
+				{
+					data[FILE_NAME][SERVER_INFO][SMTP_PORT] = "25";//加密，使能Starttls，默认使用25端口
+				}
+				data[FILE_NAME][SERVER_INFO][SMTP_SERVER] = smtpServer;
+			}
+
+			data[FILE_NAME][SERVER_INFO][ENCRYPT_TYPE] = id("encryptType").value;
+			data[FILE_NAME][SERVER_INFO][STARTTLS_ENABLED] = enabledStarttls.state == 0 ? SWITCH_OFF: SWITCH_ON;
+			data[FILE_NAME][SERVER_INFO][SERVER_AUTH] = SWITCH_ON; //服务器认证默认开
+
+			data[FILE_NAME][SERVER_INFO][ACCOUNT_NAME] = id("senderAddress").value;//用户名默认与发件人邮箱一样
+			if (pwdChgFlg)
+			{
+				data[FILE_NAME][SERVER_INFO][ACCOUNT_PASSWD] = id("accountPasswd").value;
+			}
+
+			data[FILE_NAME][ACCESSORIES_INFO] = {};
+			data[FILE_NAME][ACCESSORIES_INFO][PICTURE_ACCESSORIES] = pictureAccessories.state == 0 ? SWITCH_OFF: SWITCH_ON;
+			data[FILE_NAME][ACCESSORIES_INFO][PICTURE_INTERVAL] = id("pictureInterval").value;
+			data[FILE_NAME][ACCESSORIES_INFO][PICTURE_NUMBER] = 3;//抓图数量默认3张
+
+			showToast();
+			$.modify(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function onAdvanceParaHandle(event) {
+			if (!bAdvanceParaShow)
+			{
+				id("advancedArrow").className ="arrowUp";
+				advancedParaDetail.style.display = "";
+				bAdvanceParaShow = true;
+
+				enabledStarttls = new Switch("enabledStarttls", enabledStarttlsStatus == SWITCH_ON ? 1 : 0, exSwitchHd);
+				pictureAccessories = new Switch("pictureAccessories", pictureAccessoriesStatus == SWITCH_ON ? 1 : 0, accessoriesHd);
+				accessoriesHd(pictureAccessoriesStatus == SWITCH_ON ? 1 : 0);
+			}
+			else
+			{
+				id("advancedArrow").className ="arrowDown";
+				advancedParaDetail.style.display = "none";
+				bAdvanceParaShow = false;
+			}
+		}
+
+		/* 绑定各个按钮的响应事件 */
+		function bindEvent()
+		{
+			id("save").onclick = onSave;
+			id("advanced").onclick = onAdvanceParaHandle;
+		}
+
+		function popUpHd(type, index, para)
+		{
+			showUserConf(type, index, para);
+		}
+
+		function requestData(callBack)
+		{
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][KEY_TABLE] = [RECEIVER_TABLE];
+			data[FILE_NAME][KEY_NAME] = [ACCESSORIES_INFO, SENDER_INFO, SERVER_INFO];
+
+			$.query(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+
+					callBack(result);
+				}
+			});
+		}
+
+		function requestReceiverTable(callBack) {
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][KEY_TABLE] = [RECEIVER_TABLE];
+
+			$.query(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					callBack(result);
+				}
+			});
+		}
+
+		function exSwitchHd(state)
+		{
+			exSwitchState = state;
+		}
+
+		function authSelHandle(state)
+		{
+			if (state == 1)
+			{
+				id("accountNameTbl").style.display = "block";
+				id("accountPasswdTbl").style.display = "block";
+			}
+			else
+			{
+				id("accountNameTbl").style.display = "none";
+				id("accountPasswdTbl").style.display = "none";
+			}
+		}
+
+		function accessoriesHd(state)
+		{
+			if (state == 1)
+			{
+				//id("pictureNumberTbl").style.display = "block";
+				id("pictureIntervalTbl").style.display = "block";
+			}
+			else
+			{
+				//id("pictureNumberTbl").style.display = "none";
+				id("pictureIntervalTbl").style.display = "none";
+			}
+		}
+
+		function reloadReceiverTable(result) {
+			listReceiver = [];
+			listReceiver = formatTableData(result[FILE_NAME][RECEIVER_TABLE]);
+
+			dataGridLs.setDataSource(listReceiver);
+			dataGridLs.refresh();
+		}
+
+		function reloadTable(result)
+		{
+			if (true == $.local)
+			{
+				listReceiver =[{"receiver_name":"张三", "receiver_address":"zhangsan@163.com"},{"receiver_name":"李四", "receiver_address":"lisi@126.com"}];
+				dataGridLs.setDataSource(listReceiver);
+				dataGridLs.refresh();
+				id("senderName").value = "张三";
+				id("senderAddress").value = "zhangsan@qq.com";
+				selectInit("emailType", emailTypeList, "smtp.qq.com", changeMailType);
+				selectInit("encryptType", [{str:label.wirelessNoSecurity, value:"none"},
+										{str:label.authAuto, value:"AUTO"},
+										{str:"SSL", value:"SSL"},
+										{str:"TLS", value:"TLS"}
+										], "none");
+				selectInit("pictureInterval", pictureIntervalList, 2);
+				return;
+			}
+
+			pwdChgFlg = 0;
+
+			/* 组装root用户数据 */
+			listReceiver = [];
+			listReceiver = formatTableData(result[FILE_NAME][RECEIVER_TABLE]);
+
+			dataGridLs.setDataSource(listReceiver);
+			dataGridLs.refresh();
+
+			id("senderName").value = result[FILE_NAME][SENDER_INFO][SENDER_NAME] || "";
+			id("senderAddress").value = result[FILE_NAME][SENDER_INFO][SENDER_ADDR] || "";
+
+			smtpServer = result[FILE_NAME][SERVER_INFO][SMTP_SERVER] || "";
+			var index = $.inArray(smtpServer, emailList);
+			if (-1 == index)
+			{
+				id("otherAddr").style.display = "";
+				id("smtpServer").value = smtpServer;
+				id("otherPort").style.display = "";
+				id("smtpPort").value = result[FILE_NAME][SERVER_INFO][SMTP_PORT];
+				id("accountpwdTipStr").style.top = "304px";
+			}
+			selectInit("emailType", emailTypeList, index != -1 ? smtpServer : "-1", changeMailType);
+			selectInit("encryptType", [{str:label.wirelessNoSecurity, value:"none"},
+										{str:label.authAuto, value:"AUTO"},
+										{str:"SSL", value:"SSL"},
+										{str:"TLS", value:"TLS"}
+										], result[FILE_NAME][SERVER_INFO][ENCRYPT_TYPE]);
+			enabledStarttlsStatus = result[FILE_NAME][SERVER_INFO][STARTTLS_ENABLED];
+			enabledStarttls = new Switch("enabledStarttls", enabledStarttlsStatus == SWITCH_ON ? 1 : 0, exSwitchHd);
+
+			/*if (serverAuth.state == 1)
+			{
+				id("accountName").value = result[FILE_NAME][SERVER_INFO][ACCOUNT_NAME];
+				id("accountPasswd").value = result[FILE_NAME][SERVER_INFO][ACCOUNT_PASSWD] || "";
+				authSelHandle(1);
+				id("accountpwdTipStr").style.display = "inline";
+			}
+			else
+			{
+				id("accountName").value = result[FILE_NAME][SERVER_INFO][ACCOUNT_NAME] || "";
+				id("accountPasswd").value = result[FILE_NAME][SERVER_INFO][ACCOUNT_PASSWD] || "";
+				authSelHandle(0);
+				pwdChg();
+			}*/
+			id("accountPasswd").value = result[FILE_NAME][SERVER_INFO][ACCOUNT_PASSWD] || "";
+			id("accountpwdTipStr").style.display = "inline";
+
+			pictureAccessoriesStatus = result[FILE_NAME][ACCESSORIES_INFO][PICTURE_ACCESSORIES];
+			pictureAccessories = new Switch("pictureAccessories", pictureAccessoriesStatus == SWITCH_ON ? 1 : 0, accessoriesHd);
+			accessoriesHd(pictureAccessoriesStatus == SWITCH_ON ? 1 : 0);
+			selectInit("pictureInterval", pictureIntervalList, result[FILE_NAME][ACCESSORIES_INFO][PICTURE_INTERVAL]);
+
+		}
+
+		function getTestStatus(){
+			var data = {};
+
+			get_status_times = get_status_times + 1;
+			if (get_status_times > 180)
+			{
+				closeToast();
+				showAlert(label.emailTestTimeout);
+				return;
+			}
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][uciEmail.actionName.get_test_status] = null;
+			showToast();
+			$.action(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+					if (result["result"] == "success")
+					{
+						closeToast();
+						showAlert(label.emailTestSuccess);
+					}
+					else if (result["result"] == "waiting")
+					{
+						$.setTimeout(getTestStatus, 1000);
+					}
+				}
+			});
+		}
+
+		function emailTest(index)
+		{
+			var data = {};
+			var para = {};
+
+			showToast();
+			data[FILE_NAME] = {};
+			data[FILE_NAME]["email_test"] = para;
+			para[SENDER_NAME] = id("senderName").value;
+			para[SENDER_ADDR] = id("senderAddress").value;
+			para[RECEIVER_NAME] = listReceiver[index][RECEIVER_NAME];
+			para[RECEIVER_ADDR] = listReceiver[index][RECEIVER_ADDR];
+
+			if (id("emailType").value == "-1") //发送服务器为“其他”
+			{
+				para[SMTP_SERVER] = id("smtpServer").value;
+				para[SMTP_PORT] = id("smtpPort").value;
+			}
+			else if ("none" == id("encryptType").value)
+			{
+				para[SMTP_PORT] = "25";
+				para[SMTP_SERVER]  = smtpServer;
+			}
+			else
+			{
+				if (enabledStarttls.state == 0)
+				{
+					para[SMTP_PORT] = "465";
+				}
+				else
+				{
+					para[SMTP_PORT] = "25";
+				}
+				para[SMTP_SERVER] = smtpServer;
+			}
+
+			para[ENCRYPT_TYPE] = id("encryptType").value;
+			para[STARTTLS_ENABLED] = enabledStarttls.state == 0 ? SWITCH_OFF: SWITCH_ON;
+			para[SERVER_AUTH] = SWITCH_ON; //服务器认证默认开
+			if (pwdChgFlg)
+			{
+				para[ACCOUNT_PASSWD] = id("accountPasswd").value;
+			}
+			para[ACCOUNT_NAME] = id("senderAddress").value; //用户名默认跟发件人邮箱一致
+/*			if (serverAuth.state == 1)
+			{
+				para[ACCOUNT_NAME] = id("accountName").value;
+				if (pwdChgFlg)
+				{
+					para[ACCOUNT_PASSWD] = id("accountPasswd").value;
+				}
+			}*/
+
+			$.action(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+/*					closeToast();
+					if (result["result"] == "success")
+					{
+						showAlert("邮箱测试成功，请查收测试邮件!");
+					}
+					else
+					{
+						showAlert("邮箱测试失败!");
+					}*/
+					get_status_times = 0;
+					$.setTimeout(getTestStatus, 1000);
+				}
+			});
+		};
+
+		function tableInit()
+		{
+			list = {};
+
+			dataGridLs.init({
+				id:"recriverTbl",										// table ID
+				data:list,											// 数据源
+				hasID:true,
+				edit:true,
+				max:3,
+				head:[{field:label.receiverName, width:80},
+					  {field:label.receiverAddress, width:100},
+					  {field:"", width:50}],
+				list:[{name:RECEIVER_NAME},
+					  {name:RECEIVER_ADDR},
+					  {type:"btn", value:btn.test, className:"testLink", click:emailTest}],
+				popUpBar:{id:"tableEditCon", save:saveItem, cancel:function(type, index, handle){
+					detailConCFUM.style.height = "";
+					basicPHAutoFit();
+					handle(true);
+				}},
+				toolBar:{id:"recriverMgtUl", delSel:delItem, popUp:popUpHd, asyn:true}
+			});
+
+			showDetailCon();
+		}
+
+		function pwdChg()
+		{
+			id("accountpwdTipStr").style.display = "none";
+			pwdChgFlg = 1;
+		};
+
+		function changeMailType(value) {
+			if (value == "-1")
+			{
+				id("otherAddr").style.display = "";
+				id("otherPort").style.display = "";
+				id("accountpwdTipStr").style.top = "304px";
+			}
+			else
+			{
+				id("otherAddr").style.display = "none";
+				id("otherPort").style.display = "none";
+				id("accountpwdTipStr").style.top = "210px";
+				smtpServer = value;
+			}
+
+		}
+
+		function onBlur()
+		{
+			senderAddressCheck("senderAddress");
+			senderNameCheck("senderName");
+			smtpServerCheck("smtpServer");
+			smtpPortCheck("smtpPort");
+			//accountNameCheck("accountName");
+			pictureIntervalCheck("pictureInterval");
+			//pictureNumberCheck("pictureNumber");
+		}
+
+		function pageInit()
+		{
+//			initCheckInput("showInfo");
+			tableInit();
+			requestData(reloadTable);
+
+			id("senderAddress").onblur = onBlur;
+			id("senderName").onblur = onBlur;
+			id("smtpServer").onblur = onBlur;
+			id("smtpPort").onblur = onBlur;
+			//id("accountName").onblur = onBlur;
+			id("pictureInterval").onblur = onBlur;
+			//id("pictureNumber").onblur = onBlur;
+			id("senderAddress").onfocus = closeNoteAll;
+			id("senderName").onfocus = closeNoteAll;
+			id("smtpServer").onfocus = closeNoteAll;
+			id("smtpPort").onfocus = closeNoteAll;
+			//id("accountName").onfocus = closeNoteAll;
+			id("pictureInterval").onfocus = closeNoteAll;
+			//id("pictureNumber").onfocus = closeNoteAll;
+			id("accountPasswd").onblur = onBlur;
+			id("accountPasswd").onfocus = function(){
+				pwdChg();
+				closeNoteAll();
+			}
+		}
+
+		pageInit();
+		bindEvent();
+	}
+	init();
+</script>
+<style type="text/css">
+	div.authorityListCon{
+		color:#A0A0A0;
+		font-size:14px;
+		border:2px solid #404040;
+		padding:14px 14px 14px  14px;
+		margin:0 0 0 85px;
+		overflow:hidden;
+		*zoom:1;
+	}
+	div.authorityListCon h5{
+		margin-bottom:10px;
+	}
+	div.authorityListCon span{
+		float:left;
+		height:17px;
+		line-height:17px;
+		text-indent:26px;
+		width:70px;
+	}
+	div.authorityListCon input.text{
+		background:#404040 !important;
+	}
+	input.addItem{
+		position:absolute;
+		bottom:0px;
+	}
+	input.textTime{
+		border:1px solid #2e2e2e;
+		height:24px;
+		line-height:24px;
+		margin-right:12px;
+		width:40px;
+	}
+	input.testLink{
+		background:transparent;
+		color:#325FE0;
+		cursor:pointer;
+		font-size:13px;
+		border:none;
+		padding:0px;
+	}
+	span.depSpan{
+		font-size:14px;
+		color:#A0A0A0;
+		display:none;
+		vertical-align:middle;
+		margin-left:20px;
+	}
+	label.desECED{
+		font-size: 14px;
+		color: #A0A0A0;
+		line-height: 32px;
+		margin-left: 328px;
+		width: 85px;
+	}
+	ul.lineCon{
+		background:url(../../web-static/images/line.png) repeat-x 0px 10px;
+		clear:both;
+		padding-top:42px;
+		font-size:0px;
+	}
+	#accountpwdTipStr{
+		color:#707070;
+		font-size:13px;
+		left:158px;
+		line-height:30px !important;
+		position:absolute;
+		top:210px;
+	}
+	div.advanced{
+		text-align: right;
+		height: 22px;
+		margin-top: 40px;
+		width: 90px;
+	}
+	div.advanced label.desAdvanced{
+		float: left;
+		font-size:16px;
+		color:#7A8599;
+	}
+	div.advanced i.arrowUp{
+		float:right;
+		display:inline-block;
+		font-size:0px;
+		width:12px;
+		height:17px;
+		background:url(../../web-static/images/arrowUp.png) no-repeat 0 4px;
+		vertical-align:middle;
+/*		margin:10px 30px 10px 10px;*/
+		margin-top: 5px;
+	}
+	div.advanced i.arrowDown{
+		float:right;
+		display:inline-block;
+		font-size:0px;
+		width:12px;
+		height:17px;
+		background:url(../../web-static/images/arrowDown.png) no-repeat 0 4px;
+		vertical-align:middle;
+/*		margin:10px 30px 10px 10px;*/
+		margin-top: 5px;
+	}
+	ul.line label.desRecvList{
+		font-size:16px;
+		color:#7A8599;
+		margin-top: 32px;
+	}
+	ul.line li.lineF1{
+		margin-top: 5px;
+		margin-bottom: 5px;
+	}
+	ul.line li.lineD{
+		display: block;
+	}
+	div.actionTitleDiv{
+		margin-top: 30px;
+	}
+	div.tableCon{
+		*zoom:1;
+	}
+	ul.line label.desA{
+		font-size:13px;
+		line-height:32px;
+		width:128px;
+		text-align: right;
+		margin-right: 20px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line">
+		<div style="position:relative;*z-index:1;">
+			<li class="line lineD">
+				<label class="des desF">{%label.SMTPSer%}</label>
+				<span class="selCon">
+					<span id="emailType" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+				<!--			<input id="smtpServer" class="text textA1" maxlength="64" style="display: none; margin-left: 10px"/><i class="tip"></i>
+	                        <input id="smtpPort" class="text textA1" style="display: none; margin-left: 10px"/><i class="tip"></i>
+	                    <li class="line lineF">
+	                        <label class="des desD">{%label.SMTPPort%}</label>
+	                        <input id="smtpPort" class="text textA1"/><i class="tip"></i> -->
+			</li>
+		</div>
+		<li class="line lineD " id="otherAddr" style="display: none">
+			<label class="des desF">{%label.srvAddr%}</label>
+			<input id="smtpServer" class="text textA1" maxlength="64"/><i class="tip"></i>
+		</li>
+		<li class="line lineD" id="otherPort" style="display: none">
+			<label class="des desF">{%label.serverPort%}</label>
+			<input id="smtpPort" class="text textA1"/><i class="tip"></i>
+		</li>
+		<li class="line lineD">
+			<label class="des desF">{%label.senderName%}</label>
+			<input id="senderName" class="text textA1" maxlength="32"/><i class="tip"></i>
+		</li>
+		<li class="line lineD">
+			<label class="des desF">{%label.senderAddress%}</label>
+			<input id="senderAddress" class="text textA1" maxlength="64"/><i class="tip"></i>
+		</li>
+<!--		<li class="line lineF">
+			<label id="serverAuthDes" class="des desD">{%label.serverAuth%}</label>
+			<div id="serverAuth" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+		<li id="accountNameTbl" class="line lineF" style="display: none;">
+			<label class="des desD">{%label.accountName%}</label>
+			<input id="accountName" class="text textA1" maxlength="32"/><i class="tip"></i>
+		</li> -->
+		<li id="accountPasswdTbl" class="line lineD">
+			<label class="des desF">{%label.accountPasswd%}</label>
+			<input id="accountPasswd" type="password" class="text textA1" maxlength="63"/>
+			<label id="accountpwdTipStr" for="accountPasswd">●●●●●●</label>
+		</li>
+	</ul>
+	<ul class="line">
+		<li class="line">
+			<label class="des desRecvList">{%label.receiverList%}</label>
+		</li>
+	</ul>
+	<ul class="line lineCon"></ul>
+	<div id="detailConCFUM">
+		<div class="tableCon">
+			<div class="tableBorderCon"><table id="recriverTbl" class="dataGrid"></table></div>
+			<ul id="recriverMgtUl" class="gridToolBar">
+				<li gridType="popUp">{%btn.add%}</li>
+				<li gridType="delSel">{%btn.deleteSel%}</li>
+			</ul>
+			<div id="tableEditCon" class="tableEditLyCon">
+				<div class="tableEditCon tableEditConA">
+					<div class="innerCon">
+						<h4 class="title">{%label.addReceiver%}</h4>
+						<i id="closeTip"></i>
+						<ul class="line">
+							<li class="line lineF1">
+								<label class="des desA" for="serverAddr">{%label.receiverName%}</label>
+								<input id="receiverName" class="text textA3" maxLength="32" />
+							</li>
+							<li class="line lineF1">
+								<label class="des desA" for="serverAddr">{%label.receiverAddress%}</label>
+								<input id="receiverAddress" class="text textA3" maxLength="32" />
+							</li>
+						</ul>
+						<div class="tablePopUpToolBar tablePopUpToolBarA"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="actionTitleDiv" id="advanced">
+		<label class="actionTitle">{%label.advancedCfg%}</label>
+		<i class="arrowDown" id="advancedArrow"></i>
+	</div>
+
+	<!--<div class="advanced" id="advanced">
+		<label class="desAdvanced">高级参数</label>
+		<i class="arrowDown" id="advancedArrow"></i>
+	</div> -->
+	<div id="advancedParaDetail" style="display: none">
+		<ul class="line">
+			<li class="line lineD">
+				<label class="des desF">{%label.encryptType%}</label>
+			<span class="selCon">
+				<span id="encryptType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			</li>
+			<li class="line lineD">
+				<label id="enabledStarttlsDes" class="des desF">{%label.enabledStarttls%}</label>
+				<div id="enabledStarttls" class="switchCon">
+					<i class="switchBg"></i>
+					<i class="switchBall"></i>
+				</div>
+				<label class="des desH">ON</label>
+			</li>
+			<li class="line lineD">
+				<label id="pictureAccessoriesDes" class="des desF">{%label.pictureAccessories%}</label>
+				<div id="pictureAccessories" class="switchCon">
+					<i class="switchBg"></i>
+					<i class="switchBall"></i>
+				</div>
+				<label class="des desH">ON</label>
+			</li>
+			<li id="pictureIntervalTbl" class="line lineD">
+				<label class="des desF">{%label.pictureInterval%}</label>
+				<span class="selCon">
+				<span id="pictureInterval" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+<!--				<input id="pictureInterval" class="text textTime" maxlength="2"/><i class="tip"></i>
+				<span class="tip">{%label.second%}</span> -->
+
+			</li>
+			<!--		<li id="pictureNumberTbl" class="line lineF">
+                        <label class="des desD">{%label.pictureNumber%}</label>
+                        <input id="pictureNumber" class="text textTime" maxlength="2"/><i class="tip"></i>
+                    </li>-->
+		</ul>
+	</div>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>

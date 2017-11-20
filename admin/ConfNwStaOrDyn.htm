@@ -1,0 +1,68 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var proV = uciProto.optValue;
+		var dynIp = DEF_WAN_T = proV.proto.dynIp;
+		var staticIp = proV.proto.staticIp;
+		var pppoe = proV.proto.pppoe;
+		var $wanCon = $("#wanCon");
+		var urlArr = {
+			dynIp:"DynamicIp.htm",
+			staticIp:"StaticIp.htm",
+			pppoe:"PPPoE.htm"
+		};
+
+		function wanSel(val)
+		{
+			if (val == dynIp)
+			{
+				loadPage(urlArr.dynIp, "wanCon");
+			}
+			else if (val == staticIp)
+			{
+				loadPage(urlArr.staticIp, "wanCon");
+			}
+			else if (val == pppoe)
+			{
+				loadPage(urlArr.pppoe, "wanCon");
+			}
+		}
+
+		function fillForm(data)
+		{
+			var wanStatus = data[uciNetwork.fileName][uciNetwork.dynData.wanStatus];
+
+			wanSel(wanStatus["proto"]);
+		}
+
+		function getConfig()
+		{
+			var data = {};
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+
+			$.query(data, function(resp){
+				if (resp[ERR_CODE] == ENONE)
+				{
+					fillForm(resp);
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			if (true == $.local)
+			{
+				wanSel(DEF_WAN_T);
+			}
+			else
+			{
+				getConfig();
+			}
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<div id="wanCon"></div>

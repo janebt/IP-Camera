@@ -1,0 +1,861 @@
+<style type="text/css">
+    /* ----------------plan edit -------- */
+    label.peRowNo{
+        width:30px;
+        color:#a0a0a0;
+        font-size:14px;
+        text-align: center;
+        vertical-align:middle;
+        display:inline-block;
+        *display:inline;
+        *zoom:1;
+    }
+    input.peTextA{
+        border:2px solid #2E2E2E;
+        width:200px;
+        text-align: center;
+        text-indent:0px;
+    }
+    div.peCol span.select{
+        font-size:0px !important;
+    }
+    span.peSelect{
+        width:124px !important;
+        _width:116px !important;
+        font-size:14px !important;
+    }
+    label.peLabel{
+        color:#a0a0a0;
+        font-size:14px;
+        text-align: center;
+        margin:0 20px 0 8px;
+        display:inline-block;
+        *display:inline;
+        *zoom:1;
+    }
+
+    /* ----------------plan set---------- */
+    #recPlanGrid{
+        width:700px;
+        clear: both;
+        margin: 20px 0px 40px 20px;
+    }
+
+    #orgDC{
+        width:662px;
+    }
+    .displayNone{
+        display:none !important;
+    }
+
+    /* ----------------类型选择---------- */
+    i.peTypeRd
+    {
+        width:25px !important;
+        height:25px !important;
+    }
+    i.timeSeled
+    {
+        background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+    }
+    i.timeUnSeled
+    {
+        background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+    }
+    i.mdtUnSeled
+    {
+        background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+    }
+    i.mdtSeled
+    {
+        background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+    }
+    #timingLabel{
+        margin-right:35px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    #mdtLabel{
+        margin-right:347px;
+        *margin-right:340px;
+        display: inline-block;
+        *display: inline;
+        *zoom:1;
+    }
+    label.typeSeled{
+        color:#fff !important;
+    }
+    /* ----------------plan cpy---------- */
+    #pcSelAll{
+        margin-left:209px;
+    }
+    #pcCancel{
+        margin-left:115px;
+    }
+    #pcSave{
+        margin-left: 12px;
+    }
+
+    div.peCon{
+        position:absolute;
+        box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+        width:661px;
+        height:650px;
+        border-radius: 14px;
+        background-color: #252525;
+        z-index:2;
+        left:48px;
+        top:480px;
+    }
+    div.peCon div.peConDetail div.peCol2{
+        width:200px;
+        margin-left:21px;
+    }
+    div.peCon div.peConDetail div.peCol3{
+        width:200px;
+        margin-left:30px;
+    }
+    div.peCon div.peConDetail div.peCol4{
+        display: none;
+    }
+    div.peCon div.peConDetail div.peCol5{
+        width:50px;
+        margin-left:30px;
+        _padding-top:5px;
+    }
+
+    /* ----------------others---------- */
+    div.menuLessHT{
+        width:720px;
+        padding:0 0 20px;
+        margin-top: 30px !important;
+    }
+
+    ul.combineL{
+        height:32px;
+        margin-bottom:20px;
+        width:720px;
+    }
+
+    ul.line li.tl1{
+        width:30%;
+    }
+
+    ul.line li.tl2{
+        width:70%;
+        text-align: right;
+    }
+
+    li.ml1{
+        width:40%;
+    }
+
+    li.ml2{
+        width:46.39%;
+        text-align: right;
+    }
+
+    li.ml3{
+        width: 13.61%;
+        text-align: right;
+    }
+
+    ul.line {
+        font-size: 0px;
+        list-style: none;
+        width: 720px;
+    }
+    ul.lineBottom{
+        margin-bottom: 45px;
+    }
+    ul.line label.desA1{
+        font-size:14px;
+        color:#A0A0A0;
+        line-height:32px;
+        width:145px;
+        margin-left: 10px;
+    }
+    .vedioActiveX{
+        display:block;
+        height:405px;
+        width:720px;
+        margin-bottom:20px;
+    }
+    ul.line li.lineR{
+        display:inline-block;
+        *display:inline;
+        *zoom:1;
+        height:100%;
+        font-size:0px;
+        vertical-align:middle;
+        float: right;
+    }
+</style>
+
+
+<script type="text/javascript">
+   function init()
+    {
+        function errorHandle(code, objOrId)
+        {
+            var showStr = "";
+
+            switch(parseInt(code))
+            {
+            case ENONE:
+                return true;
+            case EINVARG:
+                showStr = errStr.IPCParamInvalid;
+                break;
+            case IPCODENABLEERR:
+                showStr = errStr.odEnErr;
+                break;
+            case IPCODOSDENABLEERR:
+                showStr = errStr.odNumEnErr;
+                break;
+            case IPCODREGIONEILLEGAL:
+                showStr = errStr.odRegionErr;
+                break;
+            case IPCOSDCOORERR:
+                showStr = errStr.paraErr;
+                break;
+            case IPCODREGIONDIRERR:
+                showStr = errStr.odRegionDirErr;
+                break;
+            case IPCUBUSCONNFAIL:
+                showStr = errStr.ipcUbusConnFail;
+                break;
+            case IPCUBUSCALLERR:
+                showStr = errStr.ipcUbusCallErr;
+                break;
+            case IPCARMINGSCHEDULEEOVERFLOW:
+                showStr = errStr.armingScheduleOverflow;
+                break;
+            case IPCARMINGSCHEDULEMIX:
+                showStr = errStr.armingScheduleMix;
+                break;
+            case IPCARMINGSCHEDULEILLEGAL:
+                showStr = errStr.armingScheduleIllegal;
+                break;
+            case IPCUMGUESTNAUTH:
+                showStr = errStr.invPermissionDenied;
+                break;
+            default:
+                showStr = errStr.invRequestFail;
+                break;
+            }
+
+            closeToast();
+            showAlert(showStr, objOrId);
+            return false;
+        }
+
+        /* 获取选中状态 */
+        function getChecked(idObj)
+        {
+            if (null != id(idObj).getAttribute("checked") &&
+                "true" == id(idObj).getAttribute("checked").toString())
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /* 设置选中状态 */
+        function setChecked(checkId, checkValue)
+        {
+            var chkVal = ENABLED_ON == checkValue ? true : false;
+            changeCheckInput(checkId, chkVal);
+        }
+
+        function toolArrToString(arr, maxLen)
+        {
+            var res, i, str;
+            var tvArr;
+            var bt;
+            var et;
+
+            if (arr == undefined)
+            {
+                return "";
+            }
+            if (maxLen == undefined)
+            {
+                maxLen = 6;
+            }
+            res = "[";
+            if (arr.length < 1)
+            {
+                res += "\"0000-0000:0\"";
+            }
+            else
+            {
+                for (i = 0; i < arr.length && i < maxLen; i++)
+                {
+                    str = arr[i].toString();
+                    tvArr = str.split(/[-,:]/, 3);
+                    bt = parseInt(tvArr[0], 10);
+                    et = parseInt(tvArr[1], 10);
+                    str = recPlanGrid._getStringWithoutType(bt, et);
+
+                    if (i > 0)
+                    {
+                        res += ",";
+                    }
+
+                    res += ("\"" + str + "\"");
+                }
+            }
+            res += "]";
+            return res;
+        }
+
+        function addType(strTimeVal) {
+            var curTV;
+            var res = new Array();
+
+            if (strTimeVal == undefined)
+            {
+                curTV = "\"0000-0000:1\"";
+                res.push(curTV);
+
+                return res;
+            }
+
+            if (!(strTimeVal instanceof Array))
+            {
+                strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+            }
+
+            for (var i = 0; i < strTimeVal.length; i++)
+            {
+                curTV = strTimeVal[i];
+                var tvArr = curTV.split(/[-]/, 2);
+                var bt = parseInt(tvArr[0], 10);
+                var et = parseInt(tvArr[1], 10);
+                res.push(recPlanGrid._getString(bt, et, 1));
+            }
+
+            return res;
+        }
+
+        function saveArmingSchedule()
+        {
+            var i;
+            var res = recPlanGrid.getTimeVal();
+
+            var data = {};
+            for (i = 0; i < weekArray.length; i++)
+            {
+                data[uciDays[i]] = toolArrToString(res[weekArray[i]]);
+            }
+
+            return data;
+        }
+
+        function setCrossRange(secObj)
+        {
+            var lineArray = formatTableData(secObj);
+
+            for (var index in lineArray)
+            {
+                var item = lineArray[index];
+                plugin.showOverLineDetInfo({pt1_x:item[PT1_X], pt1_y:item[PT1_Y], pt2_x:item[PT2_X], pt2_y:item[PT2_Y],direction:item[DIRECT]});
+            }
+        }
+
+        function getCrossRange()
+        {
+            var lineArray = [];
+            var item, tmpObj;
+            var len = 0;
+
+            item = plugin.getOverLineDetInfo(0);
+
+            if (0 <= item.pt1_x)
+            {
+                tmpObj = {};
+                tmpObj[PT1_X] = item.pt1_x;
+                tmpObj[PT1_Y] = item.pt1_y;
+                tmpObj[PT2_X] = item.pt2_x;
+                tmpObj[PT2_Y] = item.pt2_y;
+                tmpObj[DIRECT] = directionValue;
+                lineArray[len++] = tmpObj;
+            }
+
+            return lineArray;
+        }
+
+        /*选中区域后进行相关操作*/
+        function invasionCallback()
+        {
+            plugin.intelligentCallback(function(result){
+                switch(parseInt(result))
+                {
+                    case 0:
+                        num = 0;
+                        id("lineName").innerHTML = label.lineOne;
+                        break;
+                    case 1:
+                        num = 1;
+                        id("lineName").innerHTML = label.lineTwo;
+                        break;
+                    case 2:
+                        num = 2;
+                        id("lineName").innerHTML = label.lineThree;
+                        break;
+                    case 3:
+                        num = 3;
+                        id("lineName").innerHTML = label.lineFour;
+                        break;
+                }
+
+                directionValue = (directionValue == null) ? $("#directionSel"+" span.value")[0].value : directionValue;
+                $("#directionSel")[0].resetSel(directionValue);
+            });
+        }
+
+        function saveHandle()
+        {
+            var i;
+            var reqData = {};
+            var lineData = {};
+            var res = recPlanGrid.getTimeVal();
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][DET] = {};
+            reqData[FILE_NAME][RECORD_PLAN] = {};
+
+            reqData[FILE_NAME][DET][ENABLED] = overLineSwitch.state  == 1 ? ENABLED_ON : ENABLED_OFF;
+
+            gOlNumEnabled =  getChecked("olNumEnabled") ? ENABLED_ON : ENABLED_OFF;
+            reqData[FILE_NAME][DET][OSD_ENABLED] = gOlNumEnabled;
+
+            xCoor = plugin.getOsdPosition(0).x;
+            yCoor = plugin.getOsdPosition(0).y;
+            reqData[FILE_NAME][DET][X_COOR] = xCoor;
+            reqData[FILE_NAME][DET][Y_COOR] = yCoor;
+
+            reqData[FILE_NAME][RECORD_PLAN] = saveArmingSchedule();
+
+            showToast();
+
+            $.modify(reqData, function(result)
+            {
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    directionValue = (directionValue == null) ? $("#directionSel"+" span.value")[0].value : directionValue;
+
+                    lineData[FILE_NAME] = {};
+                    lineData[FILE_NAME][ADD_OL_REGIONS] = {};
+                    lineData[FILE_NAME][ADD_OL_REGIONS][REGION_INFO] = getCrossRange();
+                    $.action(lineData, function(result)
+                    {
+                        if (true == errorHandle(result[ERR_CODE]))
+                        {
+                            showToast("success");
+                        }
+                    });
+                }
+            });
+        }
+
+        function selDirection(val)
+        {
+            switch (val)
+            {
+                case "right":
+                    directionValue = "right";
+                    break;
+                case "left":
+                    directionValue = "left";
+                    break;
+                default:
+                    break;
+            }
+
+            plugin.changeDetectDirect(0,directionValue);
+        }
+
+        /* 删除当前选中界线 */
+        function delBorderDetRange()
+        {
+            showConfirmIpc(label.delOLNumConfirmIpc, function(choose)
+            {
+                if (true == choose)
+                {
+                    clearBorderDetRange();
+
+                    var reqData = {}, module = {};
+
+                    reqData[FILE_NAME] = {};
+                    module = reqData[FILE_NAME][CLEAN_OL_NUM] = null;
+
+                    showToast("loading");
+                    $.action(reqData, function(data){
+                        if (errorHandle(data[ERR_CODE]))
+                        {
+                            showToast("success");
+                        }
+                    });
+                }
+            });
+        }
+
+        /* 删除所有界线 */
+        function clearBorderDetRange()
+        {
+            plugin.delOverLineDetInfo(PLUGIN_STATE_MINUS);
+            directionValue = null;
+        }
+
+        /* 清空过线人数 */
+        function clearOverLineNum()
+        {
+            showConfirmIpc(label.cleanOLNumConfirmIpc, function(choose)
+            {
+                if (true == choose)
+                {
+                    var reqData = {}, module = {};
+
+                    reqData[FILE_NAME] = {};
+                    module = reqData[FILE_NAME][CLEAN_OL_NUM] = null;
+
+                    showToast("loading");
+                    $.action(reqData, function(data)
+                    {
+                        if (errorHandle(data[ERR_CODE]))
+                        {
+                            showToast("success");
+                        }
+                    });
+                }
+            });
+        }
+
+        function showArmingSchedule()
+        {
+            var i;
+            var data = {};
+
+            data[FILE_NAME] = {};
+            data[FILE_NAME][NAME] = RECORD_PLAN;
+            $.query(data, function(resp)
+            {
+                if (true == errorHandle(resp[ERR_CODE]))
+                {
+                    recPlanGrid.reset();
+                    for (i = 0; i < weekArray.length; i++)
+                    {
+                        recPlanGrid.setTimeVal(weekArray[i], addType(resp[FILE_NAME][RECORD_PLAN][uciDays[i]]));
+                    }
+                }
+            });
+        }
+
+        function onRecordHide()
+        {
+            if (!bRecordPlanShow)
+            {
+                id("recordHide").innerHTML= label.arrowUp;
+                id("recordArrow").className ="arrowUp";
+                armingSchedule.style.display = "";
+                bRecordPlanShow = true;
+            }
+            else
+            {
+                id("recordHide").innerHTML= label.arrowDown;
+                id("recordArrow").className ="arrowDown";
+                armingSchedule.style.display = "none";
+                bRecordPlanShow = false;
+            }
+        }
+
+        /* 获取OSD信息 */
+        function getOSDFontInfo(callBack)
+        {
+            var reqData = {};
+            reqData[uciOsd.fileName] = {};
+            reqData[uciOsd.fileName][NAME] = uciOsd.secName.font;
+
+            $.query(reqData, function(result){
+                if (ENONE == result[ERR_CODE])
+                {
+                    callBack(result);
+                }
+            });
+        }
+
+        function handleShow()
+        {
+
+            getOSDFontInfo(function(result){
+                var fontCfg = {}, dateCfg = {};
+
+                fontCfg[uciOsd.optName.size] = result[uciOsd.fileName][uciOsd.secName.font][uciOsd.optName.size];
+                fontCfg[uciOsd.optName.color] = result[uciOsd.fileName][uciOsd.secName.font][uciOsd.optName.color];
+
+                dateCfg[uciOsd.optName.xCoor] = xCoor;
+                dateCfg[uciOsd.optName.yCoor] = yCoor;
+
+                dateCfg[uciOsd.optName.text] = label.showOlNumInPreview;
+
+                if (getChecked("olNumEnabled"))
+                {
+                    dateCfg[uciOsd.optName.enabled] = ENABLED_ON;
+                    plugin.setOSD(0, dateCfg, fontCfg);
+                }
+                else
+                {
+                    dateCfg[uciOsd.optName.enabled] = ENABLED_OFF;
+                    plugin.setOSD(0, dateCfg, fontCfg);
+                }
+            });
+        }
+
+        function overLineSwitchHd(state) {
+            var hideobj = document.getElementById("hidebg");
+
+            if(0 == state)
+            {
+                plugin.setOSDStatus(0);
+                hideobj.style.display = "block";
+                $("div.tableDiv").css({"z-index":"-1"}); /* IE6/7兼容 */
+                $('#olNumEnabled').attr("disabled","disabled");
+
+                var saveHeight = getoffset(id("save")).top - getoffset(id("videoPluginCon")).top;
+
+                if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+                {
+                    hideobj.style.height = saveHeight + "px";
+                }
+                else
+                {
+                    var peConHeight = getoffset(id("peCon")).top - getoffset(id("videoPluginCon")).top + id("peCon").offsetHeight;
+                    hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+                }
+            }
+            else
+            {
+                plugin.setOSDStatus(1);
+                hideobj.style.display = "none";
+                $("div.tableDiv").css({"z-index":"0"});
+                $('#olNumEnabled').attr("disabled",false);
+            }
+        }
+
+        function getConfig()
+        {
+            enable = 0;
+            var reqData = {};
+
+            reqData[FILE_NAME] = {};
+            reqData[FILE_NAME][NAME] = DET;
+            reqData[FILE_NAME][KEY_TABLE] = [REGION_INFO];
+
+            $.query(reqData, function(result)
+            {
+                if (true == errorHandle(result[ERR_CODE]))
+                {
+                    if (true == $.local)
+                    {
+                        overLineSwitch = new Switch("overLineSwitch", 0, overLineSwitchHd);
+                        return;
+                    }
+
+                    switchState = result[FILE_NAME][DET][ENABLED];
+                    enable = (switchState == ENABLED_ON) ? 1 : 0;
+                    overLineSwitch = new Switch("overLineSwitch", enable, overLineSwitchHd);
+                    plugin.setOSDStatus(enable);
+
+                    gOlNumEnabled = result[FILE_NAME][DET][OSD_ENABLED];
+                    enable = (gOlNumEnabled == ENABLED_ON) ? 1 : 0;
+                    setChecked(olNumEnabled, gOlNumEnabled);
+                    xCoor = result[FILE_NAME][DET][X_COOR];
+                    yCoor = result[FILE_NAME][DET][Y_COOR];
+
+                    getOSDFontInfo(function(result){
+                        var fontCfg = {}, dateCfg = {};
+
+                        fontCfg[uciOsd.optName.size] = result[uciOsd.fileName][uciOsd.secName.font][uciOsd.optName.size];
+                        fontCfg[uciOsd.optName.color] = result[uciOsd.fileName][uciOsd.secName.font][uciOsd.optName.color];
+
+                        dateCfg[uciOsd.optName.xCoor] = xCoor;
+                        dateCfg[uciOsd.optName.yCoor] = yCoor;
+                        dateCfg[uciOsd.optName.text] = label.showOlNumInPreview;
+                        dateCfg[uciOsd.optName.enabled] = gOlNumEnabled;
+
+                        plugin.setOSD(0, dateCfg, fontCfg);
+                    });
+
+                    /* 方向 区域 */
+                    secObj = result[FILE_NAME][REGION_INFO];
+                    setCrossRange(secObj);
+
+                    var regionArray = formatTableData(secObj);
+
+                    if(0 != regionArray.length)
+                    {
+                        directionValue = regionArray[0][DIRECT];
+                    }
+                    else
+                    {
+                        directionValue = "left";
+                    }
+
+                    selectInit("directionSel", [{str:label.toRight, value:'right'},
+                        {str:label.toLeft, value:'left'}], directionValue, selDirection);
+
+                    selDirection();
+                    showDetailCon();
+                }
+            });
+        }
+
+        function pageInit()
+        {
+            //init plugin
+            plugin = new Plugin({id:"videoPluginCon", className:"vedioActiveX", readyHd:function(arg)
+            {
+                if (PLUGIN_STATE_ON == arg &&  true == bFirstReady)
+                {
+                    bFirstReady = false;
+                    plugin.setOverLineDetState(1);
+                    getConfig();
+                }
+            }});
+
+            initCheckInput("Enabled", function(checked, index)
+            {
+                handleShow();
+            });
+
+            plugin.playVideo();
+
+            //init plan
+            recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+            showArmingSchedule();
+        }
+
+        var FILE_NAME = uciOverLineDetection.fileName;
+        var DET = uciOverLineDetection.secName.det;
+        var RECORD_PLAN = uciOverLineDetection.secName.defenceTime;
+        var REGION = uciOverLineDetection.secName.region;
+        var REGION_INFO = uciOverLineDetection.secType.regionInfo;
+        var ENABLED = uciOverLineDetection.optName.enabled;
+        var OSD_ENABLED = uciOverLineDetection.optName.osdEnabled;
+
+        var X_COOR = uciOverLineDetection.optName.xCoor;
+        var Y_COOR = uciOverLineDetection.optName.yCoor;
+
+        var DIRECT = uciOverLineDetection.optName.direct;
+        var PT1_X = uciOverLineDetection.optName.pt1x;
+        var PT1_Y = uciOverLineDetection.optName.pt1y;
+        var PT2_X = uciOverLineDetection.optName.pt2x;
+        var PT2_Y = uciOverLineDetection.optName.pt2y;
+        var ENABLED_ON = uciOverLineDetection.optValue.enableVal.on;
+        var ENABLED_OFF = uciOverLineDetection.optValue.enableVal.off;
+        var ADD_OL_REGIONS = uciOverLineDetection.actionName.addOlRegions;
+        var CLEAN_OL_NUM = uciOverLineDetection.actionName.cleanOlNum;
+
+
+        var olNumEnabled = id("olNumEnabled");
+        var DEF_OL_NUM_ENABLED = ENABLED_OFF;
+        var gOlNumEnabled = DEF_OL_NUM_ENABLED;
+
+        var enable, secObj;
+        var bFirstReady = true;
+        var overLineSwitch = null;
+        var switchState;
+
+        var xCoor;
+        var yCoor;
+
+        var plugin = null;
+        var num = 0;//警戒线编号
+        var directionValue;
+
+        var bRecordPlanShow = false;
+
+        var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+        var uciDays = [uciOverLineDetection.optName.mon, uciOverLineDetection.optName.tue, uciOverLineDetection.optName.wed, uciOverLineDetection.optName.thu, uciOverLineDetection.optName.fri, uciOverLineDetection.optName.sat, uciOverLineDetection.optName.sun];
+        var recPlanGrid;
+
+        pageInit();
+
+        id("save").onclick = saveHandle;
+        id("clearNum").onclick = clearOverLineNum;
+        id("del").onclick = delBorderDetRange;
+        id("clearAll").onclick = function(event)
+        {
+            recPlanGrid.reset();
+        };
+        id("recordHide").onclick = onRecordHide;
+        id("recordArrow").onclick = onRecordHide;
+    }
+    init();
+</script>
+
+<div class="menuLessHT">
+    <ul class="line combineL">
+        <li class="line tl1">
+            <label class="des desA">{%label.overlineDet%}</label>
+            <div id="overLineSwitch" class="switchCon switchConHs">
+                <i class="switchBg"></i>
+                <i class="switchBall"></i>
+            </div>
+        </li>
+        <li class="line tl2">
+            <i name="Enabled" id="olNumEnabled" value="0"></i>
+            <label class="des desA1">{%label.showOlNum%}</label>
+        </li>
+    </ul>
+    <div style="position:relative;*z-index:1;">
+        <div id="hidebg"></div>
+    </div>
+    <div id="videoPluginCon"></div>
+
+    <ul class="line lineBottom">
+        <li class="line ml1">
+            <label class="des desA">{%label.overlineDirect%}</label>
+            <span class="selCon">
+                <span id="directionSel" class="select">
+                    <span class="value hsValueA"></span>
+                    <i class="arrow"></i>
+                </span>
+            </span>
+        </li>
+        <li class="line ml2">
+            <input id="clearNum" type="button" class="subBtn btnA" value="{%label.overlineClean%}" />
+        </li>
+        <li class="line ml3">
+            <input id="del" type="button" class="subBtn btnA" value="{%btn.del%}" />
+        </li>
+    </ul>
+
+    <div class="actionBarDiv">
+        <div class="actionTitleDiv">
+            <label class="actionTitle">{%label.defenceTime%}</label>
+            <label class="action" id="recordHide">{%label.arrowDown%}</label>
+            <i class="arrowDown" id="recordArrow"></i>
+        </div>
+        <div class="armingSchedule" id="armingSchedule" style="display: none">
+            <ul class="line">
+                <li class="line">
+                    <label class="tips">{%label.overlineTips%}</label>
+                </li>
+                <li class="lineR">
+                    <i class="clearAll" id="clearAll"></i>
+                    <label class="clearAllLabel">{%label.clear%}</label>
+                </li>
+            </ul>
+            <div id="recPlanGrid" class="test"></div>
+        </div>
+    </div>
+
+    <div class="funcBtnCon">
+        <input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+    </div>
+</div>

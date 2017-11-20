@@ -1,0 +1,1153 @@
+<script type="text/javascript">
+	function init()
+	{
+		var list = [];
+		var listAdmin, listGuest;
+		var dataGridLs = new DataGrid();
+		var tableEditCon = id("tableEditCon");
+		var userConfH4, userGroupSel, pwdSetConUls, authorityListCon;
+		var userName, chgPwd, password, oldPwd, authCheckList, grpOpt;
+		var newPwd, confPwd, remark, chgPwdUl, oldPwdLi;
+		var authList = [
+			{str:menuStr.preview, url:"", id:"", value:""},
+			{str:menuStr.review, url:"", id:"", value:""},
+			{str:menuStr.tool, url:"", id:"", value:""},
+			{str:menuStr.camera, url:"", id:"", value:""},
+			{str:menuStr.event, url:"", id:"", value:""},
+			{str:menuStr.storage, url:"", id:"", value:""},
+			{str:menuStr.network, url:"", id:"", value:""},
+			{str:menuStr.cloudService, url:"", id:"", value:""},
+			{str:menuStr.system, url:"", id:"", value:""}
+		];
+		var guestAuthList = [{str:menuStr.preview, url:"", id:"", value:""}];
+		var ADD = "add";
+		var EDIT = "edit";
+		var groupOption = [{str:label.root, value:GROUP_ROOT}, {str:label.operator, value:GROUP_ADMIN}, {str:label.normalUser, value:GROUP_GUEST}];
+		var groupOptionS = [{str:label.operator, value:GROUP_ADMIN}, {str:label.normalUser, value:GROUP_GUEST}];
+		var detailCon = $("div.detailCon");
+		var UCI_FILE = uciUserMgt.fileName;
+		var UCI_OPT = uciUserMgt.optName;
+		var USER_NAME = UCI_OPT.username;
+		var USER_PWD = UCI_OPT.passwd;
+		var CIPHERTEXT = UCI_OPT.ciphertext;
+		var USER_OLD_PWD = UCI_OPT.oldPasswd;
+		var USER_SECNAME = UCI_OPT.secName;
+		var USER_COMMENT = UCI_OPT.comment;
+		var USER_GROUP = GROUP = UCI_OPT.group;
+		var ROOT_TYPE = uciUserMgt.secType.root;
+		var ADMIN_TYPE = uciUserMgt.secType.admin;
+		var GUEST_TYPE = uciUserMgt.secType.guest;
+		var USER_MGT = uciUserMgt.actionName.userMgt;
+		var CHG_USER_INFO = uciUserMgt.actionName.chgUsrInfo;
+		var CUR_USR_INFO = uciUserMgt.optValue.curUsrInfo;
+		var ROOT_NAME = $.rootName;
+		var table = id("userTbl");
+		var detailConCFUM = id("detailConCFUM");
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCUMUSREXIST:
+				showStr = errStr.invUserNameExist;
+				break;
+			case IPCUMUSRNAUTH:
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCUMOLDPWDERR:
+				showStr = errStr.invOldPwdErr;
+				break;
+			case IPCUMUSRNAMEINV:
+				showStr = errStr.invUserNameValid;
+				break;
+			case IPCUMUSRBLANK:
+			case IPCUMUSRNAMELTM:
+			case IPCUMUSRNAMEGTM:
+				showStr = errStr.invUserNameLen;
+				break;
+			case IPCUMTABFULL:
+				showStr = errStr.invUserMgtGroupFull;
+				break;
+			case ETABLEFULL:
+				showStr = errStr.invUserMgtChgGroupFull;
+				break;
+			case IPCUMINFOERR:
+			case IPCUMGUESTGERR:
+			case IPCUMSECERR:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function externHd()
+		{
+			if ($.group == GROUP_ROOT)
+			{
+				table.rows[1].cells[0].innerHTML = "";
+			}
+		}
+
+		function groupSelHandle(value)
+		{
+			if (value == GROUP_ROOT || value == GROUP_ADMIN)
+			{
+				authCheckList.each(function(index){
+					this.style.background = 'url("../web-static/images/checked.png") no-repeat 7px 4px';
+				});
+			}
+			else
+			{
+				authCheckList.each(function(index){
+					this.style.background = '';
+				});
+				authCheckList[0].style.background = 'url("../web-static/images/checked.png") no-repeat 7px 4px';
+			}
+		}
+
+		function chkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+
+		function pwdBlur(idStr)
+		{
+			var pwd = id(idStr);
+			var len = pwd.value.length;
+
+			if (len >= 0 && len < 6)
+			{
+				showNote(idStr, label.chgPwdChar);
+				window.setTimeout(function(){pwd.focus()}, 0);
+			}
+			else if (!chkPswVal(pwd.value))
+			{
+				showNote(idStr, errStr.pwdCharValid);
+				window.setTimeout(function(){pwd.focus()}, 0);
+			}
+		}
+
+		function pwdCheckMixChars(str)
+		{
+			var hasNum = false;
+			var hasLetter = false;
+			var hasSymbol = false;
+
+			hasNum = /\d/g.test(str);
+			hasLetter = /[a-zA-Z]/g.test(str);
+			hasSymbol = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]/g.test(str);
+
+			return hasNum&&hasSymbol&&hasLetter;
+		}
+
+		function pwdConfFocus(depId)
+		{
+			id(depId).style.display = "none";
+		}
+
+		function pwdConfCheck(confId, pwdId, depId)
+		{
+			var pwdConf = id(confId);
+			var pwd = id(pwdId);
+
+			pwdConfFocus(depId);
+
+			if (pwdConf.value == pwd.value)
+			{
+				closeNote(confId);
+				return true;
+			}
+			else
+			{
+				showNote(confId, label.chgPwdDif);
+				return false;
+			}
+		}
+
+		function userNameCheck(idStr)
+		{
+			var user = id(idStr);
+			var userValue = user.value;
+			var len = userValue.length;
+			var result = true;
+
+			//closeNoteAll();
+
+			if (len > 32 || len <= 0)
+			{
+				showNote(idStr, errStr.invUserNameLen);
+				result = false;
+			}
+			else if (!chkPswVal(userValue))
+			{
+				showNote(idStr, errStr.invUserNameValid);
+				result = false;
+			}
+
+			return result;
+		}
+
+		function pwdCheck(idStr, depId, depDeId)
+		{
+			var tip = "";
+			var pwd = id(idStr);
+			var dep = id(depId);
+			var depDe = id(depDeId);
+			var pwdValue = pwd.value;
+			var len = pwdValue.length;
+			var result = true;
+			var lgPwdInVal = false;
+			var lgPwdless = false;
+
+			//closeNoteAll();
+
+			if (len >= 0 && len < 6 || len > 32)
+			{
+				showNote(idStr, label.chgPwdChar);
+				dep.style.display = "none";
+				result = false;
+			}
+			else if (!chkPswVal(pwdValue))
+			{
+				showNote(idStr, errStr.pwdCharValid);
+				dep.style.display = "none";
+				result = false;
+			}
+			else
+			{
+				if (/^\d+$/.test(pwdValue) ||
+					/^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]+$/.test(pwdValue) ||
+					/^[a-zA-Z]+$/.test(pwdValue))
+				{
+					if (len <= 10)
+					{
+						tip = label.weak;
+					}
+					else
+					{
+						tip = label.media;
+					}
+				}
+				else if (true == pwdCheckMixChars(pwdValue))
+				{
+					tip = label.strong;
+				}
+				else
+				{
+					if (len <= 10)
+					{
+						tip = label.media;
+					}
+					else
+					{
+						tip = label.strong;
+					}
+				}
+
+				if (tip == label.weak)
+				{
+					depDe.style.color = "#FF5500";
+				}
+				else if (tip == label.media)
+				{
+					depDe.style.color = "#FF9F00";
+				}
+				else
+				{
+					depDe.style.color = "#19B68F";
+				}
+
+				depDe.innerHTML = tip;
+				dep.style.display = "inline";
+			}
+
+			return result;
+		}
+
+		function groupStrFindOpt(str)
+		{
+			var temp;
+
+			for (var i = 0, len = groupOption.length; i < len; i++)
+			{
+				temp = groupOption[i];
+				if (temp.str == str)
+				{
+					return temp.value;
+				}
+			}
+		}
+
+		/* 显示编辑框 */
+		function showUserConf(type, index, paraObj)
+		{
+			var gp, comment;
+
+			if (undefined == userConfH4)
+			{
+				authorityListCon = $("div.authorityListCon")[0];
+				userConfH4 = $(tableEditCon).find("h4")[0];
+				selectInit("userGroup", groupOption, GROUP_ADMIN, groupSelHandle);
+				userGroupSel = id("userGroup");
+				pwdSetConUls = $("#pwdSetCon li");
+				userName = id("userName");
+				chgPwd = id("chgPwd");
+				chgPwdUl = id("chgPwdUl");
+				password = id("password");
+				oldPwd = id("oldPwd");
+				oldPwdLi = id("oldPwdLi");
+				newPwd = id("newPwd");
+				confPwd = id("confPwd");
+				remark = id("remark");
+
+				for (var i = 0, len = authList.length; i < len; i++)
+				{
+					var span = document.createElement("span");
+					var item = authList[i];
+
+					span.innerHTML = item.str;
+					authorityListCon.appendChild(span);
+				}
+				authCheckList = $(authorityListCon).find("span");
+
+				userName.onblur = function(){
+					userNameCheck("userName");
+				};
+				/*userName.onfocus = function(){
+					closeNote("userNameDep");
+				};*/
+				password.onblur = function(){
+					pwdCheck("password", "passwordDep", "passwordDepSp");
+				};
+				/*password.onfocus = function(){
+					closeNote("confPwd");
+				};*/
+				newPwd.onblur = function(){
+					pwdCheck("newPwd", "newPwdDep", "newPwdDepSp");
+				};
+				/*newPwd.onfocus = function(){
+					closeNote("confPwd");
+				};*/
+				userName.onfocus = closeNoteAll;
+				password.onfocus = closeNoteAll;
+				newPwd.onfocus = closeNoteAll;
+			}
+
+			//closeNoteAll();
+
+			if (ADD == type && $.group == GROUP_ROOT)
+			{
+				userConfH4.innerHTML = btn.addNewUser;
+				pwdSetConUls.each(function(index){
+					if (index == 0|| index == 3)
+					{
+						this.style.display = "block";
+					}
+					else
+					{
+						this.style.display = "none";
+					}
+				});
+				chgPwdUl.style.display = "none";
+				userGroupSel.resetOptions(groupOptionS, GROUP_ADMIN);
+				userGroupSel.disable(false);
+				disableInput(userName, false);
+				groupSelHandle(GROUP_ADMIN);
+
+				userName.value = "";
+				password.value = "";
+				confPwd.value = "";
+				remark.value = "";
+				id("passwordDep").style.display = "none";
+				confPwd.onblur = function(){
+					pwdConfCheck("confPwd", "password", "passwordDep");
+				};
+				/*confPwd.onfocus = function(){
+					pwdConfFocus("passwordDep");
+				};*/
+			}
+			else
+			{
+				userConfH4.innerHTML = btn.editUserConf;
+				pwdSetConUls.each(function(index){
+					this.style.display = "none";
+				});
+
+				newPwd.value = "";
+				confPwd.value = "";
+				id("newPwdDep").style.display = "none";
+				confPwd.onblur = function(){
+					pwdConfCheck("confPwd", "newPwd", "newPwdDep");
+				};
+				/*confPwd.onfocus = function(){
+					pwdConfFocus("newPwdDep");
+				};*/
+				chgPwdUl.style.display = "block";
+				if (gIsFactory){
+					$("#chgPwdUl label")[0].innerText = label.loginSetPwd;
+				}
+				else{
+					$("#chgPwdUl label")[0].innerText = label.cloudChgPwd;
+				}
+				initCheckInput(chgPwd, function(checked){
+					if (checked == true)
+					{
+						pwdSetConUls.each(function(index){
+							if (0 == index || $.group == GROUP_ROOT && paraObj[USER_NAME] != ROOT_NAME && this == oldPwdLi)
+							{
+								this.style.display = "none";
+							}
+							else
+							{
+								this.style.display = "block";
+							}
+						});
+						if (gIsFactory)
+						{
+							oldPwdLi.style.display = "none";
+							$("#newPwdLi label")[0].innerText = label.enterPwd;
+						}
+						else{
+							$("#newPwdLi label")[0].innerText = label.newPwd;
+						}
+					}
+					else
+					{
+						pwdSetConUls.each(function(index){
+							this.style.display = "none";
+						});
+					}
+				});
+				changeCheckInput(chgPwd, false);
+
+				gp = paraObj[GROUP];
+				if (label.root == gp)
+				{
+					gp = GROUP_ROOT;
+				}
+				else if (label.operator == gp)
+				{
+					gp = GROUP_ADMIN;
+				}
+				else
+				{
+					gp = GROUP_GUEST;
+				}
+
+				/* admin 或者是admin组则禁用部分内容 */
+				if ($.group == GROUP_ROOT && paraObj[USER_NAME] == ROOT_NAME ||
+					$.group == GROUP_ADMIN)
+				{
+					userGroupSel.resetOptions(groupOption, $.group);
+					userGroupSel.disable(true);
+					disableInput(userName, true);
+				}
+				else
+				{
+					userGroupSel.resetOptions(groupOptionS, gp);
+					userGroupSel.disable(false);
+					disableInput(userName, false);
+				}
+
+				comment = paraObj[USER_COMMENT];
+				groupSelHandle(gp);
+				userName.value = paraObj[USER_NAME];
+				oldPwd.value = "";
+				remark.value = comment == undefined ? "" : comment;
+			}
+
+			id("newPwd").onfocus = closeNoteAll;
+			userConfH4.type = type;
+			userConfH4.index = index;
+			tableEditCon.style.top = "0px";
+		}
+
+		/* 添加条目 */
+		function addItem(userName, pwd, gp, remark, callBack)
+		{
+			var data = {}, para = {};
+
+			data[UCI_FILE] = {};
+			if (gp == GROUP_ADMIN)
+			{
+				data[UCI_FILE][KEY_TABLE] = ADMIN_TYPE;
+				data[UCI_FILE][KEY_NAME] = ADMIN_TYPE + "_" + calcNextIndex(listAdmin);
+			}
+			else if (gp == GROUP_GUEST)
+			{
+				data[UCI_FILE][KEY_TABLE] = GUEST_TYPE;
+				data[UCI_FILE][KEY_NAME] = GUEST_TYPE + "_" + calcNextIndex(listGuest);
+			}
+
+			data[UCI_FILE][KEY_PARA] = para;
+			para[USER_NAME] = userName;
+			para[USER_PWD] = orgAuthPwd(pwd);
+			para[CIPHERTEXT] = $.encryptPwd(pwd);
+			para[USER_COMMENT] = remark;
+
+			$.add(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					para[SEC_NAME] = data[UCI_FILE][KEY_NAME];
+					if (gp == GROUP_ADMIN)
+					{
+						listAdmin[listAdmin.length] = para;
+						para[GROUP] = label.operator;
+					}
+					else
+					{
+						listGuest[listGuest.length] = para;
+						para[GROUP] = label.normalUser;
+					}
+
+					callBack(true, para);
+				}
+				else
+				{
+					callBack(false);
+				}
+			});
+		}
+
+		/* 修改组别 */
+		function changeItemGroup(userName, orgPwd, chiperText, gp, remark, secName, callBack)
+		{
+			var data = {}, para = {};
+
+			data[UCI_FILE] = {};
+			data[UCI_FILE][CHG_USER_INFO] = para;
+
+			para[USER_NAME] = userName;
+			para[USER_PWD] = orgPwd;
+			para[CIPHERTEXT] = chiperText;
+			para[USER_COMMENT] = remark;
+			para[USER_SECNAME] = secName;
+			para[USER_GROUP] = gp;
+
+			$.action(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					if (gp == GROUP_ADMIN)
+					{
+						para[GROUP] = label.operator;
+						para[SEC_NAME] = ADMIN_TYPE + "_" + calcNextIndex(listAdmin);
+						listAdmin[listAdmin.length] = para;
+
+						for (var i in listGuest)
+						{
+							if (secName == listGuest[i][SEC_NAME])
+							{
+								listGuest.splice(i, 1);
+								break;
+							}
+						}
+					}
+					else if (gp == GROUP_GUEST)
+					{
+						para[GROUP] = label.normalUser;
+						para[SEC_NAME] = GUEST_TYPE + "_" + calcNextIndex(listGuest);
+						listGuest[listGuest.length] = para;
+
+						for (var i in listAdmin)
+						{
+							if (secName == listAdmin[i][SEC_NAME])
+							{
+								listAdmin.splice(i, 1);
+								break;
+							}
+						}
+					}
+
+					callBack(true, para);
+				}
+				else
+				{
+					callBack(false);
+				}
+			});
+		}
+
+		function saveItem(type, index, callBack)
+		{
+			var data = {}, para = {};
+			var gp, listItem, secName, pwdStr, chiperText;
+			var oldUserName, oldUserPwd, oldGroup, oldChiperText;
+			var subList, bPwdChanged = false;
+
+			/* 校验 */
+			if (userName.value.length == 0)
+			{
+				showNote("userName", errStr.invUserNameNull);
+				callBack(false);
+				return;
+			}
+
+			if (false == userNameCheck("userName"))
+			{
+				callBack(false);
+				return;
+			}
+
+			if (ENONE != checkInputName(remark.value, 60, 0))
+			{
+				showNote("remark", errStr.usrRemarkLenERR);
+				callBack(false);
+				return;
+			}
+
+			if (ADD == type)
+			{
+				if (!pwdCheck("password", "passwordDep", "passwordDepSp") ||
+					!pwdConfCheck("confPwd", "password", "passwordDep"))
+				{
+					callBack(false);
+					return;
+				}
+
+				if (password.value.length != 0)
+				{
+					bPwdChanged = true;
+				}
+			}
+			else
+			{
+				if (chgPwd.getAttribute("checked") == "true" && (
+					!pwdCheck("newPwd", "newPwdDep", "newPwdDepSp") ||
+					!pwdConfCheck("confPwd", "newPwd", "newPwdDep")))
+				{
+					callBack(false);
+					return;
+				}
+
+				if ((chgPwd.getAttribute("checked") == "true") && (newPwd.value.length != 0))
+				{
+					bPwdChanged = true;
+				}
+			}
+
+			showToast();
+
+			/* 添加 */
+			if (ADD == type)
+			{
+				addItem(userName.value, password.value, userGroupSel.value, remark.value, function(result, para){
+					if (true == result)
+					{
+						showToast("success");
+						callBack(true, para);
+						externHd();
+					}
+					else
+					{
+						callBack(false);
+					}
+				});
+			}
+			else
+			{
+				listItem = list[index];
+				oldUserName = listItem[USER_NAME];
+				oldUserPwd = listItem[USER_PWD];
+				oldChiperText = listItem[CIPHERTEXT];
+				oldGroup = groupStrFindOpt(listItem[GROUP]);
+
+				/* 修改管理员密码 */
+				if (oldUserName == $.rootName)
+				{
+					data[UCI_FILE] = {};
+					data[UCI_FILE][CHG_USER_INFO] = para;
+
+					para[USER_NAME] = $.rootName;
+					para[USER_COMMENT] = remark.value;
+					para[USER_SECNAME] = ROOT_TYPE;
+
+					if (true == bPwdChanged)
+					{
+						pwdStr = orgAuthPwd(newPwd.value);
+						$.tmpPwdMD5 = $.getPwdMD5($.rootName, newPwd.value);
+						para[USER_PWD] = pwdStr;
+						para[USER_OLD_PWD] = orgAuthPwd(oldPwd.value);
+						para[CIPHERTEXT] = $.encryptPwd(newPwd.value);
+					}
+
+					$.action(data, function(result){
+						if (true == errHandle(result[ERR_CODE]))
+						{
+							showToast("success");
+							para[GROUP] = label.root;
+							callBack(true, para);
+							externHd();
+
+							gIsFactory = false;
+
+							if (true == bPwdChanged)
+							{
+								$.setLg($.rootName, pwdStr);
+							}
+						}
+						else
+						{
+							callBack(false);
+						}
+					});
+				}
+				else
+				{
+					gp = userGroupSel.value;
+
+					/* 组别没有改变，则仅仅是对该组的成员的修改 */
+					if (oldGroup == gp)
+					{
+						data[UCI_FILE] = {};
+						data[UCI_FILE][CHG_USER_INFO] = para;
+
+						para[USER_NAME] = userName.value;
+						para[USER_COMMENT] = remark.value;
+						secName = listItem[SEC_NAME];
+						para[USER_SECNAME] = secName;
+
+						if (true == bPwdChanged)
+						{
+							pwdStr = orgAuthPwd(newPwd.value);
+							$.tmpPwdMD5 = $.getPwdMD5(userName.value, newPwd.value);
+							para[USER_PWD] = pwdStr;
+							para[CIPHERTEXT] = $.encryptPwd(newPwd.value);
+
+							/* 非超级管理员的用户修改密码都需要原密码 */
+							if ($.username != $.rootName)
+							{
+								para[USER_OLD_PWD] = orgAuthPwd(oldPwd.value);
+							}
+							else
+							{
+								para[USER_OLD_PWD] = oldUserPwd;
+							}
+						}
+
+						$.action(data, function(result){
+							if (true == errHandle(result[ERR_CODE]))
+							{
+								para[SEC_NAME] = secName;
+								para[GROUP] = listItem[GROUP];
+
+								if (gp == GROUP_ADMIN)
+								{
+									subList = listAdmin;
+								}
+								else if (gp == GROUP_GUEST)
+								{
+									subList = listGuest;
+								}
+
+								/* 同步数据到具体的list中 */
+								for (var i = 0, len = subList.length; i < len; i++)
+								{
+									if (subList[i][SEC_NAME] == secName)
+									{
+										subList[i] = para;
+										break;
+									}
+								}
+
+								showToast("success");
+								callBack(true, para);
+								externHd();
+
+								/* 修改的是当前登录管理员的密码 */
+								if ($.username == oldUserName && true == bPwdChanged)
+								{
+									$.setLg(userName.value, pwdStr);
+								}
+							}
+							else
+							{
+								callBack(false);
+							}
+						});
+					}
+					else	/* 组别有改变，那么先add再delete */
+					{
+						/* 判断是否需要修改密码 */
+						if (true == bPwdChanged)
+						{
+							pwdStr = orgAuthPwd(newPwd.value);
+							chiperText = $.encryptPwd(newPwd.value);
+						}
+						else
+						{
+							pwdStr = oldUserPwd;
+							chiperText = oldChiperText;
+						}
+
+						secName = listItem[SEC_NAME];
+						changeItemGroup(userName.value, pwdStr, chiperText, gp, remark.value, secName, function(result, para){
+							if (true == result)
+							{
+								list[list.length] = para;
+								list.splice(index, 1);
+								showToast("success");
+								callBack(true, para);
+								dataGridLs.refresh(dataGridLs.getPageNum());
+								externHd();
+							}
+							else
+							{
+								callBack(false);
+							}
+						});
+					}
+				}
+			}
+		}
+
+		/* 删除所选 */
+		function delItem(index, callBack)
+		{
+			if ($.group == GROUP_ROOT)
+			{
+				var indexArry = index.toString().split("-");
+				var delList = [], data = {};
+				var secName;
+
+				//排除list数组中的空元素
+				for (var i in indexArry)
+				{
+					secName = list[indexArry[i]][SEC_NAME];
+					if (!secName)
+					{
+						continue;
+					}
+
+					delList.push(secName);
+				}
+
+				data[UCI_FILE] = {};
+				data[UCI_FILE][KEY_NAME] = delList;
+				$.del(data, function(result){
+					if (true == errHandle(result[ERR_CODE]))
+					{
+						/* 删除子串中的内容 */
+						for (var i in delList)
+						{
+							for (var j in listAdmin)
+							{
+								if (delList[i] == listAdmin[j][SEC_NAME])
+								{
+									listAdmin.splice(j, 1);
+									break;
+								}
+							}
+
+							for (var k in listGuest)
+							{
+								if (delList[i] == listGuest[k][SEC_NAME])
+								{
+									listGuest.splice(k, 1);
+									break;
+								}
+							}
+						}
+
+						showToast("success");
+						callBack(true);
+						externHd();
+					}
+					else
+					{
+						callBack(false);
+						externHd();
+					}
+				});
+			}
+		}
+
+		function popUpHd(type, index, para)
+		{
+			if (detailConCFUM.offsetHeight < 700)
+			{
+				detailConCFUM.style.height = "700px";
+				basicPHAutoFit();
+			}
+
+			showUserConf(type, index, para);
+		}
+
+		function requestData(callBack)
+		{
+			var data = {};
+
+			if ($.group == GROUP_GUEST)
+			{
+				showAlert(errStr.invPermissionDenied);
+			}
+
+			if ($.group == GROUP_ROOT)
+			{
+				data[UCI_FILE] = {};
+				data[UCI_FILE][KEY_NAME] = ROOT_TYPE;
+				data[UCI_FILE][KEY_TABLE] = [ADMIN_TYPE, GUEST_TYPE];
+			}
+			else if ($.group == GROUP_ADMIN)
+			{
+				data[USER_MGT] = {};
+				data[USER_MGT][KEY_NAME] = CUR_USR_INFO;
+			}
+
+			$.query(data, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					callBack(result);
+				}
+			});
+		}
+
+		function tableInit(result)
+		{
+			var rootData;
+
+			if (true == $.local)
+			{
+				$.group = GROUP_ROOT;
+				listAdmin = [];
+				listGuest = [];
+
+				for (var i = 0; i < 1; i++)
+				{
+					list[i] = {username:"admin", group:label.root, comment:"12"};
+				}
+
+				for (; i < 9; i++)
+				{
+					list[i] = {username:"ad" + i, group:label.operator, comment:"123"};
+				}
+
+				for (; i < 22; i++)
+				{
+					list[i] = {username:"gu" + i, group:label.normalUser, comment:"1234"};
+				}
+			}
+			else
+			{
+				if ($.group == GROUP_ROOT)
+				{
+					rootData = result[UCI_FILE][ROOT_TYPE];
+
+					/* 组装root用户数据 */
+					list[0] = {};
+					list[0][USER_NAME] = rootData[USER_NAME];
+					list[0][USER_PWD] = rootData[USER_PWD];
+					list[0][USER_COMMENT] = rootData[USER_COMMENT];
+					list[0][GROUP] = label.root;
+
+					listAdmin = formatTableData(result[UCI_FILE][ADMIN_TYPE]);
+					listGuest = formatTableData(result[UCI_FILE][GUEST_TYPE]);
+
+					for (var i = 0, len = listAdmin.length; i < len; i++)
+					{
+						listAdmin[i][GROUP] = label.operator;
+					}
+
+					for (var i = 0, len = listGuest.length; i < len; i++)
+					{
+						listGuest[i][GROUP] = label.normalUser;
+					}
+
+					list = list.concat(listAdmin, listGuest);
+				}
+				else if ($.group == GROUP_ADMIN)
+				{
+					listAdmin = list = [];
+					list[0] = result[USER_MGT][CUR_USR_INFO];
+					list[0][GROUP] = label.operator;
+				}
+			}
+
+			if ($.group == GROUP_ROOT)
+			{
+				dataGridLs.init({
+					id:"userTbl",										// table ID
+					data:list,											// 数据源
+					hasID:true,
+					edit:true,
+					head:[{field:label.userName, width:60},			// 表头选项
+						  {field:label.groupName, width:60},
+						  {field:label.remark, width:60}],
+					list:[{name:USER_NAME},
+						  {name:GROUP},
+						  {name:USER_COMMENT}],
+					popUpBar:{id:"tableEditCon", save:saveItem, cancel:function(type, index, handle){
+						closeNoteAll();
+						detailConCFUM.style.height = "";
+						basicPHAutoFit();
+						handle(true);
+					}},
+					toolBar:{id:"userMgtUl", delSel:delItem, popUp:popUpHd, asyn:true}
+				});
+				table.rows[1].cells[0].innerHTML = "";
+			}
+			else if ($.group == GROUP_ADMIN)
+			{
+				id("userMgtUl").innerHTML = "";
+				dataGridLs.init({
+					id:"userTbl",										// table ID
+					data:list,											// 数据源
+					hasID:true,
+					edit:true,
+					hasSelBox:false,
+					head:[{field:label.userName, width:60},			// 表头选项
+						  {field:label.groupName, width:60},
+						  {field:label.remark, width:60}],
+					list:[{name:USER_NAME},
+						  {name:GROUP},
+						  {name:USER_COMMENT}],
+					popUpBar:{id:"tableEditCon", save:saveItem, cancel:function(type, index, handle){
+						closeNoteAll();
+						detailConCFUM.style.height = "";
+						basicPHAutoFit();
+						handle(true);
+					}},
+					toolBar:{id:"userMgtUl", popUp:popUpHd, asyn:true}
+				});
+			}
+
+			showDetailCon();
+		}
+
+		function pageInit()
+		{
+			initCheckInput("showInfo");
+			requestData(tableInit);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	div.authorityListCon{
+		color:#333333;
+		font-size:13px;
+		border:2px solid #c8cdd9;
+		padding:16px;
+		margin:0 0 0 128px;
+		overflow:hidden;
+		*zoom:1;
+		width: 186px;
+	}
+	div.authorityListCon h5{
+		margin-bottom:8px;
+		font-size:12px;
+		color:#666666;
+	}
+	div.authorityListCon span{
+		float:left;
+		height:17px;
+		line-height:17px;
+		text-indent:26px;
+		width:93px;
+		margin-bottom: 4px;
+	}
+	div.authorityListCon input.text{
+		background:#404040 !important;
+	}
+	input.addItem{
+		position:absolute;
+		bottom:0px;
+	}
+	span.depSpan{
+		font-size:12px;
+		color:#666666;
+		display:none;
+		vertical-adatlign:middle;
+		margin-left:4px;
+	}
+    ul.line li.lineF{
+    	margin-top: 5px;
+    	margin-bottom: 5px;
+    }
+    ul.line label.desA{
+		font-size:13px;
+		line-height:32px;
+		width:108px;
+		text-align: right;
+		margin-right: 20px;
+    }
+    span.select span.hsValueA{
+    	width:174px;
+    }
+</style>
+<div id="detailConCFUM" class="detailCon">
+	<div class="tableCon">
+		<div class="tableBorderCon"><table id="userTbl" class="dataGrid"></table></div>
+		<ul id="userMgtUl" class="gridToolBar">
+			<li gridType="popUp">{%btn.add%}</li>
+			<li gridType="delSel">{%btn.deleteSel%}</li>
+		</ul>
+		<div id="tableEditCon" class="tableEditLyCon">
+			<div class="tableEditCon tableEditConA">
+				<div class="innerCon">
+					<h4 class="title">{%btn.addNewUser%}</h4>
+					<i id="closeTip"></i>
+					<ul class="line">
+						<li class="line lineF">
+							<label class="des desA" for="userName">{%label.userName%}</label>
+							<input id="userName" class="text textA3" maxLength="32" />
+						</li>
+						<li class="line lineF">
+							<label class="des desA" for="userGroup">{%label.userGroup%}</label>
+							<span class="selCon">
+								<span id="userGroup" class="select">
+									<span class="value hsValueA"></span>
+									<i class="arrow"></i>
+								</span>
+							</span>
+						</li>
+						<li class="line lineF">
+							<div class="authorityListCon">
+								<h5>{%label.authList%}</h5>
+							</div>
+						</li>
+						<li id="chgPwdUl" class="line lineF">
+							<label class="des desA" for="chgPwd">{%label.cloudChgPwd%}</label>
+							<i id="chgPwd" name="showInfo"></i>
+						</li>
+						<a id="pwdSetCon">
+							<li class="line lineF">
+								<label class="des desA" for="password">{%label.password%}</label>
+								<input id="password" type="password" class="text textA3" maxLength="32" />
+								<span id="passwordDep" class="depSpan">{%label.chgPwdDep%}{%label.colon%}<span id="passwordDepSp"></span></span>
+							</li>
+							<li id="oldPwdLi" class="line lineF">
+								<label class="des desA" for="oldPwd">{%label.oldPwd%}</label>
+								<input id="oldPwd" type="password" class="text textA3" maxLength="32" />
+							</li>
+							<li class="line lineF" id="newPwdLi">
+								<label class="des desA" for="newPwd">{%label.newPwd%}</label>
+								<input id="newPwd" type="password" class="text textA3" maxLength="32" />
+								<span id="newPwdDep" class="depSpan">{%label.chgPwdDep%}{%label.colon%}<span id="newPwdDepSp"></span></span>
+							</li>
+							<li class="line lineF">
+								<label class="des desA" for="confPwd">{%label.loginPwdConf%}</label>
+								<input id="confPwd" type="password" class="text textA3" maxLength="32" />
+							</li>
+						</a>
+						<li class="line lineF">
+							<label class="des desA" for="remark">{%label.remark%}</label>
+							<input id="remark" class="text textA3" maxLength="60" />
+						</li>
+					</ul>
+					<div class="tablePopUpToolBar tablePopUpToolBarA"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

@@ -1,0 +1,118 @@
+﻿<style type="text/css">
+	div.cloudBRRelCon{
+		padding-top:60px;
+		text-align:center;
+		font-size:0px;
+	}
+	p.cloudBRReltTip{
+		font-size:28px;
+		color:#333333;
+		margin-top:12px;
+	}
+	p.cloudBRReltTipS{
+		height:40px;
+		line-height:40px;
+		font-size:13px;
+		color:#666666;
+		margin-top:8px;
+	}
+	p.cloudBRReltTipS span{
+		color:#2797FF;
+	}
+	#cloudBRRelFuncCon{
+		margin-top:48px;
+		height:40px;
+		line-height:40px;
+	}
+	i.cloudBRSuccess{
+		background:url(../web-static/images/cloudSuccess.png) no-repeat;
+		display:inline-block;
+		height:190px;
+		width:190px;
+	}
+	i.cloudBRFail{
+		background:url(../web-static/images/warn.png) no-repeat;
+		display:inline-block;
+		height:190px;
+		width:190px;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		var redirectWaitTime = 5;
+		var redirectTimeout = 1000;
+		var closeTip = id("close");
+		var retry = id("retry");
+		var finish = id("finish");
+		var cloudBRRelt = id("cloudBRRelt");
+		var bindRelt = new Boolean(gCloudAccountBR["success"]);
+		var pageRedirectHD;
+
+		function pageRedirect()
+		{
+			if (0 == redirectWaitTime)
+			{
+				cloudGoBackBR({"binded":bindRelt, "account":gCloudAccountBR["account"]});
+				return;
+			}
+
+			id("periodLast").innerHTML = redirectWaitTime--;
+			pageRedirectHD = $.setTimeout(pageRedirect, redirectTimeout);
+		}
+
+		function pageSet()
+		{
+			if (true == bindRelt)
+			{
+				id("cloudSuccessTip").innerHTML = gCloudAccountBR["noteF"];
+				cloudBRRelt.className = "cloudBRSuccess";
+				id("cloudBRSuccess").style.display = "block";
+				finish.style.display = "inline";
+				retry.style.display = "none";
+				closeTip.style.display = "none";
+				pageRedirect();
+			}
+			else
+			{
+				id("cloudFailTip").innerHTML = gCloudAccountBR["noteF"];
+				id("cloudFailTipS").innerHTML = gCloudAccountBR["noteS"];
+				cloudBRRelt.className = "cloudBRFail";
+				id("cloudBRFail").style.display = "block";
+				retry.style.display = "inline";
+				finish.style.display = "none";
+				closeTip.style.display = "block";
+			}
+		}
+		retry.onclick = function(){
+			gCloudAccountBRHd(pageSet, pageSet, cloudAccountQueryStop);
+		}
+		finish.onclick = function(){
+			clearTimeout(pageRedirectHD);
+			cloudGoBackBR({"binded":bindRelt, "account":gCloudAccountBR["account"]});
+		};
+		closeTip.onclick = function(){cloudGoBackBR({"binded":bindRelt, "account":gCloudAccountBR["account"]})};
+		pageSet();
+	}
+	init();
+</script>
+<div class="cloudBRRelCon">
+	<i id="close" class="closeTip"></i>
+	<i id="cloudBRRelt" class="cloudBRRelt"></i>
+	<div id="cloudBRSuccess" class="disNone">
+		<p id="cloudSuccessTip" class="cloudBRReltTip">{%label.cloudAccountBindSuccess%}</p>
+		<p class="cloudBRReltTipS">
+			{%label.cloudResetPwdSusTipF%}
+			<span id="periodLast">5</span>
+			{%label.cloudResetPwdSusTipS%}
+		</p>
+	</div>
+	<div id="cloudBRFail" class="disNone">
+		<p id="cloudFailTip" class="cloudBRReltTip">{%label.cloudAccountRegistFail%}</p>
+		<p id="cloudFailTipS" class="cloudBRReltTipS">{%label.cloudServerNoRespCheckNetwork%}</p>
+	</div>
+	<div id="cloudBRRelFuncCon">
+		<input id="retry" type="button" class="subBtn btnA disNone" value="{%btn.retry%}" />
+		<input id="finish" type="button" class="subBtn btnA disNone" value="{%btn.finish%}" />
+	</div>
+</div>

@@ -1,0 +1,4351 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var senseTypeOptions = [{str:label.downloadTypeAll, value:"18446744073709551615"},
+								{str:label.downloadTypeTiming, value:"1"},
+								{str:label.downloadTypeAlarm, value:"131072"},
+								{str:label.downloadTypeMotionDet, value:"2"},
+								{str:label.downloadTypeSmartDet, value:"18446744073709551608"},
+								//{str:label.downloadTypeTamperDet, value:"4"},
+								{str:label.downloadTypeLineCrossing, value:"8"},
+								{str:label.downloadTypeIntrusion, value:"16"},
+								{str:label.downloadTypeRegionEntrance, value:"32"},
+								{str:label.downloadTypeRegionExiting, value:"64"},
+								{str:label.downloadTypeLoitering, value:"128"},
+								{str:label.downloadTypeGathering, value:"256"},
+								{str:label.downloadTypeFastMoving, value:"512"},
+								{str:label.downloadTypeParking, value:"1024"},
+								{str:label.downloadTypeUnattendedBaggage, value:"2048"},
+								{str:label.downloadTypeObjectRemove, value:"4096"},
+								{str:label.downloadTypeAudioException, value:"8192"},
+								{str:label.downloadTypeDefocusDet, value:"16384"},
+								{str:label.downloadTypeSceneChange, value:"32768"},
+								{str:label.downloadTypeFaceDet, value:"65536"}
+								];
+
+		function errorHandle(errCode)
+		{
+			var showStr = "";
+			switch(parseInt(errCode))
+			{
+			case ENONE:
+				return true;
+			case EIDREACHLIMIT:
+				showStr = errStr.clientFull;
+				break;
+			case ENOEVENTS:
+				showStr = errStr.noEvents;
+				break;
+			case ECHNEMPTY:
+				showStr = errStr.playNoChan;
+				break;
+			case ECLIPLAYING:
+				showStr = errStr.cannotSearch;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case EUNKNOWN:
+				showStr = errStr.linkUnknown;
+				break;
+			case EUBUSCONNECTFAIL:
+			case EUBUSCALLFAIL:
+			case EIDOCCUPIED:
+			case EIDINVALID:
+			case ESEARCHFAILED:
+			case EYEARNVALID:
+			case ETIMEINVALID:
+			case ECHNINVALID:
+			case ECLINOTCONNECTED:
+			case EARGSILLEGAL:
+			case EOPENFILEFAILED:
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr);
+
+			return false;
+		}
+
+		/* 获取user id */
+		function getUserId(callBack)
+		{
+			var data = {};
+			data[uciSystem.fileName] = {};
+			data[uciSystem.fileName][uciSystem.actionName.getUserId] = null;
+
+			$.action(data, function(result) {
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					userId = result[uciSystem.optName.userId];
+					typeof callBack == "function" && callBack();
+				}
+			});
+		}
+		
+		/* 获取系统时间 */
+		function getSysTime(callBack)
+		{
+			var data = {};
+			data[uciSystem.fileName] = {};
+			data[uciSystem.fileName][NAME] = uciSystem.secName.clockStatus;
+
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					/* 年 月 日 时 分 秒 */
+					curTime = tranTime(result[uciSystem.fileName][uciSystem.secName.clockStatus][uciSystem.optName.seconds]);
+					timeRes = curTime.year + "" + curTime.month + curTime.day; /* 转换为 yyyymmdd 的格式 */
+					getTimeSec();
+
+					typeof callBack == "function" && callBack();
+				}
+			});
+		}
+
+		function parseISO8601(dateStringInRange){  
+			var isoExp = /^\s*(\d{4})-(\d\d)-(\d\d)\s*$/,  
+			date = new Date(NaN), month,  
+			parts = isoExp.exec(dateStringInRange);  
+			  
+			if(parts) {  
+				month = +parts[2];  
+				date.setFullYear(parts[1], month - 1, parts[3]);  
+				if(month != date.getMonth() + 1) {  
+					date.setTime(NaN);  
+				}  
+			}  
+			return date;  
+		} 
+		/* 获取某天距标准时间的秒数 */
+		function getTimeSec()
+		{
+			//var getSecTime = new Date("2016-1-1");
+			var getSecTime = parseISO8601("2016-01-01");
+
+			getSecTime.setFullYear(curTime.year);
+			getSecTime.setMonth(parseInt(curTime.month, 10) - 1);
+			getSecTime.setDate(parseInt(curTime.day, 10));
+			getSecTime.setHours(0);
+			getSecTime.setMinutes(0);
+			getSecTime.setSeconds(0);
+
+			secDisToday = parseInt(getSecTime.getTime() / 1000, 10);
+		}
+
+		/* 备份录像信息，对录像数据进行处理 */
+		function dataCopy(tarData, srcData)
+		{
+			var tmpData;
+
+			for (var pro in srcData)
+			{
+				originTotalFile[pro] = [];
+				tarData[pro] = [];
+				tmpData = srcData[pro];
+				for (var i = 0, tDataLen = tmpData.length; i < tDataLen; i++)
+				{
+					tarData[pro][i] = {};
+					originTotalFile[pro][i] = {};
+					for (var npro in tmpData[i])
+					{
+						tarData[pro][i][npro] = tmpData[i][npro];
+						if (npro == uciPlayBack.optName.startTime || npro == uciPlayBack.optName.endTime)
+						{
+							originTotalFile[pro][i][npro] = totalFile[pro][i][npro];
+							totalFile[pro][i][npro] -= secDisToday;
+						}
+					}
+
+					if (0 == totalFile[pro][i][uciPlayBack.optName.startTime] % SECONDS)
+					{
+						totalFile[pro][i][uciPlayBack.optName.startTime] = 0;
+					}
+
+					totalFile[pro][i]["tmpStaTime"] = minToHour(totalFile[pro][i][uciPlayBack.optName.startTime], true) + "-" 
+					+ minToHour(totalFile[pro][i][uciPlayBack.optName.endTime], true);
+					originTotalFile[pro][i]["id_str"] = totalFile[pro][i][uciPlayBack.optName.idStr];
+					originTotalFile[pro][i]["size"] = totalFile[pro][i][uciPlayBack.optName.size];
+					totalFile[pro][i][uciPlayBack.optName.size] = tranFileSize(totalFile[pro][i][uciPlayBack.optName.size]);
+
+					/*if (VideoNormal == totalFile[pro][i][uciPlayBack.optName.videoType])
+					{
+						totalFile[pro][i]["vType"] = label.general;
+					}
+					else
+					{
+						totalFile[pro][i]["vType"] = label.motionDetection;
+					}*/
+					switch(totalFile[pro][i][uciPlayBack.optName.videoType]){
+						case "18446744073709551615":
+							totalFile[pro][i]["vType"] = label.typeAll;
+							break;
+						case "1":
+							totalFile[pro][i]["vType"] = label.typeTiming;
+							break;
+						case "131072":
+							totalFile[pro][i]["vType"] = label.typeAlarm;
+							break;
+						case "2":
+							totalFile[pro][i]["vType"] = label.typeMotionDet;
+							break;
+						case "18446744073709551614":
+							totalFile[pro][i]["vType"] = label.typeSmartDet;
+							break;
+						case "4":
+							totalFile[pro][i]["vType"] = label.typeTamperDet;
+							break;
+						case "8":
+							totalFile[pro][i]["vType"] = label.typeLineCrossing;
+							break;
+						case "16":
+							totalFile[pro][i]["vType"] = label.typeIntrusion;
+							break;
+						case "32":
+							totalFile[pro][i]["vType"] = label.typeRegionEntrance;
+							break;
+						case "64":
+							totalFile[pro][i]["vType"] = label.typeRegionExiting;
+							break;
+						case "128":
+							totalFile[pro][i]["vType"] = label.typeLoitering;
+							break;
+						case "256":
+							totalFile[pro][i]["vType"] = label.typeGathering;
+							break;
+						case "512":
+							totalFile[pro][i]["vType"] = label.typeFastMoving;
+							break;
+						case "1024":
+							totalFile[pro][i]["vType"] = label.typeParking;
+							break;
+						case "2048":
+							totalFile[pro][i]["vType"] = label.typeUnattendedBaggage;
+							break;
+						case "4096":
+							totalFile[pro][i]["vType"] = label.typeObjectRemove;
+							break;
+						case "8192":
+							totalFile[pro][i]["vType"] = label.typeAudioException;
+							break;
+						case "16384":
+							totalFile[pro][i]["vType"] = label.typeDefocusDet;
+							break;
+						case "32768":
+							totalFile[pro][i]["vType"] = label.typeSceneChange;
+							break;
+						case "65536":
+							totalFile[pro][i]["vType"] = label.typeFaceDet;
+							break;
+						default:
+							break;
+					}
+				}
+			}
+		}
+
+		/* 备份录像信息，对录像数据进行处理 */
+		function dataCopy2(tarData, srcData)
+		{
+			var tmpData;
+
+			for (var pro in srcData)
+			{
+				originTotalFile[pro] = [];
+				tarData[pro] = [];
+				tmpData = srcData[pro];
+				for (var i = 0, tDataLen = tmpData.length; i < tDataLen; i++)
+				{
+					tarData[pro][i] = {};
+					originTotalFile[pro][i] = {};
+					for (var npro in tmpData[i])
+					{
+						tarData[pro][i][npro] = tmpData[i][npro];
+						if (npro == "start_time" || npro == "end_time")
+						{
+							originTotalFile[pro][i][npro] = totalFile[pro][i][npro];
+							totalFile[pro][i][npro] -= secDisToday;
+						}
+					}
+					
+					totalFile[pro][i][uciPlayBack.optName.startTime] = totalFile[pro][i]["start_time"];
+					totalFile[pro][i][uciPlayBack.optName.endTime] = totalFile[pro][i]["end_time"];
+
+					if (0 == totalFile[pro][i][uciPlayBack.optName.startTime] % SECONDS)
+					{
+						totalFile[pro][i][uciPlayBack.optName.startTime] = 0;
+					}
+
+					totalFile[pro][i]["tmpStaTime"] = minToHour(totalFile[pro][i][uciPlayBack.optName.startTime], true) + "-" 
+					+ minToHour(totalFile[pro][i][uciPlayBack.optName.endTime], true);
+					originTotalFile[pro][i]["id_str"] = totalFile[pro][i][uciPlayBack.optName.idStr];
+					originTotalFile[pro][i]["size"] = totalFile[pro][i][uciPlayBack.optName.size];
+					totalFile[pro][i][uciPlayBack.optName.size] = tranFileSize(totalFile[pro][i][uciPlayBack.optName.size]);
+
+					/*if (VideoNormal == totalFile[pro][i]["video_type"])
+					{
+						totalFile[pro][i]["vType"] = label.general;
+					}
+					else
+					{
+						totalFile[pro][i]["vType"] = label.motionDetection;
+					}*/
+					switch(totalFile[pro][i]["video_type"]){
+						case "18446744073709551615":
+							totalFile[pro][i]["vType"] = label.typeAll;
+							break;
+						case "1":
+							totalFile[pro][i]["vType"] = label.typeTiming;
+							break;
+						case "131072":
+							totalFile[pro][i]["vType"] = label.typeAlarm;
+							break;
+						case "2":
+							totalFile[pro][i]["vType"] = label.typeMotionDet;
+							break;
+						case "18446744073709551614":
+							totalFile[pro][i]["vType"] = label.typeSmartDet;
+							break;
+						case "4":
+							totalFile[pro][i]["vType"] = label.typeTamperDet;
+							break;
+						case "8":
+							totalFile[pro][i]["vType"] = label.typeLineCrossing;
+							break;
+						case "16":
+							totalFile[pro][i]["vType"] = label.typeIntrusion;
+							break;
+						case "32":
+							totalFile[pro][i]["vType"] = label.typeRegionEntrance;
+							break;
+						case "64":
+							totalFile[pro][i]["vType"] = label.typeRegionExiting;
+							break;
+						case "128":
+							totalFile[pro][i]["vType"] = label.typeLoitering;
+							break;
+						case "256":
+							totalFile[pro][i]["vType"] = label.typeGathering;
+							break;
+						case "512":
+							totalFile[pro][i]["vType"] = label.typeFastMoving;
+							break;
+						case "1024":
+							totalFile[pro][i]["vType"] = label.typeParking;
+							break;
+						case "2048":
+							totalFile[pro][i]["vType"] = label.typeUnattendedBaggage;
+							break;
+						case "4096":
+							totalFile[pro][i]["vType"] = label.typeObjectRemove;
+							break;
+						case "8192":
+							totalFile[pro][i]["vType"] = label.typeAudioException;
+							break;
+						case "16384":
+							totalFile[pro][i]["vType"] = label.typeDefocusDet;
+							break;
+						case "32768":
+							totalFile[pro][i]["vType"] = label.typeSceneChange;
+							break;
+						case "65536":
+							totalFile[pro][i]["vType"] = label.typeFaceDet;
+							break;
+						default:
+							break;
+					}
+				}
+			}
+		}
+
+		/* 转换文件大小 */
+		function tranFileSize(fileSize)
+		{
+			var kSize = 1024;
+			var mSize = kSize * 1024;
+			var gSize = mSize * 1024;
+
+			fileSize = parseInt(fileSize, 10);
+
+			if (fileSize >= gSize)
+			{
+				fileSize = (fileSize/gSize).toFixed(0) + "GB";
+			}
+			else if (fileSize >= mSize)
+			{
+				fileSize = (fileSize/mSize).toFixed(0) + "MB";
+			}
+			else if (fileSize >= kSize)
+			{
+				fileSize = (fileSize/kSize).toFixed(0) + "KB";
+			}
+			else
+			{
+				fileSize = fileSize.toFixed(0) + "B";
+			}
+
+			return fileSize.toString();
+		}
+
+		/* 获取某一通道的录像数据 */
+		function getOneChnData()
+		{
+			var tarChn = "channel1"; /* 固定通道1 */
+
+			fileList = totalFile[tarChn];
+			originFileList = originTotalFile[tarChn];
+
+			fileLeaseTable.setDataSource(fileList);
+			fileLeaseTable.refresh();
+		}
+
+		function showFileListChn()
+		{
+			var showFileChn = false;
+
+				
+			$("li.chnLi").css({"display":"none"});
+
+			if (false == showFileChn)
+			{
+				$("#chanFile li").removeClass("chnLiClick");
+				getOneChnData(-1);
+
+				for (var j = 0; j < screenNum; j++)
+				{
+					getOneChnData();
+					break;
+				}
+				
+			}
+		}
+
+		/* 显示具体通道进度条 */
+		function fillTrueChn(showChanNumList)
+		{
+			var lineShowNum = 0;
+
+			$("label.chanName, div.channelLine").css({"display":"none"});
+
+			//id("chanName1").style.display = "inline-block";
+			id("channelLine1").style.display = "inline-block";
+			
+			if (null != id("runLine"))
+			{
+				id("runLine").style.height = 37 * 1 + "px";
+			}
+		}
+
+		/* 根据通道及录像事件填充进度条区域 */
+		function fillFileAndChart()
+		{
+			var tmpChanPre = "channel", tmpChannel, chanVideoObj;
+			var sIdx = 0;
+
+			options.channelList.length  = 0;
+
+			for (var j = 1; j <= ROADNUM; j++)
+			{
+				chanVideoObj = new Object();
+				tmpChannel = tmpChanPre + j;
+
+				if (null == totalFile[tmpChannel])
+				{
+					break;
+				}
+
+				chanVideoObj.channelId = j;
+				chanVideoObj.videoList = totalFile[tmpChannel];
+				options.channelList[sIdx] = chanVideoObj;
+				sIdx++;
+			}
+
+			options.runningTime = 0;
+			if (playSign == false && fileList.length > 0)
+			{
+				options.runningTime = fileList[0][uciPlayBack.optName.startTime];
+			}
+			clickDerection = 0;
+			timeControl = new ReplayTimeCon(options);
+			$(".channelLine").click(function(event){clickTime(event);});
+			timeControl.timeRun();
+		}
+
+		/* 获取某一天的视频数据 */
+		function getVideoObj(videoType)
+		{
+			var data = {}, cfg = {};
+
+			data[backName] = {};
+			data[backName][uciPlayBack.action.searchVideo] = cfg;
+			cfg[uciPlayBack.action.searchVideo] = timeRes;
+			if (videoType)
+			{
+				cfg[uciPlayBack.optName.videoType] = videoType;
+			}
+			cfg[uciPlayBack.optName.id] = userId;
+
+			showToast("loading", {"noteStr":label.loadingVideo});
+			$.action(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					videoDetailInfo = result[backName] || [];
+
+					var link = $.find("label.vedioInstallTip")[0];
+					if (0 == videoDetailInfo["channel1"].length){
+						if (!link){
+							if ("" == chanDiv.innerText){
+								chanDiv.innerText = label.noVideoToday;
+							}
+						}
+						id("backPlugin").style.visibility = "hidden";
+					}
+					else{
+						chanDiv.innerText = "";
+						id("backPlugin").style.visibility = "visible";
+					}
+					totalFile = {};
+					dataCopy(totalFile, videoDetailInfo);
+					$("#chanFile li.chnLi").eq(0).click();
+					showFileListChn();
+					fillFileAndChart();
+					fillTrueChn(showChanList);
+					closeToast();
+				}
+			});
+		}
+
+		/* 获取有视频的日期 */
+		function getHasVideoDay(year, callBack)
+		{
+			var data = {}, dayList = [];
+			var yearArr = [];
+
+			year = parseInt(year, 10);
+			if (year -1 < minYear)
+			{
+				yearArr[0] = year.toString();
+				yearArr[1] = (year + 1).toString();
+			}
+			else if (year + 1 > maxYear)
+			{
+				yearArr[0] = (year - 1).toString();
+				yearArr[1] = year.toString();
+			}
+			else
+			{
+				yearArr = [(year - 1).toString(), year.toString(), (year + 1).toString()];
+			}
+
+			data[backName] = {};
+			data[backName][uciPlayBack.action.searchYear] = yearArr || [minYear];
+
+			$.action(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (ENONE != result[backName][uciPlayBack.optName.result])
+					{
+						return;
+					}
+
+					var tmpList = result[backName], index = 0, tmpVal;
+					videoDayList.length = 0;
+
+					for (var para in tmpList)
+					{
+						if (uciPlayBack.optName.result != para)
+						{
+							for (var i = 0, len = tmpList[para].length; i < len; i++)
+							{
+								videoDayList[index] = {};
+								tmpVal = tmpList[para][i];
+								videoDayList[index].month = parseInt(tmpVal.substring(0, 2), 10);
+								videoDayList[index].day = parseInt(tmpVal.substring(2, 4), 10);
+								videoDayList[index].type = parseInt(tmpVal.substring(4), 10);
+								videoDayList[index].year = parseInt(para);
+								index++;
+							}
+						}
+					}
+
+					typeof callBack == "function" && callBack();
+				}
+			});
+		}
+
+		/* 设置播放时间 */
+		function setPlayTime(time, callBack)
+		{
+			var ret;
+
+			/* 设置start_time, type */
+			if (typeof plugin.setPlayBackInfo == "function")
+			{
+				var opt = {};
+				opt[uciPlayBack.optName.seconds] = parseInt(time) + secDisToday;
+				opt[uciPlayBack.optName.type] = playCls();
+				plugin.setPlayBackInfo(opt);
+			}
+			else
+			{
+				// 旧版本插件？
+			}
+
+			/*  不改变速率重新设置回放时间 */
+			if (typeof plugin.setPlaybackSeekScale == "function")
+			{
+				ret = plugin.setPlaybackSeekScale(playbackScaleArr[curScaleIndex], parseInt(time) + secDisToday);
+				if (ENONE == ret)
+				{
+					if (true == suspendSign)
+					{
+						suspendSign = false;
+						startPlayLi.style.backgroundImage = "url(../web-static/images/suspend.png)";
+						$("#startPlay").attr("title","{%label.pausePlay%}");
+					}
+				}
+
+				typeof callBack == "function" && callBack(ret);
+			}
+			else
+			{
+				// 旧版本插件？
+			}
+
+			return;
+		}
+
+		/* 抓图状态显示 */
+		function cameraTimeout()
+		{
+			clearTimeout(cameraTimeoutHd);
+			cameraTimeoutHd = $.setTimeout(function(){
+				$("#popNote").animate({bottom:"-250px"}, undefined, undefined, function(){
+					id("popNote").style.display = "none";
+				});
+			}, 5000);
+		}
+
+		function downloadTimeout()
+		{
+			clearTimeout(downloadTimeoutHd);
+			downloadTimeoutHd = $.setTimeout(function(){
+				downloadNote.style.bottom = "9999px";
+			}, 1000);
+		}
+
+		/* 抓图 */
+		function snapPic()
+		{
+			if (false == playSign)
+			{
+				return;
+			}
+
+			plugin.catchPic(function(result){
+				var showStr = "";
+
+				switch(parseInt(result))
+				{
+				case 0:
+					$("#StorageFolder").css('background-image','url(../web-static/images/save_reddot.png)');
+					break;
+				case 1:
+					showStr = label.snapPicSaveFail;
+					break;
+				case 2:
+					return;
+				case 3:
+					showStr = label.diskLess;
+					break;
+				case 7:
+					showStr = label.pathChange;
+					break;
+				case 8:
+					showStr = label.pathNoExist;
+					break;
+				}
+
+				if(parseInt(result) > 0)
+				{
+					clearTimeout(cameraTimeoutHd);
+					popContentCorrect.style.display = "none";
+					popContentError.style.display = "inline-block";
+					if(7 == parseInt(result))
+					{
+						titleText.innerHTML = label.cue;
+					}
+					else
+					{
+						titleText.innerHTML = label.snapPicFail;
+					}
+					popContentError.innerHTML = showStr;
+				}
+				else{
+					var path = plugin.getPicFileStoragePath();
+					var index = path.lastIndexOf('\\');
+					var nameStr = path.substr(index+1);
+					popContentCorrect.style.display = "inline-block";
+					popContentError.style.display = "none";
+					titleText.innerHTML = label.snapPicSuccess;
+					name.innerHTML = nameStr;
+					check.onclick =function(){
+						plugin.openFileStorageFolder(path);
+					}
+					cameraTimeout();
+				}
+				$("#popNote").animate({bottom:"40px"});
+				id("popNote").style.display = "inline-block";
+
+				log(result);
+				if(7 == parseInt(result))
+				{
+					cameraTimeout();
+				}
+			});
+		}
+
+		/* 全屏 */
+		function pluginFullScreen()
+		{
+			if (false == playSign || elecZoom.state == STATE_ON)
+			{
+				return;
+			}
+
+			plugin.fullScreen();
+		}
+
+		/* 电子放大 */
+		function elecZoom()
+		{
+			if (false == playSign)
+			{
+				return;
+			}
+
+			if (this.state == STATE_ON)
+			{
+				this.style.backgroundColor = "#F5F7FA";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "";
+				this.state = STATE_OFF;
+				plugin.stopDigitalZoomState(0);
+				$("li.fullScreen").css({"opacity":"1"});
+				enableHover($("li.fullScreen"), "icon");
+			}
+			else
+			{
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#A4A9B3";
+				this.style.backgroundImage = "url(../web-static/images/elecZoomPressed.png)";
+				this.state = STATE_ON;
+				plugin.stopDigitalZoomState(1);
+				$("li.fullScreen").css({"opacity":"0.5"});
+				disableHover($("li.fullScreen"), "icon");
+
+				var that = this;
+				plugin.elecZoomCallback(function(result){
+					if(parseInt(result) == 8){
+						that.style.backgroundColor = "#F5F7FA";
+						that.style.borderColor = "";
+						that.style.backgroundImage = "";
+						that.state = STATE_OFF;
+						$("li.fullScreen").css({"opacity":"1"});
+						enableHover($("li.fullScreen"), "icon");
+					}
+				});
+			}
+		}
+
+		/*音量调节*/
+		function volume(event)
+		{
+			if (false == playSign || true == suspendSign || 2 != curScaleIndex)
+			{
+				return;
+			}
+
+			if (this.state == STATE_ON)
+			{
+				this.style.backgroundColor = "#F5F7FA";
+				this.style.borderColor = "";
+				if(volumeIcon)
+				{
+					this.style.backgroundImage = "url(../web-static/images/volumeOn.png)";
+				}
+				else
+				{
+					this.style.backgroundImage = "url(../web-static/images/volumeOff.png)";
+				}
+				this.state = STATE_OFF;
+				volumeNote.style.bottom = "9999px";
+				
+			}
+			else
+			{
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#A4A9B3";
+				if(volumeIcon)
+				{
+					this.style.backgroundImage = "url(../web-static/images/volumeOnPressed.png)";
+				}
+				else
+				{
+					this.style.backgroundImage = "url(../web-static/images/volumeOffPressed.png)";
+				}
+				this.state = STATE_ON;
+				volumeNote.style.bottom = "48px";
+				volumeNote.style.left = getoffset(volume).left - volumeNote.offsetWidth/2 + volume.offsetWidth/2 + "px";
+			}
+			stopProp(event);
+			var that = this;
+			attachEvnt(document.body, "click", function(){
+				if(volumeNote.style.bottom == "9999px"){
+					return;
+				}
+				that.style.backgroundColor = "#F5F7FA";
+				that.style.borderColor = "";
+				if(volumeIcon)
+				{
+					that.style.backgroundImage = "url(../web-static/images/volumeOn.png)";
+				}
+				else
+				{
+					that.style.backgroundImage = "url(../web-static/images/volumeOff.png)";
+				}
+				that.state = STATE_OFF;
+				volumeNote.style.bottom = "9999px";
+			});
+		}
+
+		/*音量调节回调函数*/
+		function volumeChange(val)
+		{
+			volumeDragLine.setValue(val);
+			plugin.setAudioVolume(val);
+			volumeValue = val;
+			if(val > 0){
+				$("#volumeDragLine").css('background-image','url(../web-static/images/volumeOn.png)');
+				if(id("volume").state == STATE_ON)
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOnPressed.png)');
+				}
+				else
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOn.png)');
+				}
+				volumeIcon = true;
+			}
+			else{
+				$("#volumeDragLine").css('background-image','url(../web-static/images/volumeOff.png)');
+				if(id("volume").state == STATE_ON)
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOffPressed.png)');
+				}
+				else
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+				}
+				volumeIcon = false;
+			}
+		}
+
+		/*点击音量图标，音量开启/关闭*/
+		function volumeIconClick()
+		{
+			if (volumeIcon)
+			{
+				$("#volumeDragLine").css('background-image','url(../web-static/images/volumeOff.png)');
+				$("#volume").css('background-image','url(../web-static/images/volumeOffPressed.png)');
+				volumeDragLine.setValue(0);
+			    plugin.setAudioVolume(0);
+				volumeIcon = false;				
+			}
+			else
+			{
+				$("#volumeDragLine").css('background-image','url(../web-static/images/volumeOn.png)');
+				$("#volume").css('background-image','url(../web-static/images/volumeOnPressed.png)');
+				volumeDragLine.setValue(volumeValue);
+			    plugin.setAudioVolume(volumeValue);
+				volumeIcon = true;				
+			}
+			stopProp(event);
+		}
+
+		/*阻止冒泡事件*/
+		function stopClickProp(event)
+		{
+			event = event || window.event;
+			stopProp(event);
+		}
+
+		/* 倒放 */
+		function reversePlay()
+		{
+		
+		}
+
+		/* 上一帧 */
+		function preVideo()
+		{
+		
+		}
+
+		/* 下一帧 */
+		function nextVideo()
+		{
+			if (false == playSign || (true == suspendSign && false == singleFrame) || cutClick == true)
+			{
+				return;
+			}
+
+			singleFrame = true;
+			suspendSign = true;
+			startPlayLi.style.backgroundImage = "url(../web-static/images/startPlay.png)";
+			$("#startPlay").attr("title","{%label.startPlay%}");
+			$("li.fastThSec, li.slowPlay, li.curSpeed, li.speedPlay, li.cutVideo, li.volume").css({"opacity":"0.5"});
+			disableHover($("li.fastThSec, li.slowPlay, li.speedPlay, li.cutVideo, li.volume"), "icon");
+			$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+
+			plugin.PlaySingleFrame();
+			getPlayingTime();
+			if (options.runningTime >= maxFinishTime)
+			{
+				stopPlay();
+				return;
+			}
+			timeControl.timeRun();
+		}
+
+		/* 设置通道和画面的对应关系 */
+		function setWinChn()
+		{
+			for (var i = 0; i < screenNum; i++)
+			{
+				plugin.setPlaybackChn(i, 1);
+			}
+		}
+
+		function noteStopPlay()
+		{
+			showAlert(errStr.stopPlayFirst);
+		}
+
+		/*播放或暂停时在日期选择器上覆盖div，禁用日期选择功能*/
+		function showCoverDiv(paraDiv)
+		{
+			var bottomDiv = id(paraDiv);
+			var topDiv = id(paraDiv + "Cover");
+			if (undefined == id(paraDiv + "Cover"))
+			{
+				topDiv = document.createElement("div");
+				topDiv.id = paraDiv + "Cover";
+				topDiv.style.position = "absolute";
+				topDiv.style.left = "0px";
+				topDiv.style.top = "0px";
+				topDiv.style.width = bottomDiv.scrollWidth + "px";
+				topDiv.style.height = bottomDiv.scrollHeight + "px";
+				topDiv.className = "laydate_boxCover";
+				topDiv.style.display = "block";
+				$(topDiv).click(noteStopPlay);
+				bottomDiv.appendChild(topDiv);
+			}
+			else
+			{
+				topDiv.style.display = "block";
+			}
+		}
+
+		/* 播放和暂停 */
+		function startPlay()
+		{
+			if (VideoNone == playCls())
+			{
+				showAlert(errStr.choosePlayTypeFirst);
+				return;
+			}
+
+			if (false == playSign) /* 未播放任何视频 */
+			{
+				var showIndex = 0, videoChan, videoObjList, hasVideo = false;
+				var getMaxTime = 0;
+
+				/* 选中播放的通道 */
+				showIngList.length = 0;
+				maxFinishTime = 0;
+				for (var i = 0; i < screenNum; i++)
+				{
+					if (-1 != showChanList[i])
+					{
+						showIngList[showIndex] = showChanList[i];
+						showIndex++;
+					}
+				}
+
+				/* 判断是否有录像事件 */
+				videoChan = $("div.channelLine");/* 所有通道 */
+
+				for (var i = 0; i < showIndex; i++)
+				{
+					videoObjList = $("div#channelLine" + (showIngList[i] + 1) + " span");
+					for (var j = 0, len = videoObjList.length; j < len; j++)
+					{
+						if ("hidden" != videoObjList[j].style.visibility)
+						{
+							hasVideo = true;
+							getMaxTime = parseInt(videoObjList[j].getAttribute("value"), 10);
+							if (maxFinishTime < getMaxTime)
+							{
+								maxFinishTime = getMaxTime;
+							}
+						}
+					}
+				}
+
+				if (false == hasVideo) /* 没有播放的录像事件 */
+				{
+					showAlert(errStr.hasNoVideo);
+					return;
+				}
+
+				if (0 != lastPlayTime && 0 == options.runningTime)
+				{
+					options.runningTime = lastPlayTime;
+					lastPlayTime = 0;
+				}
+				if (options.runningTime >= maxFinishTime)
+				{
+					showAlert(errStr.setPlayTimeErr);
+					return;
+				}
+
+				if ("block" == fileArea.style.display)
+				{
+					id("senseType").disable(true);
+					id("senseType").onclick = noteStopPlay;
+				}
+				if ("block" == id("laydate_box").style.display)
+				{
+					showCoverDiv("laydate_box");
+				}
+
+				enableHover($("ul.vedioSetMenu li.iconDis"), "icon");
+
+				showToast("loading");
+				id("backPlugin").style.visibility = "visible";
+				chanDiv.style.visibility = "hidden";
+				nowTime = secDisToday;
+				$.setTimeout(function(){
+					setWinChn();
+
+					if (typeof plugin.setPlayBackInfo == "function")
+					{
+						/* 调用playback之前先设置 clientId, playbackType, playbackScale, startTime */
+						var opt = {};
+						opt[uciPlayBack.optName.seconds] = parseInt(options.runningTime) + secDisToday;
+						opt[uciPlayBack.optName.type] = playCls();
+						opt[uciPlayBack.optName.scale] = playbackScaleArr[curScaleIndex];
+						plugin.setPlayBackInfo(opt);
+					}
+					plugin.playback();
+				},0);
+			}
+			else /* 有视频在播放 */
+			{
+				if (typeof plugin.pausePlayback == "function")
+				{
+					var pauseFlag = (suspendSign == true ? STARTPLAY : STOPSIGN);
+					plugin.pausePlayback(pauseFlag);
+
+					suspendSign = suspendSign == true ? false : true;
+					if (true == suspendSign)
+					{
+						startPlayLi.style.backgroundImage = "url(../web-static/images/startPlay.png)";
+						$("#startPlay").attr("title","{%label.startPlay%}");
+						$("li.fastThSec, li.slowPlay, li.speedPlay, li.curSpeed, li.nextVideo, li.cutVideo, li.volume").css({"opacity":"0.5"});
+						disableHover($("li.fastThSec, li.slowPlay, li.speedPlay, li.nextVideo, li.cutVideo, li.volume"), "icon");
+					}
+					else
+					{
+						startPlayLi.style.backgroundImage = "url(../web-static/images/suspend.png)";
+						$("#startPlay").attr("title","{%label.pausePlay%}");
+						if (bRecording)
+						{
+							$("li.fullScreen, li.camera, li.cutVideo, li.elecZoom, li.volume").css({"opacity":"1"});
+							enableHover($("li.fullScreen, li.camera, li.cutVideo, li.elecZoom, li.volume"), "icon");
+						}
+						else
+						{
+							$("li.fastThSec, li.fullScreen, li.slowPlay, li.curSpeed, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume").css({"opacity":"1"});
+							enableHover($("li.fastThSec, li.fullScreen, li.slowPlay, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume"), "icon");
+							if (2 != curScaleIndex)
+							{
+								$("li.volume, li.cutVideo").css({"opacity":"0.5"});
+								disableHover($("li.volume, li.cutVideo"), "icon");
+							}
+						}
+						if (true == singleFrame)
+						{
+							$("li.volume").css({"opacity":"1"});
+							enableHover($("li.volume"), "icon");
+							$("#volume").css('background-image','url(../web-static/images/volumeOn.png)');
+						}
+						singleFrame = false;
+						if (2 != curScaleIndex)
+						{
+							$("li.volume").css({"opacity":"0.5"});
+							disableHover($("li.volume"), "icon");
+							$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+						}
+					}
+				}
+			}
+		}
+
+		/* 慢放 */
+		function slowPlay()
+		{
+			if (curScaleIndex <= 0 || playSign == false || singleFrame == true || true == suspendSign)
+			{
+				return;
+			}
+
+			curScaleIndex--;
+			id("curSpeed").style.backgroundImage="url(" + imageArr[curScaleIndex] + ")";
+			if (2 == curScaleIndex)
+			{
+				$("li.volume, li.cutVideo").css({"opacity":"1"});
+				enableHover($("li.volume, li.cutVideo"), "icon");
+				if (volumeIcon)
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOn.png)');
+				}
+			}
+			else
+			{
+				$("li.volume, li.cutVideo").css({"opacity":"0.5"});
+				disableHover($("li.volume, li.cutVideo"), "icon");
+				$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+			}
+			plugin.setPlaybackScale(playbackScaleArr[curScaleIndex]);
+		}
+
+		/* 快进 */
+		function speedPlay()
+		{
+			if (curScaleIndex >= 4 || playSign == false || singleFrame == true || true == suspendSign)
+			{
+				return;
+			}
+
+			curScaleIndex++;
+			id("curSpeed").style.backgroundImage="url(" + imageArr[curScaleIndex] + ")";
+			if (2 == curScaleIndex)
+			{
+				$("li.volume, li.cutVideo").css({"opacity":"1"});
+				enableHover($("li.volume, li.cutVideo"), "icon");
+				if (volumeIcon)
+				{
+					$("#volume").css('background-image','url(../web-static/images/volumeOn.png)');
+				}
+			}
+			else
+			{
+				$("li.volume, li.cutVideo").css({"opacity":"0.5"});
+				disableHover($("li.volume, li.cutVideo"), "icon");
+				$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+			}
+			plugin.setPlaybackScale(playbackScaleArr[curScaleIndex]);
+		}
+
+		/* 停止播放 */
+		function stopPlay()
+		{
+			if (playSign == false)
+			{
+				return;
+			}
+
+			if ("block" == fileArea.style.display)
+			{
+				id("senseType").onclick = noteStopPlay;
+				id("senseType").disable(false);
+			}
+			if (id("laydate_boxCover") && "block" == id("laydate_boxCover").style.display)
+			{
+				id("laydate_boxCover").style.display = "none";
+			}
+
+			plugin.stopPlayback();
+			clearTimeout(runHd);
+			playSign = false;
+			singleFrame = false;
+			tdObjClick.clickDisabled = false;
+			suspendSign = false;
+			timingIcon.disabled = false;
+			MoveDetIcon.disabled = false;
+			startPlayLi.style.backgroundImage = "url(../web-static/images/startPlay.png)";
+			$("#startPlay").attr("title","{%label.startPlay%}");
+			$("li.pluginScreen").attr("disabled", false).css({"opacity":"1"});
+			$("li.fastThSec, li.stopPlay, li.fullScreen, li.slowPlay, li.curSpeed, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume").css({"opacity":"0.5"});
+			disableHover($("li.fastThSec, li.stopPlay, li.fullScreen, li.slowPlay, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume"), "icon");
+
+			if (playSign == false && fileList.length > 0)
+			{
+				options.runningTime = fileList[0][uciPlayBack.optName.startTime];
+			}
+			timeControl.timeRun();
+
+			if (volumeIcon)
+			{
+				$("#volume").css('background-image','url(../web-static/images/volumeOn.png)');
+			}
+			id("backPlugin").style.visibility = "hidden";
+			chanDiv.style.visibility = "visible";
+			clickDerection = 0;
+			maxFinishTime = 0;
+
+			var elecZoom = $.find("li.elecZoom")[0];
+			if (elecZoom.state == STATE_ON)
+			{
+				elecZoom.style.backgroundColor = "#F5F7FA";
+				elecZoom.style.borderColor = "";
+				elecZoom.style.backgroundImage = "";
+				elecZoom.state = STATE_OFF;
+				plugin.stopDigitalZoomState(0);
+			}
+		}
+
+		/* 快进30秒 */
+		function fastThSec()
+		{
+			/* 未播放视频/暂停/截取视频时不允许快进 */
+			if (playSign == false || true == suspendSign || cutClick == true)
+			{
+				return;
+			}
+
+			options.runningTime += 30;
+
+			if (options.runningTime >= maxFinishTime)
+			{
+				stopPlay();
+				return;
+			}
+
+			showToast("loading");
+			setPlayTime(options.runningTime, function(errCode){
+				if (ENONE != errCode)
+				{
+					closeToast();
+					showAlert(label.invRequestFail);
+					return;
+				}
+				else
+				{
+					//showToast("success");
+					success = true;
+				}
+			});
+		}
+
+		function kinescopHideOut()
+		{
+			clearTimeout(kinescopTimeoutHd);
+			kinescopTimeoutHd = $.setTimeout(function(){
+				$("#popNote").animate({bottom:"-250px"}, undefined, undefined, function(){
+					id("popNote").style.display = "none";
+				});
+			}, 5000);
+		}
+
+		function getKinescopeTime()
+		{
+			var kpTime, kpCurTimeArr;
+			var hour, minute, second;
+			var crSecond;
+
+			clearTimeout(getKinescopeTimeHd);
+
+			crSecond = plugin.getPlayTime();
+			kpTime = parseInt(crSecond - kpStartSecond);
+			hour = parseInt(kpTime/3600);
+			minute = parseInt(kpTime%3600/60);
+			second = parseInt(kpTime%60);
+
+			if (second  < 10)
+			{
+				second = "0" + second;
+			}
+
+			if (minute  < 10)
+			{
+				minute = "0" + minute;
+			}
+
+			if (hour  < 10)
+			{
+				hour = "0" + hour;
+			}
+
+			kpTime = hour + ":" + minute + ":" + second;
+			kinescopingSp.html(kpTime);
+			getKinescopeTimeHd = $.setTimeout(arguments.callee, 200);
+		}
+
+		/* 截取视频 */
+		function cutVideo()
+		{
+			if (false == playSign  || true == suspendSign || 2 != curScaleIndex)
+			{
+				return;
+			}
+			cutClick = true == cutClick ? false : true;
+
+			var obj = this;
+
+			function kinescopeEnd()
+			{
+				bRecording = false;
+				if (true == playSign)
+				{
+					$("li.fastThSec, li.slowPlay, li.curSpeed, li.speedPlay, li.nextVideo").css({"opacity":"1"});
+					enableHover($("li.fastThSec, li.slowPlay, li.speedPlay, li.nextVideo"), "icon");
+				}
+				obj.style.backgroundColor = "#F5F7FA";
+				obj.style.borderColor = "";
+				obj.style.backgroundImage = "";
+				obj.state = STATE_OFF;
+				kinescoping.hide();
+				kinescopingNote.style.bottom = "9999px";
+				clearTimeout(getKinescopeTimeHd);
+			}
+
+			if (this.state == STATE_ON)
+			{
+				plugin.saveVideo(PLUGIN_STATE_OFF);
+				kinescopeEnd("noteCorrect", label.kinescopeEnd);
+				this.style.backgroundColor = "#F5F7FA";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "";
+				this.state = STATE_OFF;
+				kinescopingNote.style.bottom = "9999px";
+			}
+			else
+			{
+				if (!(false === plugin.saveVideo(PLUGIN_STATE_ON, function(result){
+					if (result == PLUGIN_STATE_ON)
+					{
+						kpStartSecond = plugin.getPlayTime();
+						kinescopingSp.html(kpInitTime);
+						kinescoping.show();
+						getKinescopeTimeHd = $.setTimeout(getKinescopeTime, 200);
+						kinescopingNote.style.bottom = "9999px";
+						bRecording = true;
+						$("li.fastThSec, li.slowPlay, li.curSpeed, li.speedPlay, li.nextVideo").css({"opacity":"0.5"});
+						disableHover($("li.fastThSec, li.slowPlay, li.speedPlay, li.nextVideo"), "icon");
+					}
+				}, function(result){
+					var showStr = "";
+
+					switch(parseInt(result))
+					{
+					case 0:
+						showStr = label.kinescopeEnd;
+						$("#StorageFolder").css('background-image','url(../web-static/images/save_reddot.png)');
+						break;
+					case 1:
+						showStr = statusStr.wanNetworkExpt;
+						break;
+					case 3:
+						showStr = label.diskLess;
+						break;
+					case 5:
+						showStr = label.kinescopeSaveFail;
+						break;
+					case 6:
+						showStr = label.kinescopeSaveTimeLess;
+						break;
+					case 7:
+						showStr = label.pathChange;
+						break;
+					case 8:
+						showStr = label.pathNoExist;
+						break;
+					}
+
+					if(parseInt(result) > 0)
+					{
+						clearTimeout(kinescopTimeoutHd)
+						popContentCorrect.style.display = "none";
+						popContentError.style.display = "inline-block";
+						if(7 == parseInt(result))
+						{
+							titleText.innerHTML = label.cue;
+						}
+						else
+						{
+							titleText.innerHTML = label.kinescopFail;
+						}
+						popContentError.innerHTML = showStr;
+					}
+					else{
+						var path = plugin.getVideoFileStoragePath();
+						var index = path.lastIndexOf('\\');
+						var nameStr = path.substr(index+1);
+						popContentCorrect.style.display = "inline-block";
+						popContentError.style.display = "none";
+						titleText.innerHTML = label.kinescopSuccess;
+						name.innerHTML = nameStr;
+						check.onclick = function(){
+							plugin.openFileStorageFolder(path);
+						}
+						kinescopHideOut();
+					}
+					$("#popNote").animate({bottom:"40px"});
+					id("popNote").style.display = "inline-block";
+					log(result);
+					if(7 == parseInt(result))
+					{
+						kinescopHideOut();
+					}
+					else
+					{
+						kinescopeEnd();
+					}
+				})))
+				{
+					this.style.backgroundColor = "#E8EAED";
+					this.style.borderColor = "#A4A9B3";
+					this.style.backgroundImage = "url(../web-static/images/cutVideoPressed.png)";
+					this.state = STATE_ON;
+					kinescopingNote.style.bottom = "48px";
+					kinescopingNote.style.left = getoffset(kinescopingSet).left - kinescopingNote.offsetWidth/2 + kinescopingSet.offsetWidth/2 + "px";
+				}
+			}
+		}
+
+		function cutShow()
+		{
+			/*if (true == cutClick)
+			{
+				id("cutVideo").style.backgroundColor = "#0b0b0b";
+				cutSaveBtn.style.visibility = "visible";
+				id("trueCover").style.visibility = "visible";
+				id("cutArea").style.visibility = "visible";
+			}
+			else
+			{
+				id("cutVideo").style.backgroundColor = "transparent";
+				id("trueCover").style.visibility = "hidden";
+				id("cutArea").style.visibility = "hidden";
+				cutSaveBtn.style.visibility = "hidden";
+			}*/
+		}
+
+		/* 保存截取的视频 */
+		function saveCutVideo()
+		{
+
+		}
+
+		function vedioHeightFit(resolution)
+		{
+			if (null == id("videoPluginReplayCon"))
+			{
+				basicResizeArrRemove("basicRePlay");
+				return;
+			}
+
+			try
+			{
+				var vedioSetDivHeihgt = vedioSetDiv.offsetHeight + 2; /* 图标+2px border */
+				var rConHeight = rCon[0].offsetHeight; /* 总高度 */
+				var footHeight = footTime.offsetHeight; /* 底部 */
+				var videoAreaWidth = parseInt(id("videoPluginReplayCon").offsetWidth);
+				var height = parseInt(rConHeight) - parseInt(vedioSetDivHeihgt) - parseInt(footHeight) -32; /*32为插件距vedioSetDivHeihgt和footHeight各16px*/
+				var minHeight = 420, minWidth = 1000, minPluginWidth = 662, width;
+				if($("div.channelCon")[0]){
+					minHeight = $("div.channelCon")[0].offsetHeight > minHeight ? $("div.channelCon")[0].offsetHeight : minHeight;
+				}
+
+				if(isIESix)
+				{
+					$("div.btnCon")[0].style.top = (height - 16) + "px";
+				}
+				resolution = resolution == undefined ? 16/9 : resolution;
+				height = height < minHeight ? minHeight : height;
+				width = height * resolution;
+
+				if (document.documentElement.clientWidth < parseInt(width + 301)) /*301为侧边栏280+border的1px+视频右侧距侧边栏20px*/
+				{
+					//width = document.documentElement.clientWidth - 301;
+					//width = width < minPluginWidth ? minPluginWidth : width;
+					document.body.style.width = width + 301 + "px";
+				}
+				else
+				{
+					document.body.style.width = document.documentElement.clientWidth + "px";
+				}
+				plugin.setSize({height:height + "px", width:width + "px"});
+				plugin.checkInstalled(function(){
+					plugin.showInstalledTip();
+				});
+				chanDiv.style.height = height + "px";
+				chanDiv.style.lineHeight = height + "px";
+				chanDiv.style.width = width + "px";
+
+				if((videoAreaWidth - width) > 0){
+					chanDiv.style.left = (videoAreaWidth - width) * 0.5 + "px";
+				}
+
+				rCon.css("visibility", "visible");
+			}catch(ex){
+				log(ex);
+			}
+		}
+
+		function getPageData()
+		{
+			var resolution = 16/9;
+
+			for (var index = 0, len = menuList.length; index < len; index++)
+			{
+				menuList[index].onclick = menuFuncList[index].func;
+			}
+
+			window.gBasicPreviewResolution = resolution;
+			window.vedioHeightFit = vedioHeightFit;
+			gBasicResizeArr["basicRePlay"] = {func:function(){
+				/*音量弹框位置随页面缩放调整*/
+				if(volumeNote.style.left != "0px"){
+					volumeNote.style.left = getoffset(volume).left - volumeNote.offsetWidth/2 + volume.offsetWidth/2 + "px";
+				}
+				/*剪辑录像弹框位置随页面缩放调整*/
+				if(kinescopingNote.style.left != "0px"){
+					kinescopingNote.style.left = getoffset(kinescopingSet).left - kinescopingNote.offsetWidth/2 + kinescopingSet.offsetWidth/2 + "px";
+				}
+				vedioHeightFit(gBasicPreviewResolution);
+				var pluginUpInfoCon = $("div.pluginUpInfoCon")[0];
+				if(pluginUpInfoCon){
+					$(".laydate_box").css("top","134px");
+					$("#timePosition").css("top","350px");
+				}
+				else{
+					$(".laydate_box").css("top","90px");
+					$("#timePosition").css("top","306px");
+				}
+			}};
+			vedioSetDiv.style.display = "block";
+			volumeDragLine = new DragLine({id:"volumeDragLine", cb:volumeChange, lowerBound:0});
+			vedioHeightFit(resolution);
+			volumeValue = plugin.getAudioVolume();
+			if(volumeValue){
+				volumeChange(volumeValue);
+			}
+			id("volumeDragLineDragLineLabel").onclick = volumeIconClick;
+			volumeNote.onclick = stopClickProp;
+
+			id("startPlay").onmousedown = function()
+			{
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				if (true == suspendSign)
+				{
+					this.style.backgroundImage = "url(../web-static/images/suspendPressed.png)";
+				}
+				else
+				{
+					this.style.backgroundImage = "url(../web-static/images/startPlayPressed.png)";
+				}
+			}
+			id("startPlay").onmouseup = function()
+			{
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				if (true == suspendSign)
+				{
+					this.style.backgroundImage = "url(../web-static/images/suspend.png)";
+				}
+				else
+				{
+					this.style.backgroundImage = "url(../web-static/images/startPlay.png)";
+				}
+			}
+
+			id("stopPlay").onmousedown = function()
+			{
+				if (false == playSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/stopPlayPressed.png)";
+			}
+			id("stopPlay").onmouseup = function()
+			{
+				if (false == playSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/stopPlay.png)";
+			}
+
+			id("slowPlay").onmousedown = function()
+			{
+				if (curScaleIndex <= 0 || playSign == false || singleFrame == true || true == suspendSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/slowPlayPressed.png)";
+			}
+			id("slowPlay").onmouseup = function()
+			{
+				if (curScaleIndex <= 0 || playSign == false || singleFrame == true || true == suspendSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/slowPlay.png)";
+			}
+
+			id("speedPlay").onmousedown = function()
+			{
+				if (curScaleIndex >= 4 || playSign == false || singleFrame == true || true == suspendSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/speedPlayPressed.png)";
+			}
+			id("speedPlay").onmouseup = function()
+			{
+				if (curScaleIndex >= 4 || playSign == false || singleFrame == true || true == suspendSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/speedPlay.png)";
+			}
+
+			id("fastThSec").onmousedown = function()
+			{
+				if (playSign == false || true == suspendSign || cutClick == true)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/fast30Pressed.png)";
+			}
+			id("fastThSec").onmouseup = function()
+			{
+				if (playSign == false || true == suspendSign || cutClick == true)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/fast30.png)";
+			}
+
+			id("nextVideo").onmousedown = function()
+			{
+				if (false == playSign || (true == suspendSign && false == singleFrame) || cutClick == true)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/nextVideoPressed.png)";
+			}
+			id("nextVideo").onmouseup = function()
+			{
+				if (false == playSign || (true == suspendSign && false == singleFrame) || cutClick == true)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/nextVideo.png)";
+			}
+
+			id("cameraSet").onmousedown = function()
+			{
+				if (false == playSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/cameraPressed.png)";
+			}
+			id("cameraSet").onmouseup = function()
+			{
+				if (false == playSign)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#F5F7FA";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/camera.png)";
+			}
+
+			id("fullScreen").onmousedown = function()
+			{
+				if (false == playSign || elecZoom.state == STATE_ON)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/fullScreenPressed.png)";
+			}
+			id("fullScreen").onmouseup = function()
+			{
+				if (false == playSign || elecZoom.state == STATE_ON)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#F5F7FA";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/fullScreen.png)";
+			}
+			id("goToTime").onmousedown = function(){
+				if(timeErr)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#E8EAED";
+				this.style.borderColor = "#C8CDD9";
+				this.style.backgroundImage = "url(../web-static/images/goToTimePressed.png)";
+			}
+			id("goToTime").onmouseup = function()
+			{
+				if(timeErr)
+				{
+					return;
+				}
+				this.style.backgroundColor = "#FFFFFF";
+				this.style.borderColor = "";
+				this.style.backgroundImage = "url(../web-static/images/goToTime.png)";
+			}
+			id("goToTime").onmouseover = function(){
+				if(timeErr)
+				{
+					return;
+				}
+				this.style.borderColor = "#5A92FF";
+				this.style.cursor = "pointer";
+			}
+			id("goToTime").onmouseout = function(){
+				if(timeErr)
+				{
+					return;
+				}
+				this.style.borderColor = "";
+				this.style.cursor = "default";
+			}
+			id("closeTip").onclick = function()
+			{
+				 $("#popNote").animate({bottom:"-250px"}, undefined, undefined, function(){
+					id("popNote").style.display = "none";
+				});
+			}
+		}
+
+		function timeCheck()
+		{
+			if(parseInt(id("hourInput").value) <= 24 && parseInt(id("hourInput").value) >= 0 && parseInt(id("minuInput").value) <= 60 && parseInt(id("minuInput").value) >= 0 
+				&& parseInt(id("secInput").value) <= 60 && parseInt(id("secInput").value) >= 0)
+			{
+				id("goToTime").style.backgroundImage = "url(../web-static/images/goToTime.png)";
+				id("goToTime").style.backgroundColor = "#FFFFFF";
+				return timeErr = false;
+			}
+			id("goToTime").style.backgroundImage = "url(../web-static/images/goToTimeDis.png)";
+			id("goToTime").style.backgroundColor = "#F5F7FA";
+			return timeErr = true;
+		}
+		function getFileNum(startTime, endTime, type)
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+			var moduleName, actionName, numName;
+			
+			moduleName = "playback";
+			actionName = "get_video_num";
+			numName = "video_num";
+
+			data[moduleName] = module;
+			module[actionName] = actObj;
+			actObj["start_time"] = startTime.toString();
+			actObj["end_time"] = endTime.toString();
+			actObj["type"] = type || typeOnShow;
+			actObj["id"] = userId;
+
+			$.action(data, function(result){
+				totalNum = result[moduleName][numName] || 0;
+			});
+		}
+
+		function senseTypeChange(type)
+		{
+			var data = {};
+			var module = {};
+			var actObj = {};
+			var startTime = secDisToday;
+			var endTime = secDisToday + 60 * 60 * 24 - 1;
+			var moduleName, actionName, listName;
+			
+			showToast();
+			moduleName = "playback";
+			actionName = "get_video_num";
+			numName = "video_num";
+
+			data[moduleName] = module;
+			module[actionName] = actObj;
+			actObj["start_time"] = startTime.toString();
+			actObj["end_time"] = endTime.toString();
+			actObj["type"] = type || typeOnShow;
+			actObj["id"] = userId;
+
+			$.action(data, function(result){
+				var totalNum = result[moduleName][numName] || 0;
+				
+				if (totalNum == 0 || totalNum == "0")
+				{
+					videoDetailInfo["channel1"] = [];
+					totalFile = {};
+					dataCopy2(totalFile, videoDetailInfo);
+					$("#chanFile li.chnLi").eq(0).click();
+					showFileListChn();
+					fillFileAndChart();
+					fillTrueChn(showChanList);
+					closeToast();
+					return;
+				}
+
+				moduleName = "playback";
+				actionName = "get_video_list";
+				listName = "video_list";
+				
+				data = {};
+				module = {};
+				actObj = {};
+				
+				data[moduleName] = module;
+				module[actionName] = actObj;
+				actObj["start_time"] = startTime.toString();
+				actObj["end_time"] = endTime.toString();
+				actObj["type"] = type;
+				actObj["id"] = userId;
+				actObj["index_start"] = 1;
+				actObj["index_end"] = totalNum;
+				
+				$.action(data, function(result){
+					if (errorHandle(result[ERR_CODE]))
+					{
+						videoDetailInfo = [];
+						videoDetailInfo["channel1"] = result[moduleName]["video_list"];
+						totalFile = {};
+						dataCopy2(totalFile, videoDetailInfo);
+						$("#chanFile li.chnLi").eq(0).click();
+						showFileListChn();
+						fillFileAndChart();
+						fillTrueChn(showChanList);
+						closeToast();
+					}
+				});
+			});			
+		}
+
+		/* 右侧选择函数 */
+		function fileClickFun()
+		{
+			id("downloadCon").onclick = function()
+			{
+				if (this.state == STATE_ON)
+				{
+					if (downloading)
+					{
+						downloadNote.style.bottom = "10px";
+						downloadNote.style.left = getoffset(cameraSet).left + cameraSet.offsetWidth/2 + "px";
+						downloadTimeout();
+
+						return;
+					}
+					dateArea.style.display = "block";
+					fileArea.style.display = "none";
+
+					if (playSign && id("laydate_boxCover") && "block" != id("laydate_boxCover").style.display)
+					{
+						id("laydate_boxCover").style.display = "block";
+					}
+					if (!playSign && id("laydate_boxCover") && "none" != id("laydate_boxCover").style.display)
+					{
+						id("laydate_boxCover").style.display = "none";
+					}
+
+					isShowDate = true;
+					id("laydate_box").style.display = "block";
+					id("downloadTableDiv").style.display = "none";
+					this.state = STATE_OFF;
+					this.value = label.downloadVideo;
+					id("dateCls").style.display = "inline-block";
+					id("fileCls").style.display = "none";
+					id("timePosition").style.display = "inline-block";
+				}
+				else
+				{
+					fileArea.style.display = "block";
+					dateArea.style.display = "none";
+					isShowDate = false;
+					id("laydate_box").style.display = "none";
+					selectInit("senseType", senseTypeOptions, 
+								"18446744073709551615", senseTypeChange, 12);//maxSize=12,下拉框每一项最多显示12个英文字符、6个中文字符
+					if(true == playSign)
+					{
+						id("senseType").disable(true);
+						id("senseType").onclick = noteStopPlay;
+					}
+					else
+					{
+						id("senseType").onclick = null;
+						id("senseType").disable(false);
+					}
+					this.state = STATE_ON;
+					this.value = btn.backWzd;
+					id("fileCls").style.display = "inline-block";
+					id("timePosition").style.display = "none";
+					id("dateCls").style.display = "none";
+				}
+			}
+			initListByChan();
+		}
+
+		/* 初始化日期控件 */
+		function initDate()
+		{
+			var ht = new Date();
+
+			ht.setTime(secDisToday * 1000);
+			laydate({elem:"#dateArea", sysTime:ht, close:false, videoDay:videoDayList,
+				preInitFun:function(curYear, callBack){
+					getHasVideoDay(curYear, callBack);
+				},
+				choose:function(date){
+					var ymd = date.split("-"), tmpTmRes;
+
+					tmpTmRes = date.replace(/-/g, "");
+					if (tmpTmRes == timeRes)
+					{
+						return;
+					}
+					curTime.year = parseInt(ymd[0], 10);
+					curTime.month = parseInt(ymd[1], 10);
+					curTime.day = parseInt(ymd[2], 10);
+					getTimeSec();
+					timeRes = tmpTmRes;
+					getVideoObj(); /* 重新获取录像视频 */
+				},
+				tdDisabled:tdObjClick
+			});
+			dateArea.click();
+		}
+
+		/* 点击文件列表播放文件 */
+		function clickFilePlay(index)
+		{
+			srcPlayTime = options.runningTime;
+			options.runningTime = fileList[index][uciPlayBack.optName.startTime];
+
+			if (false == playSign)
+			{
+				startPlay();
+			}
+			else if (true == suspendSign)
+			{
+				stopPlay();
+				srcPlayTime = options.runningTime;
+				options.runningTime = fileList[index][uciPlayBack.optName.startTime];
+				startPlay();
+			}
+			else
+			{
+				if (true == bRecording)
+				{
+					kinescopingSet.click();
+				}
+				showToast();
+				setPlayTime(options.runningTime, function(errCode){
+					if (ENONE == errCode)
+					{
+						//showToast("success");
+						success = true;
+					}
+					else
+					{
+						options.runningTime = srcPlayTime;
+						closeToast();
+						showAlert(errStr.chooseFileFail);
+					}
+				});
+			}
+		}
+
+		/* 回放时间定位 */
+		function goToTimePosition()
+		{
+			if(!id("hourInput").value || !id("minuInput").value || !id("secInput").value)
+			{
+				return;
+			}
+			srcPlayTime = options.runningTime;
+			options.runningTime = id("hourInput").value*3600 + id("minuInput").value*60 + id("secInput").value*1;
+
+			if (false == playSign)
+			{
+				startPlay();
+			}
+			else if (true == suspendSign)
+			{
+				stopPlay();
+				srcPlayTime = options.runningTime;
+				options.runningTime = id("hourInput").value*3600 + id("minuInput").value*60 + id("secInput").value;
+				if (options.runningTime >= maxFinishTime)
+				{
+					stopPlay();
+					return;
+				}
+				startPlay();
+			}
+			else
+			{
+				if (true == bRecording)
+				{
+					kinescopingSet.click();
+				}
+				showToast();
+				setPlayTime(options.runningTime, function(errCode){
+					if (ENONE == errCode)
+					{
+						success = true;
+					}
+					else
+					{
+						options.runningTime = srcPlayTime;
+						closeToast();
+						showAlert(label.invRequestFail);
+					}
+				});
+			}
+		}
+
+		function modifyTimeStr(value)
+		{
+			if (value < 10)
+			{
+				value = "0" + value;
+			}
+
+			return value;
+		}
+
+		function formateDate(msecs)
+		{
+			var now;
+
+			if (undefined == msecs)
+			{
+				now = new Date();
+			}
+			else
+			{
+				now = new Date(msecs);
+			}
+
+			return now.getFullYear() + "-" + modifyTimeStr(now.getMonth() + 1) + "-" + modifyTimeStr(now.getDate()) + " " +
+					modifyTimeStr(now.getHours()) + ":" + modifyTimeStr(now.getMinutes()) + ":" + modifyTimeStr(now.getSeconds());
+		}
+
+		function generateFileName(startTime) {
+			var fileName = formateDate((parseInt(startTime, 10) + secDisToday) * 1000);
+			fileName = fileName.replace(/-/g, "");
+			fileName = fileName.replace(/ /g, "");
+			fileName = fileName.replace(/:/g, "");
+			fileName += ".mp4";
+
+			return fileName;
+		}
+
+		function downloadVideo(indexArry) {
+			var startTime, endTime;
+			var totalSize;
+			downIndex = 0;
+			var idStr;
+			downloaded = false;
+
+			for (var i = 0; i < indexArry.length; ++i)
+			{
+				table.rows[i + 1].cells[2].innerHTML = "<span class=noDownload>" + label.waitingToDownload +"</span>";
+			}
+
+			startTime = originFileList[indexArry[downIndex]]["startTime"] ? originFileList[indexArry[downIndex]]["startTime"]:originFileList[indexArry[downIndex]]["start_time"];
+			endTime = originFileList[indexArry[downIndex]]["endTime"] ? originFileList[indexArry[downIndex]]["endTime"]:originFileList[indexArry[downIndex]]["end_time"];
+
+			idStr = originFileList[indexArry[downIndex]]["id_str"];
+			totalSize = parseInt(originFileList[indexArry[downIndex]]["size"], 10);
+			plugin.setDownloadCallback(function (progress) {
+				if (-1 == progress)
+				{
+					for (var i = downIndex; i < indexArry.length; i++)
+					{
+						table.rows[i + 1].cells[2].innerHTML = "<span class=downloadErr>" + label.downloadErr +"</span>";
+					}
+					id("downloadNum").style.backgroundImage = "url(../web-static/images/downloadErrIcon.png)";
+					return;
+				}
+				if(downloading){
+					table.rows[downIndex + 1].cells[2].innerHTML = "<span class=downloading>" + progress + "%" +"</span>";
+				}
+				if (progress == 100)
+				{
+					path = plugin.getFileStorageFolder();
+					$("#StorageFolder").css('background-image','url(../web-static/images/save_reddot.png)');
+					table.rows[downIndex + 1].cells[2].innerHTML = "<i class=completeIcon>" + "</i>" + "<span class=downloaded>" + label.check +"</span>";
+					(function(path)
+					{
+						table.rows[parseInt(downIndex, 10) + 1].cells[2].childNodes[1].onclick = function()
+						{
+							plugin.openFileStorageFolder(path);
+						}
+					}(path));
+					downIndex++;
+
+					if (downIndex == indexArry.length)
+					{
+						downloaded = true;
+						$.find("li.stopDownload")[0].click();
+						return;
+					}
+					startTime = originFileList[indexArry[downIndex]]["startTime"] ? originFileList[indexArry[downIndex]]["startTime"]:originFileList[indexArry[downIndex]]["start_time"];
+
+					endTime = originFileList[indexArry[downIndex]]["endTime"] ? originFileList[indexArry[downIndex]]["endTime"]:originFileList[indexArry[downIndex]]["end_time"];
+
+					idStr = originFileList[indexArry[downIndex]]["id_str"];
+					totalSize = parseInt(originFileList[indexArry[downIndex]]["size"], 10);
+					plugin.downloadVideo(startTime, endTime, idStr, totalSize);
+				}
+			});
+
+			table.rows[downIndex + 1].cells[2].innerHTML = "0%";
+			downloading = true;
+			plugin.downloadVideo(startTime, endTime, idStr, totalSize);
+		}
+
+		function downloadFunc(index) {
+			if (true == plugin.isIEProtected())
+			{
+				$.find("li.stopDownload")[0].click();
+				return;
+			}
+			indexArry = index.toString().split("-");
+			id("downloadNum").style.display = "inline-block";
+			id("downloadNum").innerHTML = indexArry.length;
+			var secName;
+			var tmp;
+
+			downloadFileList = []; /*用于显示*/
+			for (var i in indexArry)
+			{
+				tmp = [];
+				secName = fileList[indexArry[i]];
+				tmp["filename"] = generateFileName(secName["startTime"]);
+				tmp["progress"] = "";
+				downloadFileList.push(tmp);
+			}
+
+			downloadFileTable.setDataSource(downloadFileList);
+			downloadFileTable.refresh();
+
+			downloadVideo(indexArry);
+		}
+
+		function stopDownloadFunc() {
+			downloading = false;
+			plugin.stopDownloading();
+
+			if(!downloaded){
+				for (var i = downIndex; i < indexArry.length; ++i)
+				{
+					table.rows[i + 1].cells[2].style.color = "#ff0000";
+					table.rows[i + 1].cells[2].innerHTML = "<span class=noDownload>" + label.alreadyStopped +"</span>";
+				}
+			}
+		}
+
+		function initFileList()
+		{
+			var vedioSetDivHeihgt = vedioSetDiv.offsetHeight; /* 图标 */
+			var bodyHeight = parseInt(document.documentElement.clientHeight);/* 总高度 */
+			var footHeight = footTime.offsetHeight; /* 底部 */
+			var topHeight = id("basicHead").offsetHeight; /* 顶部 */
+			var height = parseInt(bodyHeight) - parseInt(vedioSetDivHeihgt) - parseInt(footHeight) - parseInt(topHeight) -165;
+			var num = parseInt(height/37)-1; /*表格每行+border为37px*/
+
+			fileLeaseTable = new DataGrid();
+			fileLeaseTable.init({
+				max:2000,
+				id:"fileTable",
+				data:fileList,
+				hasSelBox:true,
+				paging:{num:num, page:1},
+				edit:false,
+				selWidth:30,
+				classCol:{gridClassName:"dataGrid"},
+				head:[{field:label.beginTime, width:100},
+					  {field:label.size, width:70},
+					  {field:label.type, width:50}],
+				list:[{name:"tmpStaTime", type:"str", maxSize:17, click:clickFilePlay, tdStyles:{cursor:"pointer"}},
+					  {name:"size", type:"str", maxSize:10, click:clickFilePlay, tdStyles:{cursor:"pointer"}},
+					  {name:"vType", type:"str", maxSize:12, click:clickFilePlay, tdStyles:{cursor:"pointer"}}],
+				toolBar:{id:"downloadUl", download:downloadFunc, stopDownload:stopDownloadFunc, asyn:true}
+			});
+		}
+
+		function initDownloadFileList()
+		{
+			downloadFileTable = new DataGrid();
+			downloadFileTable.init({
+				IDWidth: "40px",
+				max:2000,
+				id:"downloadTable",
+				data:downloadFileList,
+				hasSelBox:false,
+				hasID:true,
+				paging:{num:2000, page:1},
+				edit:false,
+				//niceScroll:downloadScroll,
+				classCol:{gridClassName:"dataGrid"},
+				head:[{field:label.downloadFileName, width:100},
+					{field:label.downloadProgress, width:50}],
+				list:[{name:"filename",maxSize:20},
+					{name:"progress", maxSize:3}]
+			});
+		}
+
+		/* *****************下部进度条区域****************** */
+		function reSizeFun()
+		{
+			var newWidth = footTime.offsetWidth - options.chanNameWidth - timeClsWidth - 30;
+
+			/* 当宽度不变或宽度为负值时，不需要重新绘制时间轴 */
+			if (newWidth == options.chanWidth || newWidth < 0)
+			{
+				return;
+			}
+
+			options.chanWidth = newWidth;
+			timeControl = new ReplayTimeCon(options);
+			$(".channelLine").click(function(event){clickTime(event);});
+			fillTrueChn(showChanList);
+		}
+
+		/* 获取回放的时间 */
+		function getPlayingTime()
+		{
+			var tmpTime = secDisToday, curPlayTime = 0;
+			var sameNum = 0;
+
+
+			for (var i = 0; i < screenNum; i++)
+			{
+				curPlayTime = plugin.getReplayTime(i); /* 通道时间 */
+
+				if (0 == curPlayTime)
+				{
+					lastPlayTime = lastTime[i] - secDisToday;
+				}
+				if (lastTime[i] == curPlayTime) /* 前一秒和现在的时间相同，计算时间剔除此通道 */
+				{
+					sameNum++;
+					continue;
+				}
+
+				tmpTime = tmpTime < curPlayTime ? curPlayTime : tmpTime; /* 获取最大的时间值 */
+				lastTime[i] = curPlayTime;
+			}
+
+			if (sameNum != screenNum) /* 时间在变化 */
+			{
+				/* 如果发生了时间轴点击事件 */
+				if (clickDerection != 0)
+				{
+					/* 时间按照点击事件的预期时间点变化 */
+					if (clickDerection > 0 && tmpTime > options.runningTime ||
+						clickDerection < 0 && options.runningTime < nowTime)
+					{
+						clickDerection = 0;
+						nowTime = tmpTime;
+					}
+				}
+				else
+				{
+					nowTime = tmpTime;
+					options.runningTime = nowTime - secDisToday;
+				}
+			}
+		}
+
+		function runFun()
+		{
+			clearTimeout(runHd);
+
+			if (true == playSign && false == suspendSign)
+			{
+				/* timeControl.jumpNoArea(videoType, showIngList); */
+				getPlayingTime();
+
+				if (options.runningTime >= maxFinishTime)
+				{
+					stopPlay();
+					return;
+				}
+
+				timeControl.timeRun();
+			}
+
+
+			if (SECONDS <= options.runningTime)
+			{
+				stopPlay();
+				return;
+			}
+
+			runHd = $.setTimeout(runFun, 1000);
+		}
+
+		/* 点击选择时间 */
+		function clickTime(event)
+		{
+			event = event || window.event;
+			var pos = getMousePos(event);
+			var offLft = $("#channel").offset().left;
+			var showLft = pos.x - offLft;
+			var mgnLft = parseInt($(".channelVideo").css("left")) || 0;
+			var tLft = showLft - mgnLft;
+			var replayTime = id("playingTime");
+			var runTimeLeft = parseInt(replayTime.style.left);
+			var runLineLeft = parseInt(id("runLine").style.left);
+
+			srcPlayTime = options.runningTime;
+			options.runningTime = SECONDS * tLft / (options.chanWidth * HOURS / options.showFullTime);
+			clickDerection = 0;
+
+			if (true == playSign)
+			{
+				if (true == bRecording)
+				{
+					kinescopingSet.click();
+				}
+				showToast("loading");
+
+				if (options.runningTime >= maxFinishTime)
+				{
+					options.runningTime = srcPlayTime;
+					closeToast();
+					showAlert(errStr.setPlayTimeErr);
+					stopPlay();
+					return;
+				}
+				if (true == suspendSign)
+				{
+					stopPlay();
+					srcPlayTime = options.runningTime;
+					options.runningTime = SECONDS * tLft / (options.chanWidth * HOURS / options.showFullTime);
+					startPlay();
+				}
+				else
+				{
+					setPlayTime(options.runningTime, function(errCode){
+						if (ENONE == errCode)
+						{
+							replayTime.innerHTML = minToHour(options.runningTime, true);
+							replayTime.style.left = runTimeLeft + tLft - runLineLeft + "px";
+							id("runLine").style.left = tLft + "px";
+							clickDerection = options.runningTime - srcPlayTime;
+							//showToast("success");
+							success = true;
+							jumpSuccess = true;
+							clearTimeout(runHd);
+							//runFun();
+						}
+						else
+						{
+							options.runningTime = srcPlayTime;
+							closeToast();
+							showAlert(errStr.setPlayTimeFail);
+						}
+					});
+				}
+			}
+			else
+			{
+				id("runLine").style.left = tLft + "px";
+				replayTime.innerHTML = minToHour(options.runningTime, true);
+				replayTime.style.left = runTimeLeft + tLft - runLineLeft + "px";
+				clickDerection = options.runningTime - srcPlayTime;
+			}
+		}
+
+		function timeConHan(value)
+		{
+			options.showFullTime = value;
+			timeControl = new ReplayTimeCon(options);
+			showClsVd();
+			fillTrueChn(showChanList);
+			$(".channelLine").click(function(event){clickTime(event);});
+			timeControl.timeRun();
+		}
+
+		function playCls()
+		{
+			if (true == isShowTiming && true == isShowMovedetc)
+			{
+				videoType = VideoBoth;
+			}
+			else if (true == isShowTiming && false == isShowMovedetc)
+			{
+				videoType = VideoNormal;
+			}
+			else if (false == isShowTiming && true == isShowMovedetc)
+			{
+				videoType = VideoMove;
+			}
+			else
+			{
+				videoType = VideoNone;
+			}
+
+			return videoType;
+		}
+
+		function showT() /* 定时 */
+		{
+			if (false == isShowTiming)
+			{
+				timingIcon.className = "timingIcon";
+				$(".timingVideo").css({"visibility":"hidden"});
+			}
+			else
+			{
+				timingIcon.className = "timingChecked";
+				$(".timingVideo").css({"visibility":"visible"});
+			}
+		}
+
+		function showN()
+		{
+			if (false == isShowMovedetc)
+			{
+				moveDetIcon.className = "moveDetIcon";
+				$(".moveDetVideo").css({"visibility":"hidden"});
+			}
+			else
+			{
+				moveDetIcon.className = "moveDetChecked";
+				$(".moveDetVideo").css({"visibility":"visible"});
+			}
+		}
+
+		function showClsVd()
+		{
+			showT();
+			showN();
+		}
+
+		function showTimingCls()
+		{
+			isShowTiming = true == isShowTiming ? false : true;
+			showT();
+		}
+
+		function showMoveDetcCls()
+		{
+			isShowMovedetc = true == isShowMovedetc ? false : true;
+			showN();
+		}
+
+		function selChanHandle(value, obj)
+		{
+			var objId = obj.id;
+			var screenIndex = objId.match(/\d+/g);
+			var interIdx = -1;
+			var clickIdx = objId.match(/\d+/);
+
+			if (value == -1)
+			{
+				showChanList[clickIdx] = -1;
+				fillTrueChn(showChanList);
+				showFileListChn();
+				return;
+			}
+
+			if (value != showChanList[screenIndex])
+			{
+				for (var i = 0, len = showChanList.length; i < len; i++)
+				{
+					if (value == showChanList[i])
+					{
+						showChanList[i] = showChanList[screenIndex];
+						interIdx = i;
+						break;
+					}
+				}
+
+				if (-1 != interIdx)
+				{
+					id("channelSel" + interIdx).changeSel(showChanList[screenIndex]);
+				}
+
+				showChanList[screenIndex] = value;
+				setWinChn();
+				fillTrueChn(showChanList);
+				showFileListChn();
+			}
+		}
+
+		function initSelect()
+		{
+			var chnSize, chanList = [];
+
+			chnSize = ROADNUM + 1
+			chanList.length = chnSize;
+			for (var i = 0; i < ROADNUM; i++)
+			{
+				chanList[i] = {str:label.channel + (i+1), value:i}
+			}
+			chanList[ROADNUM] = {str:label.close, value:-1};
+
+			/*for (var i = 0, len = chnSize; i < len && i < maxScreenNum; i++)
+			{
+				selectInit("channelSel" + i, chanList, chanList[i % chnSize].value, selChanHandle);
+			}
+			for (var i = chnSize; i < maxScreenNum; i++)
+			{
+				selectInit("channelSel" + i, chanList, chanList[chnSize - 1].value, selChanHandle);
+			}*/
+
+			positionChn();
+		}
+
+		function positionChn()
+		{
+			var aSpanList = $("div#chanDiv span.selCon");
+			var paceHei, paceWidth;
+			var squareNum = 1, index = 0;
+
+			aSpanList.css({"visibility":"hidden"});
+			for (var i = 1; i <= 3; i++)
+			{
+				if (screenNum == i * i)
+				{
+					squareNum = i;
+					break;
+				}
+			}
+
+			paceHei = chanDiv.offsetHeight / squareNum;
+			paceWidth = chanDiv.offsetWidth / squareNum;
+
+			for (var i = 0; i < squareNum; i++)
+			{
+				for (var j = 0; j < squareNum; j++)
+				{
+					aSpanList.eq(index).css({"visibility":"visible", "top":(i * paceHei + 5) + "px", "left":(j * paceWidth + 10)+ "px"});
+					index++;
+				}
+			}
+		}
+
+		/* 初始化文件列表区域的通道列表 */
+		function initListByChan()
+		{
+			var chanLi, chnStr = "channel", fileLen = 0;
+			showFileListChn();
+			return;
+			for (var idx = 1; idx <= ROADNUM; idx++)
+			{
+				chanLi = el("li");
+				chanLi.className = "chnLi";
+				chanLi.id = "chLi" + idx;
+				chanLi.innerHTML = idx;
+				chanLi.setAttribute("value", idx);
+				chanFile.appendChild(chanLi);
+
+				chanLi.onclick = function(){
+					var tmpIdx = parseInt(this.getAttribute("value"), 10);
+					var chnLiList = $("#chanFile li");
+
+					chnLiList.removeClass("chnLiClick");
+					chnLiList.eq(tmpIdx-1).addClass("chnLiClick");
+					getOneChnData(tmpIdx);
+				}
+			}
+			showFileListChn();
+		}
+
+		selectUpPreviewInit = function(idStr, options, value, callback, maxSize)
+		{
+			var iframeBg = $("#" + idStr + " ~ iframe");
+			var classObj = {
+				type:"up",
+				selectInit:false,
+				className:"selOptsUl selOptsUlPreview",
+				optHideHd:function(){
+					iframeBg.hide();
+				},
+				optShowHd:function(){
+					iframeBg.show();
+				}
+			};
+
+			selectInit(idStr, options, value, callback, maxSize, classObj);
+		}
+
+		function runLineDrag()
+		{
+			if (true == playSign)
+			{
+				showToast("loading");
+				setPlayTime(options.runningTime, function(errCode){
+					if (ENONE != errCode)
+					{
+						closeToast();
+						showAlert(errStr.setPlayTimeFail);
+						return;
+					}
+					showToast("success");
+				});
+			}
+		}
+
+		var videoMainObj, videoMinorObj;
+		var menuList = $("ul.vedioSetMenu > li");
+		var menuFuncList = [
+			{func:reversePlay},
+			{func:preVideo},
+			{func:startPlay},
+			{func:stopPlay},
+			{func:slowPlay},
+			{func:null},
+			{func:speedPlay},
+			{func:fastThSec},
+			{func:nextVideo},
+			{func:saveCutVideo},
+			{func:pluginFullScreen},
+			{func:volume},
+			{func:elecZoom},
+			{func:cutVideo},
+			{func:snapPic}
+		];
+		var lastPlayTime = 0;
+		var backName = uciPlayBack.fileName;
+		var vedioSetDiv = $("div.vedioSetDiv")[0];
+		var rCon = $("div.basicConR");
+		var vedioSetMenu = $("ul.vedioSetMenu");
+		var plugin;
+		var STATE_ON = "on", STOPSIGN = 1, STARTPLAY = 0;
+		var titleText = id("titleText");
+		var popContentError = id("popContentError");
+		var popContentCorrect = id("popContentCorrect");
+		var name = id("name");
+		var downloadNote = id("downloadNote");
+		var downloadInner = $("#downloadNote div")[0];
+		var cameraSet = id("cameraSet");
+		var kinescopingSet = id("cutVideo");
+		var STATE_OFF = "off";
+		var cameraTimeoutHd;
+		var downloadTimeoutHd;
+		var codeChangeStopHd;
+		var cutSaveBtn = id("cutSave"), cutClick = false;
+		var isShowDate = true;
+		var fileLeaseTable = null;
+		var downloadFileTable = null;
+		var pictureCls = id("pictureCls"), kinescopeCls = id("kinescopeCls");
+		var backBtn = id("backVideo");
+		var chanFile = id("chanFile");
+		var dateArea = id("dateArea"), fileArea = id("fileArea");
+		var fileList = [], picList = [], videoDayList = [];
+		var downloadFileList = [];
+		var timeConOptions = [{str:"24h", value:24}, {str:"12h", value:12}, {str:"6h", value:6},
+							{str:"2h", value:2}, {str:"1h", value:1}, {str:"30min", value:0.5}];
+		var timeControl;
+		var chanDiv = id("chanDiv");
+		var timeCls = id("timeCls");
+		var footTime = id("footTime");
+		var timeClsWidth = timeCls.offsetWidth;
+		var tWidth = footTime.offsetWidth;
+		var runHd = null;
+		var isShowTiming = true, 	/* 播放定时（普通）视频 */
+			isShowMovedetc = true;	/* 播放动检视频 */
+		var timingIcon = id("timingIcon"),
+			moveDetIcon = id("MoveDetIcon");
+		var VideoNormal = "1", VideoMove = "2",
+			VideoBoth = "3", VideoNone = "0";
+		var userId = 0, 			/* 记录用户id */
+			videoType = VideoBoth;	/* 记录播放类型 */
+		var screenNum = 1, 			/* 画面数(1,4,9) */
+			curTime = {},  			/* 当前时间 （年月日时分秒）*/
+			videoDetailInfo = [], 	/* 选中天录像视频的具体信息 */
+			timeRes;				/* 选中日期（特定格式yyyymmdd）*/
+		var suspendSign = false, 	/* 是否处于暂停状态（已经开始播放）*/
+			playSign = false;		/* 是否处于播放状态 */
+		var startPlayLi = id("startPlay");
+		var showChanList = [];	/* 记录窗口播放通道的id，-1为停止关闭状态 */
+		var lastTime = [];
+		var nowTime = 0;
+		var showIngList = [];
+		var totalFile = {};
+		var originTotalFile = {};		/* 原始总文件，文件大小未转换 */
+		var originFileList = [];		/* 某一通道原始文件， 文件大小未转换 */
+		var secDisToday = 0;		/* 记录当前天到1970-01-01的秒数 */
+		var HOURS = 24;
+		var SECONDS = 86400;
+		var minYear = 2000, maxYear = 2037;
+		var scrollWidth = 30;
+		var ROADNUM = 1;			/* smartIPC无通道概念，先置为1方便移植 */
+		var maxScreenNum = 9;
+		var srcPlayTime = 0;
+		var tdObjClick = {clickDisabled:playSign};
+		var options = {
+			totalId:"timeAndChan",	/* 进度条区域 */
+			srcSepNum:48,			/* 时间分隔 */
+			runningTime:0,			/* 播放的时间 */
+			cutStartTime:0,			/* 截取视频开始时间 */
+			cutEndTime:7200,		/* 截取视频结束时间 */
+			showFullTime:24,		/* 时间轴显示时间 */
+			chanNameWidth:50,		/* 通道名称的宽度 px */
+			chanWidth:1000,			/* 24小时时通道的宽度 px*/
+			channelList:[],			/* 通道信息列表 */
+			callBack:null,
+			setRunTime:runLineDrag	/* 播放同步函数 */
+		};
+		var clickDerection = 0;
+		var maxFinishTime = 0;
+		var kinescoping = $("div.kinescoping");
+		var kinescopingSp = kinescoping.find("span");
+		var kinescopTimeoutHd, getKinescopeTimeHd;
+		var kpStartSecond, kpStartTimeArr, kpInitTime = "00:00:00";
+		var downloadScroll;
+
+		var TS_HINT_NO_HINT = 0;
+		var TS_HINT_CONNECT = 1;
+		var TS_HINT_AUTHENTICATION = 2;
+		var TS_HINT_SERVICE_UNAVAILABLE = 3;
+		var TS_HINT_UNKNOWN = 4;
+		var TS_HINT_NO_CHN_AVAILABLE = 5;
+		var TS_HINT_BANDWIDTH_LIMITED = 6;
+		var TS_HINT_CLIENT_NUM_LIMITED = 7;
+
+		var volume = id("volume");
+		var volumeNote = id("volumeNote");
+		var volumeValue = 0;
+		var volumeDragLine;
+		var volumeIcon = false;
+
+		var playbackScaleArr = ["1/4", "1/2", "1/1", "2/1", "4/1"];
+		var imageArr = ["../web-static/images/0.25x_normal.png","../web-static/images/0.5x_normal.png",
+			"../web-static/images/1x_normal.png","../web-static/images/2x_normal.png","../web-static/images/4x_normal.png"];
+		var curScaleIndex = 2;
+		var singleFrame = false;
+
+		var table = id("downloadTable");
+		var downloading = false;
+		var downloaded = false;
+		var indexArry;
+		var downIndex;
+
+		var bRecording = false;
+		var success = false;
+		var jumpSuccess = false;
+		var timeErr = true;
+
+		var domId = null;
+		var hInput = id("hourInput");
+		var mInput = id("minuInput");
+		var sInput = id("secInput");
+
+		var path;
+
+		for (var i = 0; i < maxScreenNum; i++)
+		{
+			lastTime[i] = -1;
+			showChanList[i] = i;
+
+			if (i >= ROADNUM)
+			{
+				showChanList[i] = -1;
+			}
+		}
+
+		if (4 == ROADNUM)
+		{
+			id("nineScreen").style.display = "none";
+		}
+
+		options.callBack = function(){showClsVd();};
+		options.chanWidth = document.documentElement.clientWidth - options.chanNameWidth - timeClsWidth - scrollWidth;
+		selectUpPreviewInit("timeClsSel", timeConOptions, options.showFullTime, timeConHan);
+
+		function pluginReadyHd(arg)
+		{
+			/* 视频开始播放 */
+			if (arg == PLUGIN_STATE_ON)
+			{
+				var rsObj;
+
+				if (success)
+				{
+					showToast("success");
+					success = false;
+				}
+				if (jumpSuccess)
+				{
+					runFun();
+					jumpSuccess = false;
+				}
+
+				rsObj = plugin.getResolution();
+				if (rsObj.resolution)
+				{
+					gBasicPreviewResolution = rsObj.resolution;
+					vedioHeightFit(rsObj.resolution);
+				}
+			}
+			if (arg == 3)
+			{
+				stopPlay();
+			}
+		}
+		function changeTime(e){
+			if (null == domId){
+				return;
+			}
+			var box = id(domId);
+			var e = e || window.event;
+			var up = true;
+			var maxTime = 0;
+			up = e.wheelDelta?e.wheelDelta>0:e.detail<0;
+			if ("hourInput" == domId){
+				maxTime = 23;
+			}
+			else{
+				maxTime = 59;
+			}
+			if (up){
+				if (!isNaN(box.value) && "" != box.value){
+					if (maxTime != parseInt(box.value)){
+						box.value = parseInt(box.value) + 1;
+					}
+					else{
+						box.value = 0;
+					}
+				}
+				else{
+					box.value = 0;
+				}
+			}
+			else{
+				if (!isNaN(box.value) && "" != box.value){
+					if (0 != parseInt(box.value)){
+						box.value = parseInt(box.value) - 1;
+					}
+					else{
+						box.value = maxTime;
+					}
+				}
+				else{
+					box.value = 0;
+				}
+			}
+			if (isIETenLess){
+				return false;
+			}
+			else{
+				e.preventDefault();
+			}
+		}
+
+		function pageInit()
+		{
+			if (true == $.local)
+			{
+				var ht = new Date();
+				var opt1 = {}, opt2 = {};
+
+				ht.setTime(1443123434 * 1000);
+				laydate({elem:"#dateArea", sysTime:ht, close:false,
+					preInitFun:function(curYear){
+						return;
+					},
+					choose:function(date){
+						timeRes = date.replace(/-/g, "");
+					},
+					videoDay:[{year:2015, month:9, day:24},{year:2015, month:7, day:24},{year:2015, month:8, day:24}],
+					tdDisabled:tdObjClick
+				});
+				dateArea.click();
+
+				opt1 = {
+					channelId:"1",
+					videoList:[{startTime:0, endTime:465, vedio_type:0},
+								{startTime:77989, endTime:78454, vedio_type:1},
+								{startTime:78456, endTime:78921, vedio_type:0},
+								{startTime:82192, endTime:82657, vedio_type:0},
+								{startTime:82659, endTime:83124, vedio_type:1},
+								{startTime:83124, endTime:83126, vedio_type:0},
+								{startTime:83126, endTime:84058, vedio_type:1}]
+				};
+				opt2 = {
+					channelId:"2",
+					videoList:[{startTime:120, endTime:3244, type:1},
+								{startTime:3415, endTime:14405, type:0},
+								{startTime:16895, endTime:23567, type:1},
+								{startTime:35123, endTime:58902, type:0},
+								{startTime:58900, endTime:76000, type:1}]
+				};
+
+				options.channelList = [opt1, opt2];
+
+				fileList = [{startTime:"07:30-12:00", size:"435346346", vedio_type:"55"},
+							{startTime:"07:30-12:00", size:"346346", vedio_type:"55"}];
+				picList = [{startTime:"08:30-12:00", size:"21346342", vedio_type:"1"},
+							{startTime:"11:30-12:00", size:"1135542", vedio_type:"0"}];
+				for (var i = 0,len = fileList.length; i < len; i++)
+				{
+					fileList[i].size = tranFileSize(fileList[i].size);
+				}
+
+				timeControl = new ReplayTimeCon(options);
+				$(".channelLine").click(function(event){clickTime(event);});
+			}
+
+			downloadScroll = new NiceScroll("downloadTableBorderCon");
+			downloadScroll.scrollTipOpacity(1);
+			downloadScroll.scrollTipSet({"background":"#34A9DA"});
+			downloadScroll.init();
+
+			id("downloadTableDiv").style.display = "none";
+
+			plugin = new Plugin({id:"videoPluginReplayCon",
+								iePluId:"backPlugin",othrPluId:"backPlugin",
+								readyHd:pluginReadyHd,
+								className:"previewVedioActiveX"});
+			screenNum = 1;
+			getPageData();
+			initFileList();
+			initDownloadFileList();
+			initSelect();
+			fileClickFun();
+
+			getSysTime(function(){
+				getHasVideoDay(curTime.year, initDate);
+				getUserId(function(){
+					getVideoObj();
+					plugin.setClientId(userId);
+					plugin.setVideoConnectCallback(function(chnId, status){
+						if (TS_HINT_BANDWIDTH_LIMITED == status)
+						{
+							return;
+						}
+						if (TS_HINT_NO_HINT != status)
+						{
+							closeToast();
+							showAlert(errStr.invNetworkErr);
+							stopPlay();
+							return;
+						}
+
+						runFun();
+						playSign = true;
+						suspendSign = false;
+						tdObjClick.clickDisabled=true;
+						startPlayLi.style.backgroundImage = "url(../web-static/images/suspend.png)";
+						$("#startPlay").attr("title","{%label.pausePlay%}");
+						$("li.pluginScreen").attr("disabled", true).css({"opacity":"0.5"});
+						$("li.fastThSec, li.stopPlay, li.fullScreen, li.slowPlay, li.curSpeed, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume").css({"opacity":"1"});
+						enableHover($("li.fastThSec, li.stopPlay, li.fullScreen, li.slowPlay, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume"), "icon");
+						if (2 != curScaleIndex)
+						{
+							$("li.volume, li.cutVideo").css({"opacity":"0.5"});
+							disableHover($("li.volume, li.cutVideo"), "icon");
+							$("#volume").css('background-image','url(../web-static/images/volumeOff.png)');
+						}
+						timingIcon.disabled = true;
+						MoveDetIcon.disabled = true;
+						closeToast();
+					});
+				});
+			});
+			disableHover($("li.fastThSec, li.stopPlay, li.fullScreen, li.slowPlay, li.speedPlay, li.nextVideo, li.camera, li.cutVideo, li.elecZoom, li.volume"), "icon");
+
+			backBtn.onclick = function(){};
+			timingIcon.onclick = showTimingCls;
+			moveDetIcon.onclick = showMoveDetcCls;
+			id("downloadIcon").onclick = function(){
+				if (this.state == STATE_ON)
+				{
+					this.state = STATE_OFF;
+					id("downloadTableDiv").style.display = "none";
+				}
+				else
+				{
+					this.state = STATE_ON;
+					id("downloadTableDiv").style.display = "block";
+				}
+			}
+			id("downloadNum").onclick = function(){
+				id("downloadIcon").click();
+			}
+			id("goToTime").onclick = function(){
+				if(timeErr)
+				{
+					return;
+				}
+				goToTimePosition();
+			}
+			id("hourInput").onfocus = function(){
+				domId = "hourInput"
+			}
+			id("hourInput").onblur = function(){
+				domId = null;
+				timeCheck();
+			}
+			id("hourInput").onkeyup = function(){
+				timeCheck();
+			}
+			id("minuInput").onfocus = function(){
+				domId = "minuInput"
+			}
+			id("minuInput").onblur = function(){
+				domId = null;
+				timeCheck();
+			}
+			id("minuInput").onkeyup = function(){
+				timeCheck();
+			}
+			id("secInput").onfocus = function(){
+				domId = "secInput"
+			}
+			id("secInput").onblur = function(){
+				domId = null;
+				timeCheck();
+			}
+			id("secInput").onkeyup = function(){
+				timeCheck();
+			}
+			if (isFirefox){
+				attachEvnt(hInput, 'DOMMouseScroll', changeTime);
+				attachEvnt(mInput, 'DOMMouseScroll', changeTime);
+				attachEvnt(sInput, 'DOMMouseScroll', changeTime);
+			}
+			else{
+				attachEvnt(hInput, 'mousewheel', changeTime);
+				attachEvnt(mInput, 'mousewheel', changeTime);
+				attachEvnt(sInput, 'mousewheel', changeTime);
+			}
+			attachEvnt(window, "resize", reSizeFun);
+			if (id("laydate_boxCover") && "block" == id("laydate_boxCover").style.display)
+			{
+				id("laydate_boxCover").style.display = "none";
+			}
+		}
+		pageInit();
+		if(id("stopDownloadAll"))
+		{
+			id("stopDownloadAll").onclick = function()
+			{
+				if($.find("#downloadUl li.stopDownload")[0]){
+					$.find("#downloadUl li.stopDownload")[0].click();
+				}
+			}
+		}
+	}
+	init();
+</script>
+<style type="text/css">
+	body{
+		overflow-y:scroll !important;
+		*overflow-y:visible;
+	}
+	div.footTime{
+		height:85px;
+		background-color:#F8F8F8;
+	}
+	div.timeAndChan{
+		display:inline-block;
+		vertical-align:top;
+		position:relative;
+		overflow:hidden;
+		background-color:#FFFFFF;
+		*display:inline;
+		*zoom:1;
+	}
+	/* 时间轴 */
+	div.timeArea{
+		padding:0 19px;
+		padding-left:20px;
+		height:34px;
+		overflow:hidden;
+		border-right:1px solid #CCCCCC;
+	}
+	div.timeShaft{
+		position:relative;
+		height:34px;
+		*zoom:1;
+	}
+	div.trueShaft{
+		position:absolute;
+		bottom:0px;
+		left:0px;
+	}
+	span.timeLine{
+		position:absolute;
+		bottom:0px;
+		height:12px;
+		width:1px;
+		background-color:#CCCCCC;
+	}
+	span.lowSolid{
+		height:6px;
+		width:1px;
+	}
+	span.timeValue{
+		position:absolute;
+		bottom:13px;
+		color:#666666;
+		width:40px;
+		height:16px;
+		font-size:12px;
+		line-height:16px;
+		text-align:center;
+		-moz-user-select:-moz-none;
+	}
+
+	/* 通道 */
+	div.channelArea{
+		height:37px;
+		position:relative;
+		background-color:#E6E8EB;
+		border-top:1px solid #CCCCCC;
+		border-bottom:1px solid #CCCCCC;
+		border-right:1px solid #CCCCCC;
+	}
+	div.channelName{
+		display:inline-block;
+		position:relative;
+		vertical-align:top;
+		*display:inline;
+		*zoom:1;
+	}
+	label.chanName{
+		height:20px;
+		line-height:20px;
+		vertical-align:middle;
+		color:#a0a0a0;
+		margin-left:10px;
+		display:inline-block;
+	}
+	div.channel{
+		display:inline-block;
+		vertical-align:middle;
+		position:relative;
+		font-size:0px;
+		overflow:visible;
+		*display:inline;
+		*zoom:1;
+	}
+	div.channelLine{
+		display:inline-block;
+		height:0px;
+		padding-top:13px;
+		padding-bottom:12px;
+		overflow:hidden;
+		vertical-align:middle;
+		cursor:pointer;
+		*display:inline;
+		*zoom:1;
+	}
+	div.channelVideo{
+		height:12px;
+		background-color:#D2D4D6;
+		position:relative;
+		cursor:pointer;
+	}
+	span.videoObj{
+		position:absolute;
+		height:12px;
+		top:0px;
+		visibility:visible;
+	}
+	span.timingVideo{
+		background-color:#5A92FF;
+	}
+	span.moveDetVideo{
+		background-color:#06D694;
+	}
+	/* 截取视频 */
+	div.cutArea{
+		position:absolute;
+		top:30px;
+		visibility:hidden;
+	}
+	div.cutObj{
+		position:relative;
+	}
+	div.cutPoint{
+		position:absolute;
+		top:0px;
+		width:0px;
+		min-height:18px;
+		border:3px solid #ffcc00;
+		cursor:w-resize;
+		z-index:1;
+	}
+	div.cutStart{
+		border-right:3px transparent;
+	}
+	div.cutEnd{
+		border-left:0px;
+	}
+	span.cutTime{
+		position:absolute;
+		top:-30px;
+		height:24px;
+		font-size:12px;
+		line-height:24px;
+		color:#ffffff;
+		background-color:#1377dd;
+		border-radius:12px;
+		text-align:center;
+		width:68px;
+		font-weight:bold;
+		left:-31px;
+	}
+	div.cutCover{
+		position:absolute;
+		/*opacity:0.5;*/
+		top:0px;
+		left:0px;
+	}
+	div.trueCover{
+		position:absolute;
+		background-color:#5baefc;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		top:0px;
+		visibility:hidden;
+	}
+	span.runLine{
+		position:absolute;
+		top:0px;
+		background-color:#FF5511;
+		width:2px;
+		height:160px;
+		cursor:pointer;
+	}
+	span.playingTime{
+		position:absolute;
+		top:13px;
+		left:20px;
+		width:60px;
+		height:20px;
+		background-color:#333333;
+		border-radius:6px;
+		color:#ffffff;
+		font-size:12px;
+		line-height:20px;
+		text-align:center;
+		z-index:10;
+	}
+	span.mouseupTime{
+		position:absolute;
+		width:60px;
+		height:20px;
+		top:0px;
+		left:0px;
+		background-color:#333333;
+		border-radius:6px;
+		color:#ffffff;
+		font-size:12px;
+		line-height:20px;
+		text-align:center;
+		z-index:11;
+		visibility:hidden;
+	}
+	/* 横向滚动条 */
+	div.scrollArea{
+		height:12px;
+		padding-right:19px;
+		border-right:1px solid #CCCCCC;
+		background-color:#F5F6FA;
+		position:relative;
+	}
+	span.scrollBar{
+		display:inline-block;
+		height:10px;
+		margin-top:1px;
+		min-width:200px;
+		border-radius:4px;
+		background-color:#999999;
+		vertical-align:top;
+		cursor:pointer;
+	}
+	div.leftBar{
+		background:url(../web-static/images/leftBar_normal.png) no-repeat 0px 0px;
+		width:12px;
+		height:12px;
+		display:inline-block;
+		position:absolute;
+		top:0px;
+		left:38px;
+		cursor:pointer;
+	}
+	div.rightBar{
+		background:url(../web-static/images/rightBar_normal.png) no-repeat 0px 0px;
+		width:12px;
+		height:12px;
+		display:inline-block;
+		position:absolute;
+		top:0px;
+		right:7px;
+		cursor:pointer;
+	}
+	div.timeCls{
+		float:right;
+		*float:none;
+		vertical-align:top;
+		width:174px;
+		height:85px;
+		*display:inline;
+		*zoom:1;
+	}
+	span.selCon{
+		margin-top:12px;
+		margin-left:6px;
+	}
+	span.select span.hsValueD{
+		width:53px;
+	}
+	li.videoCls{
+		line-height:16px;
+		height:16px;
+		list-style:none;
+		margin-top:12px;
+	}
+	li.videoCls input{
+		width:18px;
+		height:18px;
+		vertical-align:middle;
+		border:0;
+		padding:0;
+	}
+	li.videoCls input#timingIcon{
+		margin-left:6px;
+		*margin-left:0px;
+	}
+	li.videoCls label{
+		vertical-align:middle;
+		color:#666666;
+		font-size:13px;
+	}
+	li.videoCls label.timing{
+		margin-right:8px;
+		*margin-right:0px;
+	}
+	input.timingIcon{
+		background:url(../web-static/images/checkHovered.png) no-repeat 0 0;
+	}
+	input.timingChecked{
+		background:url(../web-static/images/choosed.png) no-repeat 0 0;
+	}
+	input.moveDetIcon{
+		background:url(../web-static/images/checkGreen.png) no-repeat 0 0;
+	}
+	input.moveDetChecked{
+		background:url(../web-static/images/choosedGreen.png) no-repeat 0 0;
+	}
+	ul.vedioSetMenu li#cutSave{
+		color:#ffffff;
+		font-size:14px;
+		height:30px;
+		line-height:30px;
+		border-radius:15px;
+		width:60px;
+		background-color:#606060;
+		visibility:hidden;
+		text-align:center;
+		vertical-align:middle;
+	}
+</style>
+<style type="text/css">
+	body{
+		background-color:#F5F7FA !important;
+		position:relative;
+	}
+	div.vedioSetDiv{
+		background:#F5F7FA;
+		height:38px;
+		line-height:38px;
+		display:none;
+		border-top:1px solid #CCCCCC;
+		border-bottom:1px solid #CCCCCC;
+	}
+	.previewVedioActiveX{
+		z-index:0;
+		visibility:visible;
+		min-height:240px;
+		display:block;
+		margin:0 auto;
+	}
+	ul.vedioSetMenu{
+		list-style:none;
+		padding:4px 20px 0 20px;
+		min-width:670px;
+	}
+	li.vedioSetOptL{
+		float:left;
+		margin-right:12px;
+	}
+	li.vedioSetOptR{
+		margin-right:12px !important;
+		float:right;
+	}
+	ul.vedioSetMenu li.icon{
+		border-radius:2px;
+		height:28px;
+		width:40px;
+		cursor:pointer;
+		position:relative;
+		visibility:visible;
+		border:1px solid #F5F7FA;
+	}
+	ul.vedioSetMenu li.iconDis{
+		border-radius:2px;
+		height:28px;
+		width:40px;
+		cursor:pointer;
+		position:relative;
+		visibility:visible;
+		border:1px solid #F5F7FA;
+	}
+	ul.vedioSetMenu li.icon:hover{
+		border:1px solid #5A92FF;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.icon1{
+		height:28px;
+		width:64px;
+		position:relative;
+		visibility:visible;
+		background-color:#FFFFFF;
+		border-top:1px solid #C8CDD9;
+		border-bottom:1px solid #C8CDD9;
+		margin-left:-12px;
+		margin-right:0px;
+	}
+	ul.vedioSetMenu li.reversePlay{
+		background:url(../web-static/images/reversePlay.png) no-repeat 8px 2px;
+	}
+	ul.vedioSetMenu li.preVideo{
+		background:url(../web-static/images/preVideo.png) no-repeat 8px 2px;
+	}
+	ul.vedioSetMenu li.startPlay{
+		background-image:url(../web-static/images/startPlay.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.nextVideo{
+		background-image:url(../web-static/images/nextVideo.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.slowPlay{
+		background-image:url(../web-static/images/slowPlay.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.curSpeed{
+		background-image:url(../web-static/images/1x_normal.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+	}
+	ul.vedioSetMenu li.speedPlay{
+		background-image:url(../web-static/images/speedPlay.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.stopPlay{
+		background-image:url(../web-static/images/stopPlay.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.fastThSec{
+		background-image:url(../web-static/images/fast30.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #C8CDD9;
+		background-color:#FFFFFF;
+	}
+	ul.vedioSetMenu li.cutVideo{
+		background-image:url(../web-static/images/cutVideo.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #F5F7FA;
+		background-color:#F5F7FA;
+	}
+	ul.vedioSetMenu li.camera{
+		background-image:url(../web-static/images/camera.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #F5F7FA;
+		background-color:#F5F7FA;
+	}
+	ul.vedioSetMenu li.elecZoom{
+		background-image:url(../web-static/images/elecZoom.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #F5F7FA;
+		background-color:#F5F7FA;
+	}
+	ul.vedioSetMenu li.volume{
+		background-image:url(../web-static/images/volumeOff.png);
+		background-repeat:no-repeat;
+		background-position:8px 2px;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #F5F7FA;
+		background-color:#F5F7FA;
+	}
+	ul.vedioSetMenu li.vedioSet{
+		background:url(../web-static/images/vedioSet.png) no-repeat 8px 2px;
+	}
+	ul.vedioSetMenu li.fullScreen{
+		background:url(../web-static/images/fullScreen.png) no-repeat 8px 2px;
+		margin-right:0 !important;
+		opacity:0.5;
+		filter:alpha(opacity=50);
+		border:1px solid #F5F7FA;
+		background-color:#F5F7FA;
+	}
+	ul.vedioSetMenu li.nineScreen{
+		background:url(../web-static/images/nineScreen2.png) no-repeat 5px 9px;
+	}
+	ul.vedioSetMenu li.nineScreen2{
+		background:url(../web-static/images/nineScreen.png) no-repeat 5px 9px #000000;
+	}
+	ul.vedioSetMenu li.fourScreen{
+		background:url(../web-static/images/fourScreen2.png) no-repeat 6px 10px;
+	}
+	ul.vedioSetMenu li.fourScreen2{
+		background:url(../web-static/images/fourScreen.png) no-repeat 6px 10px #000000;
+	}
+	ul.vedioSetMenu li.singleScreen{
+		background:url(../web-static/images/singleScreen2.png) no-repeat 8px 11px;
+	}
+	ul.vedioSetMenu li.singleScreen2{
+		background:url(../web-static/images/singleScreen.png) no-repeat 8px 11px #000000;
+	}
+	div.layout{
+		width:auto;
+	}
+	input.mlBtn{
+		margin-left:30px;
+	}
+	div.popNote{
+		bottom:-250px;
+		display:none;
+		right:0px;
+		position:absolute;
+		height:140px;
+		width:278px;
+		border:1px solid #CCCCCC;
+		box-shadow:0px 2px 4px rgba(0,0,0,0.1);
+		border-radius:2px;
+		background:#FFFFFF;
+		z-index:1;
+	}
+	#closeTip{
+		width:28px;
+		height:28px;
+	}
+	div.popNote div.popTitle{
+		height:40px;
+		line-height:40px;
+		width:100%;
+		border-bottom:1px solid #CCCCCC;
+		text-indent:12px;
+		text-align:left;
+		font-size:14px;
+		color:#7a8599;
+	}
+	div.popNote div.popContent{
+		padding-top:32px;
+		text-align:left;
+	}
+	div.popNote div.popContentError{
+		height:20px;
+		line-height:20px;
+		text-indent:12px;
+		font-size:13px;
+	}
+	div.popNote div.popContentCorrect{
+		height:20px;
+		width:278px;
+		line-height:20px;
+		font-size:13px;
+	}
+	div.popContentCorrect span.name{
+		text-indent:12px;
+		width:200px;
+		display:inline-block;
+		word-wrap:break-word;
+		word-break:break-all;
+	}
+	div.popContentCorrect i.completeIcon{
+		width:20px;
+		height:20px;
+		background:url(../web-static/images/download_complete.png) no-repeat;
+		display:inline-block;
+		vertical-align:middle;
+		margin-right:12px;
+		float:right;
+	}
+	div.popContentCorrect span.check{
+		color:#325fe0;
+		text-decoration:underline;
+		cursor:pointer;
+		margin-right:12px;
+		float:right;
+	}
+	div.popNote iframe.kinescopeNoteIframe{
+		border:0px;
+		height:100%;
+		width:100%;
+		position:absolute;
+		top:0px;
+		right:0px;
+		z-index:-1;
+	}
+	div.bpToolNote{
+		bottom:9999px;
+		position:absolute;
+		height:34px;
+		width:170px;
+		border:1px solid #CCCCCC;
+		box-shadow:0px 2px 4px rgba(0,0,0,0.1);
+		border-radius:2px;
+	}
+	div.bpToolNoteB{
+		width:184px;
+	}
+	div.bpToolNote div.noteKinescoping{
+		background:#F5F7FA!important;
+	}
+	div.bpToolNote div.noteCorrect{
+		background:url(../web-static/images/checked.png) no-repeat 5px 11px #F5F7FA;;
+		/* border-radius:7px; */
+		color:#333333;
+		height:100%;
+		width:100%;
+		line-height:34px;
+		font-size:14px;
+		position:absolute;
+		top:0px;
+		left:0px;
+		text-indent:54px;
+		z-index:1;
+	}
+	div.bpToolNote div.noteError{
+		background:url(../web-static/images/note.png) no-repeat 5px 9px #F5F7FA;;
+		/* border-radius:7px; */
+		color:#333333;
+		height:100%;
+		width:100%;
+		line-height:34px;
+		font-size:14px;
+		position:absolute;
+		top:0px;
+		left:0px;
+		text-indent:54px;
+		z-index:1;
+	}
+	div.bpToolNote div.noteVolume{
+		background:url(../web-static/images/volumeOff.png) no-repeat 12px 6px #F5F7FA;;
+		/*border-radius:7px;*/
+		color:#333333;
+		height:100%;
+		width:100%;
+		line-height:34px;
+		font-size:14px;
+		opacity:0.95;
+		filter:alpha(opacity=95);
+		position:absolute;
+		top:0px;
+		left:0px;
+		text-indent:25px;
+		z-index:1;
+	}
+	div.bpToolNote iframe.kinescopeNoteIframe{
+		border:0px;
+		height:100%;
+		width:100%;
+		position:absolute;
+		opacity:0;
+		filter:alpha(opacity=0);
+		top:0px;
+		left:0px;
+		z-index:0;
+	}
+	div.laydate_boxCover{
+		background-color:#FFFFFF;
+		opacity:0.3;
+		filter:alpha(opacity = 0.3);
+		z-index: 1050;
+	}
+	div.previewCon{
+		width:100%;
+		overflow:hidden;
+		position:relative;
+		*zoom:1;
+	}
+	div.channelCon{
+		color:#666666;
+		font-size:14px;
+		float:right;
+		width:280px;
+		_position:relative;
+		margin-bottom:50px;
+	}
+	div.channelCon h2.channelHead{
+		font-size:16px;
+		padding:14px 0 14px 32px;
+	}
+	ul.channel{
+		list-style:none;
+		border-top:1px solid #353535;
+		color:#a0a0a0;
+		font-size:16px;
+	}
+	ul.channel li{
+		background:url("../web-static/images/videoStop.png") no-repeat 32px 19px;
+		border-bottom:1px solid #353535;
+		cursor:pointer;
+		height:50px;
+		line-height:50px;
+		padding-left:67px;
+	}
+	span.timeTab{
+		display:inline-block;
+		height:20px;
+		line-height:20px;
+		background-color:#2e2e2e;
+		width:60px;
+		margin:5px;
+		color:#a0a0a0;
+		border-radius:5px;
+	}
+	div.timeTabDiv{
+		text-align:center;
+	}
+	div.wrapTime{
+		text-align:center;
+	}
+	ul.showCls li{
+		display:inline-block;
+		height:60px;
+		line-height:80px;
+		width:169px;
+		border-bottom:3px solid #2a2a2a;
+		background-color:#2a2a2a;
+		font-size:16px;
+		text-align:center;
+		*display:inline;
+		*zoom:1;
+	}
+	ul.showCls li.clicked{
+		color:#ffffff;
+		border-bottom:3px solid #3099fc;
+		border-sh
+	}
+	ul.findCls{
+		border-bottom:1px solid #CED7E0;
+		width:280px;
+		border-radius:2px;
+		overflow:hidden;
+		background-color:#F5F7FA;
+		height:32px;
+		line-height:32px;
+		vertical-align:middle;
+	}
+	ul.findCls li.dateCls{
+		text-indent:12px;
+		list-style-type:none;
+	}
+	ul.findCls li.fileCls{
+		width:100%;
+		text-indent:12px;
+	}
+	ul.findCls i.downloadIcon{
+		width:32px;
+		height:24px;
+		background:url(../web-static/images/downloadIcon.png) 0px 8px no-repeat;
+		cursor:pointer;
+		float:right;
+	}
+	ul.findCls i.downloadIcon:hover{
+		background:url(../web-static/images/downloadIconHover.png) 0px 8px no-repeat;
+	}
+	ul.findCls i.downloadNum{
+		width:26px;
+		height:24px;
+		background:url(../web-static/images/downloadingIcon.png) 0px 8px no-repeat;
+		cursor:pointer;
+		float:right;
+		color:#FFFFFF;
+		font-size:12px;
+		font-weight:bold;
+		text-align:center;
+		font-style:normal;
+		text-indent:0px;
+	}
+	/* 文件列表 */
+	div.fileArea{
+		width:280px;
+		margin:8px auto;
+		min-height:30px;
+	}
+	div.fileArea div.selConDiv{
+		margin-bottom:8px;
+		z-index:0;
+	}
+	div.dateArea{
+		height:0px;
+		width:280px;
+		margin:9px auto;
+		_margin:-7px auto;
+		opacity:0;
+		filter:alpha(opacity=0);
+	}
+	div.tableBorderCon{
+		width:278px;
+		margin:0;
+	}
+	#downloadTableBorderCon{
+		height:200px;
+	}
+	div.downloadTableBorderCon{
+		width:306px;
+		height:200px;
+		background-color:#2e2e2e;
+		border-radius:13px;
+		padding:10px 0;
+		border: 2px solid #2e2e2e;
+		margin: 15px 0 0;
+		display: none;
+		position: absolute;
+		bottom: 140px;
+	}
+	table.dataGrid{
+		width:273px;
+	}
+	table.dataGrid tr{
+		height:36px;
+	}
+	table.dataGrid td{
+		font-size:12px;
+	}
+	table.dataGrid td.white{
+		color:#ffffff;
+	}
+	i.completeIcon{
+		background:url(../web-static/images/download_complete.png) center no-repeat;
+		width:20px;
+		height:20px;
+		display:inline-block;
+		vertical-align:middle;
+	}
+	span.downloaded{
+		color:#325FE0;
+		cursor:pointer;
+		vertical-align:middle;
+		margin-left:12px;
+		text-decoration:underline;
+	}
+	span.downloadErr{
+		color:#FF5500;
+		margin-right:8px;
+	}
+	span.downloading{
+		color:#19B68F;
+		margin-right:31px;
+	}
+	span.noDownload{
+		color:#333333;
+		margin-right:20px;
+	}
+	input.backVideo{
+		width:100%;
+		height:36px;
+		line-height:36px;
+		background-color:#353535;
+		color:#ffffff;
+		text-align:center;
+		border:0;
+		border-radius:18px;
+		margin-top:34px;
+		font-size:16px;
+	}
+	label.chnLstHd, li.chnLi{
+		display:inline-block;
+		color:#a0a0a0;
+		height:24px;
+		line-height:24px;
+		width:30px;
+		text-align:center;
+		cursor:pointer;
+		list-style:none;
+		*zoom:1;
+		*display:inline;
+	}
+	label.chnLstHd{
+		width:50px;
+	}
+	li.chnLiClick{
+		color:#3099fc;
+	}
+	div.ipcDragLineDiv label{
+		width:33px;
+		height:100%;
+		cursor:pointer;
+	}
+	#volumeDragLineDragLineStrip{
+		margin-top:14px;
+	}
+	#volumeDragLineDragLineInput{
+		display: none;
+	}
+</style>
+<style type="text/css">
+	div.laydate_box{
+		right:23px !important;
+	}
+	.laydate_body .laydate_table td{
+		position:relative;
+	}
+	#laydate_ms, #laydate_ys{
+		height:192px;
+	}
+	#laydate_ms span.chooseM, #laydate_ys span.chooseY{
+		height:48px;
+		line-height:48px;
+	}
+	#laydate_ms span.chooseM span, #laydate_ys span.chooseY span{
+		margin:0px;
+	}
+	.laydate_body .has_video{
+		color:#5A92FF;
+		background:url(../web-static/images/hasVideoBlue.png) no-repeat 14px 21px;
+	}
+	.laydate_body .has_video span.borderBlue{
+		width:4px;
+		height:4px;
+		background:url(../web-static/images/hasVideoWhite.png) no-repeat 0px 0px;
+		position:absolute;
+		left:14px;
+		top:21px;
+	}
+	.laydate_body .laydate_table td.has_video:hover{
+		color:#5A92FF;
+	}
+	.laydate_body .laydate_bottom .laydate_btn{
+		display:none;
+	}
+	.laydate_body .laydate_bottom{
+		height:16px;
+		line-height:16px;
+	}
+	.laydate_body .laydate_table .laydate_today{
+	}
+	.laydate_body .laydate_box{
+		z-index:1009;
+	}
+	div.videoPlugin{
+		position:relative;
+		overflow: hidden;
+		background-color:#DCDDE0 !important;
+		padding-bottom:16px;
+		padding-top:16px;
+		border-right:1px solid #CED7E0;
+		height:100%;/*解决IE6兼容性增加*/
+		text-align:center;
+		font-size:0px;
+	}
+	div.chanChsList{
+		position:absolute;
+		top:16px;
+		color:#FFFFFF;
+		font-size:14px;
+		left:20px;
+		z-index:1000;
+		background-color:#b4b4b4;
+	}
+	ul.selOptsUl{
+		max-height:180px;
+		*width:100px !important;
+	}
+	div.chanChsList span.selCon{
+		position:absolute !important;
+		visibility:hidden;
+		background:transparent;
+	}
+	div.kinescoping i{
+		background:red;
+		border-radius:7px;
+		height:14px;
+		font-size:0px;
+		width:14px;
+		left:36px;
+		top:10px;
+		position:absolute;
+	}
+	div.kinescoping span{
+		color:#333333;
+		font-size:14px;
+		left:18px;
+		top:0px;
+		position:absolute;
+	}
+	div.kinescoping{
+		display:none;
+		top:-27px;
+		right:67px;
+		line-height:20px;
+		position:absolute;
+		width:200px;
+	}
+	ul.gridToolBar{
+		font-size:0px;
+		list-style:none;
+		text-align:right;
+		clear:both;
+		float: right;
+		margin-top: 0;
+	}
+	ul.gridToolBar li{
+		margin-right:4px;
+	}
+	ul.gridToolBar li.stopDownloadUn{
+		margin-right:8px;
+	}
+	ul.gridToolBar li input
+	{
+		padding:0 11px 0;
+		*padding:1px 3px 1px;
+		height:26px;
+	}
+	span.select span.hsValueA {
+		width: 90px;
+	}
+	div.channelCon div.btnCon{
+		position:absolute;
+		bottom:16px;
+		right:30px;
+	}
+	div.channelCon div.btnCon input.btnA
+	{
+		width:220px;
+	}
+	div.gotoPageBlock label.gotoDesLbl,label.pageDesLbl{
+		display:none;
+	}
+	div.downloadTableDivTop{
+		height:40px;
+		line-height:40px;
+		background:#FFFFFF;
+		text-indent:12px;
+		border-top:1px solid #CED7E0;
+		border-left:1px solid #CED7E0;
+		border-right:1px solid #CED7E0;
+	}
+	div.downloadTableDivBottom{
+		height:40px;
+		line-height:40px;
+		background:#F5F5F5;
+		border-bottom:1px solid #CED7E0;
+		border-left:1px solid #CED7E0;
+		border-right:1px solid #CED7E0;
+		text-align:right;
+		padding-right:12px;
+	}
+	#downloadTableDiv{
+		position:absolute;
+		top:41px;
+		box-shadow:0px 0px 4px rgba(0,0,0,0.3);
+	}
+	span.select span.hsValueE{
+		width:82px;
+	}
+	div.timePosition{
+		position:absolute;
+		top:306px;
+		right:0px;
+		width:280px;
+		border-top:1px solid #CED7E0;
+		border-bottom:1px solid #CED7E0;
+	}
+	div.timePositionText{
+		text-indent:12px;
+		margin-top:8px;
+		margin-bottom:16px;
+	}
+	div.timeInput{
+		text-align:center;
+		margin-bottom:8px;
+		font-size:0;
+	}
+	input.textA4{
+		height:24px;
+		line-height:24px;
+	}
+	label.tipText{
+		width:12px;
+		height:26px;
+		line-height:26px;
+		text-align:center;
+		color:#333333;
+		font-size:13px;
+		display:inline-block;
+		vertical-align:middle;
+	}
+	div.timeInput i.goToTime{
+		width:48px;
+		height:24px;
+		border:1px solid #C8CDD9;
+		background-color:#F5F7FA;
+		border-radius:2px;
+		font-size:13px;
+		box-shadow:inset 0px 1px 2px rgba(0,0,0,0.2);
+		background-image:url(../../web-static/images/goToTimeDis.png);
+		background-repeat:no-repeat;
+		background-position:16px 4px;
+		cursor:default;
+		display:inline-block;
+		vertical-align:middle;
+	}
+	div.topArrow{
+		height:9px;
+		width:18px;
+		overflow:hidden;
+		position:absolute;
+		top:-7px;
+		right:16px;
+		background:url(../../web-static/images/topArrow.png) no-repeat;
+	}
+	div.pageListPo
+	{
+		padding:9px 6px 9px 0;
+		width:272px;
+		height:26px;
+		line-height:26px;
+		border-bottom:1px solid #CED7E0;
+		border-left:1px solid #CED7E0;
+		border-right:1px solid #CED7E0;
+		background:#FFFFFF;
+	}
+	div.pageListPo span.pageArrowLa
+	{
+		margin:3px 2px 0 0;
+	}
+	div.gotoPageBlock input.gotoPageBtn
+	{
+		margin:2px 0 0 0;
+	}
+	#selCon{
+		margin-left:8px;
+	}
+</style>
+<div class="basicConR visibleH">
+	<div class="previewCon">
+		<div class="channelCon IESIXFMLM3" id="channelCon">
+			<!-- <ul class="showCls disNone">
+				<li class="clicked" id="kinescopeCls">{%label.kinescope%}</li><li id="pictureCls">{%label.picture%}</li>
+			</ul> -->
+			<ul class="findCls">
+				<li class="dateCls" id="dateCls">{%label.selectDate%}</li>
+				<li class="fileCls disNone" id="fileCls">
+					<i class="downloadIcon" id="downloadIcon"></i>
+					<i class="downloadNum disNone" id="downloadNum"></i>
+					<span class="fileClsText">{%label.videoFile%}</span>
+				</li>
+			</ul>
+			<div class="dateArea" id="dateArea"></div>
+			<div class="timePosition" id="timePosition">
+				<div class="timePositionText">{%label.locateReplayTime%}</div>
+				<div class="timeInput">
+					<input class="text textA4" id="hourInput" type="text" maxlength="2" />
+					<label class="tipText">:</label>
+					<input class="text textA4" id="minuInput" type="text" maxlength="2" />
+					<label class="tipText">:</label>
+					<input class="text textA4" id="secInput" type="text" maxlength="2" />
+					<label class="tipText"></label>
+					<i class="goToTime" id="goToTime" type="button"></i>
+				</div>
+			</div>
+			<div class="fileArea disNone" id="fileArea">
+				<div class="selConDiv">
+					<ul id="downloadUl" class="gridToolBar">
+						<li gridType="download">{%label.download%}</li>
+						<li gridType="stopDownload">{%label.allStopped%}</li>
+					</ul>
+					<div class="selCon" id="selCon">
+						<span class="select selectA" id="senseType">
+							<span class="value hsValueE hsValueB"></span>
+							<i class="arrow"></i>
+						</span>
+					</div>
+				</div>
+				<ul class="chanFile" id="chanFile">
+				</ul>
+				<div class="tableBorderCon"><table id="fileTable" class="dataGrid"></table></div>
+				<div id="downloadTableDiv">
+					<div class="topArrow"></div>
+					<div class="downloadTableDivTop">{%label.downloadList%}</div>
+					<div class="tableBorderCon" id="downloadTableBorderCon">
+						<table id="downloadTable" class="dataGrid"></table>
+					</div>
+					<div class="downloadTableDivBottom">
+						<input type="button" class="subBtnB btnA btnSmall" id="stopDownloadAll" value="{%label.allStopped%}" />
+					</div>
+				</div>
+				<input type="button" class="backVideo disNone" id="backVideo" value="{%label.backVideo%}" />
+			</div>
+			<div class="btnCon">
+				<input id="downloadCon" class="subBtn btnA" type="button" value="{%label.downloadVideo%}" />
+			</div>
+		</div>
+		<div id="videoPluginReplayCon" class="videoPlugin">
+			<div class="chanChsList" id="chanDiv">
+			</div>
+		</div>
+	</div>
+	<div class="vedioSetDiv positionRel">
+		<ul class="vedioSetMenu">
+			<div id="popNote" class="popNote">
+				<div class="popTitle" id="popTitle">
+					<i id="closeTip" style="float:right;"></i>
+					<span id="titleText"></span>
+				</div>
+				<div class="popContent" id ="popContent">
+					<div class="popContentError disNone" id="popContentError"></div>
+					<div class="popContentCorrect" id="popContentCorrect">
+						<span class="check" id="check">{%label.check%}</span>
+						<i class="completeIcon"></i>
+						<span class="name" id="name"></span>
+					</div>
+				</div>
+				<iframe frameborder="0" class="kinescopeNoteIframe"></iframe>
+			</div>
+			<div id="downloadNote" class="bpToolNote">
+				<div class="noteCorrect">{%label.stopDownloadingFirst%}</div>
+				<iframe frameborder="0" class="kinescopeNoteIframe"></iframe>
+			</div>
+			<li class="reversePlay vedioSetOptL icon disNone" title="{%label.reversePlay%}"></li>
+			<li class="preVideo vedioSetOptL icon disNone" title="{%label.preVideo%}"></li>
+			<li class="startPlay vedioSetOptL icon" id="startPlay" title="{%label.startPlay%}"></li>
+			<li class="stopPlay vedioSetOptL icon" id="stopPlay" title="{%label.stopPlay%}"></li>
+			<li class="slowPlay vedioSetOptL icon" id="slowPlay" title="{%label.slowPlay%}"></li>
+			<li class="curSpeed vedioSetOptL icon1" id="curSpeed"></li>
+			<li class="speedPlay vedioSetOptL icon" id="speedPlay" title="{%label.speedPlay%}"></li>
+			<li class="fastThSec vedioSetOptL icon" id="fastThSec" title="{%label.fastThSec%}"></li>
+			<li class="nextVideo vedioSetOptL icon" id="nextVideo" title="{%label.nextVideo%}"></li>
+			<li id="cutSave" class="vedioSetOptL icon cutBtn">{%btn.save%}</li>
+			<li id="fullScreen" class="vedioSetOptR fullScreen icon" title="{%label.fullScreen%}"></li>
+			<li id="volume" class="vedioSetOptR volume icon" title="{%label.volume%}"></li>
+			<div id="volumeNote" class="bpToolNote bpToolNoteB">
+				<div id="volumeDragLine" class="ipcDragLineDiv noteVolume"></div>
+				<iframe frameborder="0" class="kinescopeNoteIframe"></iframe>
+			</div>
+			<li class="vedioSetOptR elecZoom icon" title="{%label.elecZoom%}"></li>
+			<li id="cutVideo" class="vedioSetOptR cutVideo icon" title="{%label.cutVideo%}"></li>
+			<div id="kinescopingNote" class="bpToolNote">
+				<div class="kinescoping noteError noteKinescoping">
+					<i></i>
+					<span>00:00:00</span>
+				</div>
+				<iframe frameborder="0" class="kinescopeNoteIframe"></iframe>
+			</div>
+			<li id="cameraSet" class="vedioSetOptR camera icon playDisabled" title="{%label.snapPic%}"></li>
+		</ul>
+	</div>
+	<div class="footTime" id="footTime">
+		<div class="timeAndChan" id="timeAndChan"></div>
+		<div class="timeCls" id="timeCls">
+			<span class="selCon">
+				<span id="timeClsSel" class="select selectA">
+					<span class="value hsValueD hsValueB"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			<li class="videoCls" id="fixTime">
+				<input type="button" class="timingChecked" id="timingIcon" checked="true"/>
+				<label for="timingIcon" class="timing">{%label.timeVedio%}</label>
+				<input type="button" class="moveDetChecked" id="MoveDetIcon" checked="true"/>
+				<label for="MoveDetIcon">{%label.eventVedio%}</label>
+			</li>
+		</div>
+	</div>
+</div>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>OSD</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+		
+		#posInfo{
+			border-top: 2px solid gray;
+			padding: 50px;
+		}
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> OSD </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.21" id="serverIp">
+		</p>
+		<p>			
+			<input type="button" value="start play" id="startPlay">
+			<input type="button" value="stop play" id="stopPlay">
+		</p>
+		<p>			
+			<span>时间</span><input type="checkbox" id="chkTime">
+        </p> 
+		<p>			
+			<span>通道名称</span><input type="checkbox" id="chkTitle"><input type="text" placeholder="input OSD text" id="textTitle" value="OSD TITLE TEXT">
+        </p> 
+		<p>			
+			<span>字符1</span><input type="checkbox" id="chk1"><input type="text" placeholder="OSD text 1" id="text1" value="OSD TEXT 1">
+        </p> 
+		<p>			
+			<span>字符2</span><input type="checkbox" id="chk2"><input type="text" placeholder="OSD text 2" id="text2" value="OSD TEXT 2">
+        </p> 
+		<p>			
+			<span>字符3</span><input type="checkbox" id="chk3"><input type="text" placeholder="OSD text 3" id="text3" value="OSD TEXT 3">
+        </p> 
+		<p>			
+			<span>字符4</span><input type="checkbox" id="chk4"><input type="text" placeholder="OSD text 4" id="text4" value="OSD TEXT 4">
+        </p> 		
+		<div>
+			<input type="button" value="fresh OSD info" id="OSDFreshBtn">
+			<p id="posInfo"></p>
+		</div>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.21",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480,
+			
+			OSDIdList: ["chkTitle", "chk1", "chk2","chk3","chk4", "chkTime"],
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	//在视频正常播放以前很多参数和方法是无法正常调用的，故增加ready函数
+	//以 fullScreen 为例，如果是在PlayVideo之后马上调用这个函数则应使用Ready方法: pluginObj.Ready(pluginObj.fullScreen);
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	pluginObj.showOSD = function(){   //向OSDTitleStr属性赋值，修改通道名称，插件内部给定的最大长度128字节
+		console.log(this.id); 
+		if(this.checked){
+			var bEn = 1;
+		}else{
+			var bEn = 0;
+		}		
+		var list = pluginObj.param.OSDIdList;
+		var len = pluginObj.param.OSDIdList.length;
+		var textList = ["textTitle", "text1", "text2","text3","text4"];
+		
+		for(var i=0; i< len; i++)
+		{
+			if(i<len-1 && this.id == list[i])
+			{
+			 //index |  开启、关闭OSD显示 | 左上角X坐标 | 左上角Y坐标 | 字体颜色（暂时无作用）| 字体大小 | 需显示的字符串
+			//	obj.ShowOSD(i, bEn, 500, 300+50*i, 0xFFFFFF, 25, document.getElementById(textList[i]).value );  
+			//点的x变换值为 实际值 * 10000 / 分辨率的width
+			//点的y变换值为 实际值 * 10000 / 分辨率的height  (我的测试环境分辨率为1280*720，其它情况做测试请适当调整)
+				obj.ShowOSD(i, bEn, 3906, 4166+694*i, 0xFFFFFF, 25, document.getElementById(textList[i]).value );
+			}
+			else if(i==len-1 && this.id == list[i])
+			{
+				obj.ShowTime(bEn, 195, 347, 0xFFFFFF, 25);
+			}
+		}
+		pluginObj.writeOSDPos();
+	};
+	
+	pluginObj.writeOSDPos = function(){    
+		var OSDPos = {};
+		var pos = [0, 0];          //必须预先设置2位的数组，否则会出错
+		obj.getOSDTimePos(pos);     //getOSDTimePos(pos) 得到Title显示位置的左上角坐标，参数是一个长度2位的数组，经过插件的getOSDTimePos()方法调用后该数组的值会发生变化，0位是Title矩形左上角X坐标，1位是Y坐标。
+		OSDPos.x = pos[0];
+		OSDPos.y = pos[1];  	  //因为开启关闭OSD都用的同一个接口，在关闭OSD时所设置的 posX | posY 实际上被插件保存了。所以应该在关闭OSD前读取OSD区域的位置信息，否则读到的是调用ShowOSD/ShowTime方法时设置的参数
+
+		var posStr = "Time Position: (" + OSDPos.x + ", "+ OSDPos.y +")<br>";   
+		
+		var OSDArrLen = obj.OSDArrLen;                   //新增属性OSDArrLen，用于获取OSD可显示的字符个数（不含时间字符，但包含通道名称和星期）
+		for(var i=0; i<OSDArrLen; i++){
+			obj.getOSDTitlePos(i, pos);
+			OSDPos.x = pos[0];
+			OSDPos.y = pos[1];
+			posStr += "OSD Position "+ i +": (" + OSDPos.x + ", "+ OSDPos.y +")<br>";
+		}		
+		document.getElementById("posInfo").innerHTML = posStr;
+	};
+	
+	(function(){
+		document.getElementById("startPlay").onclick = pluginObj.play;
+		document.getElementById("stopPlay").onclick = pluginObj.stop;
+		
+		var list = pluginObj.param.OSDIdList;
+		for(var i=0; i<list.length; i++){
+			document.getElementById(list[i]).onclick = pluginObj.showOSD;
+		}		
+		//通道名和字符发生changed时也应该调用obj.ShowOSD()，这里省略
+		
+		document.getElementById("OSDFreshBtn").onclick = pluginObj.writeOSDPos;
+	})();
+	
+</script>
+<div>
+<h2>OSD - On Screen Display</h2>
+<p>该功能的作用是让用户决定在视频上添加什么文字，以及在哪个位置显示它们。在插件上显示的红色字符并不是最后在预览界面或者保存视频后看到的文字，只是在设置文字内容和位置时临时展示给用户看的，只有点击保存后这些文字和位置信息才会传给web server，并由后台实现显示。
+如果文字描述不够清晰，可以找海康的样机看一下，就知道这个功能的作用了。</p>
+
+<h5>ShowTime(bEn, 195, 347, 0xFFFFFF, 25)</h5>
+<p>
+	开启/关闭时间信息显示的接口方法<br>
+	参数1: 1-开启/0-关闭：参数2：位置信息，左上角X坐标；参数3：位置信息，左上角Y坐标；参数4：字体颜色，暂时没有用，保留接口；参数5：字体大小<br>
+	OSD功能所显示的信息分为2类，其一是时间信息，因为插件可以从每帧的视频数据中得到时间信息，所以显示的字符无需从JS得到<br>
+	关闭时间信息显示也用同样的接口方法，后面的参数虽然没有影响，但必须填写。这是插件COM编程的方式决定的，除非增加接口方法，否则无法规避。<br>
+	这个功能第一步需要从web server获取是否显示OSD 时间信息、位置信息和字体大小，并通过这个接口方法交给插件显示。<br>
+	位置信息和字体大小可能会因为用户选择的分辨率不同而不同，这个需要和后台同事再沟通。<br>
+	本例中的左上角X坐标和Y坐标是经过转换后的值，X坐标变换值为 实际值 * 10000 / 分辨率的width；Y坐标变换值为 实际值 * 10000 / 分辨率的height。坐标转换的处理分别在后台和插件中，JS实际上不需要对这个值进行处理，这里仅作解释。
+</p>
+
+<h5>ShowOSD(index, bEn, 3906, 4166, 0xFFFFFF, 25, "OSD TEXT" )</h5>
+<p>
+	开启/关闭OSD文字信息显示的接口方法<br>
+	参数1: 1-开启/0-关闭：参数2：位置信息，左上角X坐标；参数3：位置信息，左上角Y坐标；参数4：字体颜色，暂时没有用，保留接口；参数5：字体大小；参数6：需要显示的文字<br>
+	星期信息和其它字符信息都采用同样的方法处理，所以需由JS传递星期字符串给插件。至于时间和星期信息如何获得，请和后台同事沟通。<br>
+	因为星期信息和其它字符信息共5个接口都是相同的，故采用同样的接口方法，并通过下标index的方式标明设置的哪一个OSD文字。<br>
+</p>
+
+<h5>getOSDTimePos(posArray)</h5>
+<p>
+	得到时间信息的左上角坐标值的接口方法<br>
+	参数1：长度为2的数组，参数数组必须在调用该方法前预先定义，否则调用出错。<br>
+	该方法调用结束后，参数数组的值会被改变，第0位保存了时间信息左上角X坐标值，第1位保存了时间信息左上角Y坐标值。<br>
+	在用户点击保存时需要从插件中获取OSD时间的位置信息，然后将其保存到web server中。这样后台就能对其进行处理并真正的把OSD信息显示在用户指定的位置。<br>
+	这个值同样是经过转换后的X坐标信息，转换方法同前。同样不需要JS对其进行处理。
+</p>
+
+<h5>OSDArrLen</h5>
+<p>属性：插件支持的OSD字符显示个数</p>
+
+<h5>getOSDTitlePos(index, posArray)</h5>
+<p>
+	得到OSD字符信息的左上角X坐标值的接口方法<br>
+	参数1：下标，指定需要得到哪一个OSD字符的位置信息; 参数2：长度为2的数组，参数数组必须在调用该方法前预先定义，否则调用出错。<br>
+	该方法调用结束后，参数数组的值会被改变，第0位保存了OSD字符信息左上角X坐标值，第1位保存了左上角Y坐标值。<br>
+	因为多个OSD字符使用同一个接口，故使用下标的方法，下标值需注意和ShowOSD使用的保持一致。<br>
+	不提供获取OSD字符的文字内容的接口，因为插件不改变用户在HTML中设置的文字内容。
+</p>
+
+</div>
+</body>

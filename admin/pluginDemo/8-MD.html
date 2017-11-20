@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>motion detection</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> motion detection </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#">
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="pluginObj.play();">
+			<input type="button" value="stop play" id="stopPlay" onclick="pluginObj.stop();">
+        </p>   
+		<p>
+			<input type="button" value="start" id="MDBtn">
+			<input type="button" value="在控制台打印信息" id="print">
+			<input type="button" value="删除" id="del">
+			<input type="button" value="清除" id="reset">
+		</p>
+	</form>
+</div>
+
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");	
+	
+	
+	var pluginObj = {};
+	
+	pluginObj.param = 	{
+			ip : "192.168.1.186",
+			port: 8080,
+			username: "admin",
+			password: "YWRtaW4=",
+			streamtype: 2,
+			streamresolution: 0,
+			width: 640,
+			height: 480
+		};
+
+	pluginObj.play = function(){
+		var param = pluginObj.param;
+		obj.ip = param.ip;
+		obj.port = param.port;
+		obj.username = param.username;
+		obj.password = param.password;
+		obj.streamtype = param.streamtype;
+		obj.streamresolution = param.streamresolution;
+		obj.width = param.width;
+		obj.height = param.height;
+		
+		obj.PlayVideo();
+	};
+	
+	pluginObj.stop = function(){
+		obj.StopVideo();
+	};
+	
+	pluginObj.Ready = function(callback){   
+		setTimeout(function(){	
+				if( obj.isVideoPlaying )	//isVideoPlaying属性可以用来判断插件是否完全进入播放状态
+				{
+					callback();
+				}else{
+					setTimeout(arguments.callee, 2000);
+				}
+			}, 0);
+	};
+	
+	pluginObj.MDStart = function(){
+		obj.MotionDetection(2);              //MotionDetection()开启移动侦测，传入的参数必须是2。因为1保留给了旧版本的移动侦测，最后需要和产品部讨论才能决定使用哪套方案，或者2套都支持。
+		
+		obj.addMDRect(1562, 2777, 1562, 4861);       //从后台获取矩形数据，将已有矩形一个一个告知插件，插件再将其绘制出来。
+													//最多支持128个矩形。
+	};
+	
+	pluginObj.MDStop = function(){
+		obj.MotionDetection(0);              //MotionDetection()关闭移动侦测，传入参数0。
+	};
+	
+	pluginObj.getMDArrInfo = function(){
+		var startPoint = {};  //左上角坐标
+		var width, height;    //长宽
+		var pos = [-1,-1, -1, -1];
+		console.log(obj.MDArrLen);
+		for(var i=0; i<obj.MDArrLen; i++)    //MDArrLen - MD模块可绘制的区域覆盖矩形个数，上限是128个
+		{
+		
+			obj.getMDPos(i, pos);                  //getMDPos()得到“移动侦测”矩形的信息，输入参数是下标和一个长度为4的数组，数组必须预先定义。
+			if(pos[0] == -1)          //ROI, RegionCover, MD和MDOcclude模块都采用类似的接口获取矩形信息，如果用户绘制的矩形没到上限时，访问某些下标得到的是全-1。
+			{                         //假如没有开启MD功能，调用getMDArrInfo会发生什么呢？可以调用，但是参数数组的值不会发生任何改变。
+				continue;
+			}
+			startPoint.x = pos[0];                          //getMDPos()方法调用后，其参数数组的值发生变化，第0位是左上角X坐标，第1位是左上角Y坐标，第3位是矩形长度，第4位是高度。
+			startPoint.y = pos[1];
+			width = pos[2];
+			height = pos[3];
+			console.log("Motion Detection Rect "+ i + ": startPoint(" +  startPoint.x + ", " + startPoint.y + ")    " + "width = " +  width + ", height = " + height );
+		}
+	};
+
+	
+	pluginObj.delCurRect = function(){
+		obj.delMDRect(1);      //delMDRect(),删除当前选中状态的MD矩形 。obj.delMDRect()方法的参数分2种情况，正数和负数。正数则删除当前选中的矩形，负数则清空
+		                       //以后可能会增加右键删除或者del键删除，但是暂时只支持这种删除方法
+	};
+	
+	pluginObj.resetRect = function(){
+		obj.delMDRect(-1);      //清除所有MD矩形
+	};
+	
+	(function(){
+		document.getElementById("MDBtn").onclick = function(){
+			if(this.value == "start")
+			{
+				pluginObj.MDStart();
+				this.value = "end";
+			}else if(this.value == "end")
+			{
+				pluginObj.MDStop();
+				this.value = "start";
+			}
+		};
+		
+		document.getElementById("print").onclick = pluginObj.getMDArrInfo;
+		
+		document.getElementById("del").onclick = pluginObj.delCurRect;
+		
+		document.getElementById("reset").onclick = pluginObj.resetRect;
+	})();
+	
+	
+</script>
+
+
+<div>
+<h2>移动侦测</h2>
+<p>可叠加多个矩形区域，当用户选定的区域中有物体移动时报警。<br>当前最多支持128个矩形。</p>
+
+<h5>MotionDetection(bEnable)</h5>
+<p>
+	接口方法：开启或关闭移动侦测。<br>
+	参数1：数值。为 0 时关闭移动侦测功能。 为 2 时开启器移动侦测功能，为 1 时开启旧版本的移动侦测。不支持其它数字，如果输入其它数字的参数，插件不做任何处理。<br>
+	这里之所以保留参数1是因为产品部还不确定使用哪种方案。也可能同时支持。
+</p>
+
+<h5>addMDRect(pointX, pointY, width, height)</h5>
+<p>
+	接口方法：用于将从后台获取的矩形信息设置进插件。<br>
+	参数1：数值，左上角X坐标（经过转换的值，后面同）；参数2：数值，左上角Y坐标；参数3：矩形width；参数4：矩形height。
+</p>
+
+<h5>MDArrLen</h5>
+<p>
+	属性：数值，只能读不能写；表示移动侦测支持绘制的矩形个数，当前为128。
+</p>
+
+<h5>getMDPos(index, array)</h5>
+<p>
+	接口方法：用于从插件读取的矩形信息。<br>
+	参数1：数值，数组下标，表明读取第几个矩形的信息；参数2：长度为4的数组，必须预先定义，否则会出错。<br>
+	经过这个方法调用后，参数array的值被修改为[左上角X坐标， 左上角Y坐标， 矩形width， 矩形height]。<br>
+	
+</p>
+
+<h5>delMDRect(bReset)</h5>
+<p>
+	接口方法：删除或者清除绘制的矩形。<br>
+	参数1：数值，当为正数时删除当前选中的矩形；当为负数时清除所有矩形。
+</p>
+
+</div>
+
+</body>

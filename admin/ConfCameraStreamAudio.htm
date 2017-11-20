@@ -1,0 +1,387 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var auT = $("#audioType")[0];
+		var auI = $("#audioInput")[0];
+		var saR = $("#sampleRate")[0];
+		var bit = $("#bitrate")[0];
+		var btnReset = id("reset");
+		var btnSave = id("save");
+		var audioFN = uciAudio.fileName;
+		var secN = uciAudio.secName;
+		var optN = uciAudio.optName;
+		var optV = uciAudio.optValue;
+		var ENABLED_ON = uciAudio.optValue.enableVal.on;
+		var ENABLED_OFF = uciAudio.optValue.enableVal.off;
+		var speakerMute;
+		var speakerVolume;
+		var inputMute;
+		var inputVolume;
+		var noiseSwitch;
+		var noiseState;
+		var speakerMuteState;
+		var inputMuteState;
+		var volumeValue;
+		var speakerVolumeValue = 50;
+		var micVolumeValue = 50;
+		var sysFile = uciSystem.fileName;
+		var RESETCONFIG = uciSystem.actionName.configReset;
+		var CONFIGNAME = uciSystem.optName.configName;
+		var volumeErr = false;
+
+
+		function errorHandle(code, objOrId)
+		{
+			var str = "";
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+                str = errStr.ipcUbusConnFail;
+                break;
+            case IPCUBUSCALLERR:
+                str = errStr.ipcUbusCallErr;
+                break;
+			case IPCAUOPRERR:
+				str = errStr.ipcAuOprErr;
+				break;
+			case IPCAUSRERR:
+				str = errStr.ipcAuSrErr;
+				break;
+			case IPCAUCHNERR:
+				str = errStr.ipcAuChnErr;
+				break;
+			case IPCAUCODERR:
+				str = errStr.ipcAuCodErr;
+				break;
+			case IPCAUDECERR:
+				str = errStr.ipcAuDecErr;
+				break;
+			case IPCAUVOLERR:
+				str = errStr.ipcAuVolErr;
+				break;
+			case IPCAUDEVERR:
+				str = errStr.ipcAuDevErr;
+				break;
+			case IPCAUBRERR:
+				str = errStr.ipcAuBrErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function onReset()
+		{
+			showConfirmIpc(label.resetDefaultConfirm, function(choose)
+			{
+				if (true == choose)
+				{
+					var data = {};
+
+					data[sysFile] = {};
+					data[sysFile][RESETCONFIG] = {};
+					data[sysFile][RESETCONFIG][CONFIGNAME] = [audioFN];
+
+					showToast("loading");
+					$.action(data, function(resp){
+						if (true == errorHandle(resp[ERR_CODE]))
+						{
+							showToast("success");
+							id("info_conf_stream_audio_rsMenu").onclick();
+						}
+					});
+				}
+			});
+		}
+/*
+		function checkBitRate(value, max, min, objOrId)
+		{
+			if (value.length < 1)
+			{
+				showNote(objOrId, errStr.bitRateUpBoundEmtpy);
+				return false;
+			}
+			if (false == checkNum(value))
+			{
+				showNote(objOrId, errStr.bitRateUpBoundInvChar);
+				return false;
+			}
+			if (false == checkNumRange(parseInt(value, 10), max, min))
+			{
+				showNote(objOrId, errStr.bitRateUpBoundErr);
+				return false;
+			}
+
+			return true;
+		}
+|*/
+		function noiseSwichHd(state)
+		{
+			noiseState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+		}
+
+		function speakerMuteHd(state)
+		{
+			speakerMuteState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+		}
+
+		function inputMuteHd(state)
+		{
+			inputMuteState = state == 0 ? ENABLED_ON : ENABLED_OFF;
+		}
+
+		function volumeChange(val)
+		{
+			micVolumeValue = val;
+			if ((true == checkNum(val)) &&
+				(true == checkNumRange(parseInt(val), 100, 0)))
+			{
+				volumeErr = false;
+			}
+			else
+			{
+				showNote("inputVolumeDragLineInput", errStr.audioVolumeErr);
+				volumeErr = true;
+			}
+		}
+
+		function speakerVolumeChange(val)
+		{
+			speakerVolumeValue = val;
+		}
+
+		function onSave()
+		{
+			if(volumeErr){
+				return;
+			}
+			var data = {};
+			var speaker, mic;
+
+			/*if ()
+			{
+				return;
+			}*/
+
+			data[audioFN] = {};
+			speaker = data[audioFN][uciAudio.secName.speaker] = {};
+			mic = data[audioFN][uciAudio.secName.microphone] = {};
+
+			/*speaker*/
+			speaker.mute = speakerMuteState;
+			speaker.volume = speakerVolumeValue;
+			/*microphone*/
+			mic.sampling_rate = saR.value;
+			mic.channels = 1; //通道数暂时不开放给用户配置，默认1
+			mic.encode_type = auT.value;
+			mic.input_device_type = auI.value;
+			mic.mute = inputMuteState;
+			mic.volume = micVolumeValue;
+			mic.noise_cancelling = noiseState;
+			mic.bitrate = bit.value;
+			mic.echo_cancelling = ENABLED_OFF;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function fillDom(resp)
+		{
+			var speakerD, micD;
+
+			if (resp == undefined || resp["error_code"] != ERR_NONE)
+			{
+				return ;
+			}
+
+			speakerD = resp[audioFN][uciAudio.secName.speaker];
+			micD = resp[audioFN][uciAudio.secName.microphone];
+
+			/*speaker*/
+			speakerMuteState = speakerD.mute;
+			speakerMute.setState((speakerMuteState == ENABLED_ON) ? 1 : 0);
+			speakerVolume.setValue(speakerD.volume);
+			speakerVolumeValue = speakerD.volume;
+			/*microphone*/
+			saR.resetSel(micD.sampling_rate);
+			auT.resetSel(micD.encode_type);
+			auI.resetSel(micD.input_device_type);
+			inputMuteState = micD.mute;
+			inputMute.setState((inputMuteState == ENABLED_ON) ? 0 : 1);
+			inputVolume.setValue(micD.volume);
+			micVolumeValue = micD.volume;
+			noiseState = micD.noise_cancelling;
+			noiseSwitch.setState((noiseState == ENABLED_ON) ? 1 : 0);
+			bit.resetSel(micD.bitrate);
+
+			showDetailCon();
+		}
+
+		function constructDom()
+		{
+			var sampleRateOpt = [{str:8, value:8},
+			   {str:16, value:16},
+			   {str:22.05, value:22.05},
+			   {str:44.1, value:44.1},
+			   {str:48, value:48}];
+			var audioTypeOpt = [{str:label.G711alaw, value:"G711alaw"},
+			   {str:label.G711ulaw, value:"G711ulaw"},
+			   {str:label.G726, value:"G726"},
+			   {str:label.ADPCM, value:"ADPCM"}];
+			var audioInputOpt = [{str:label.LineIn, value:"LineIn"},
+			   {str:label.MicIn, value:"MicIn"}];
+			var bitrateOpt = [{str:32, value:32},
+			   {str:40, value:40},
+			   {str:48, value:48},
+			   {str:56, value:56},
+			   {str:64, value:64},
+			   {str:80, value:80},
+			   {str:96, value:96},
+			   {str:112, value:112},
+			   {str:128, value:128},
+			   {str:144, value:144},
+			   {str:160, value:160}];
+
+			/*speaker*/
+			speakerMute = new Switch("speakerMute", 1 , speakerMuteHd);
+			speakerVolume = new DragLine({id:"speakerVolume", name:label.volume, cb:speakerVolumeChange});
+			/*microphone*/
+			selectInit("sampleRate", sampleRateOpt, 8);
+			selectInit("audioType", audioTypeOpt, "G711alaw");
+			selectInit("audioInput", audioInputOpt, "LineIn");
+			inputMute = new Switch("inputMute", 1 , inputMuteHd);
+			inputVolume = new DragLine({id:"inputVolume", name:label.volume, cb:volumeChange});
+			noiseSwitch = new Switch("noiseSwitch", 1 , noiseSwichHd);
+			selectInit("bitrate", bitrateOpt, 64);
+
+			speakerVolume.setValue(50);
+			inputVolume.setValue(100);
+		}
+
+		function pageInit()
+		{
+			var data = {};
+
+			btnReset.onclick = onReset;
+			btnSave.onclick = onSave;
+
+			constructDom();
+
+			data[audioFN] = {};
+			data[audioFN][NAME] = [uciAudio.secName.speaker,uciAudio.secName.microphone];
+			$.query(data, fillDom);
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+
+<style type="text/css">
+	/*hidden部分配置，设备暂不支持*/
+	li.hidden{
+		display: none !important;
+	}
+</style>
+
+<div class="detailCon detailConMorePad">
+	<ul class="line lineL">
+		<li class="line lineD hidden">
+			<label class="des desA">speaker</label>
+		</li>
+		<li class="line lineD hidden">
+			<label class="des desA">{%label.mute%}</label>
+			<div id="speakerMute" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH"></label>
+		</li>
+		<li class="line lineD hidden">
+			<div id="speakerVolume" class="ipcDragLineDiv"></div>
+		</li>
+
+		<li class="line lineD hidden">
+			<label class="des desA">microphone</label>
+		</li>
+		<div style="position:relative;*z-index:1;">
+			<li class="line lineD hidden">
+				<label class="des desA">{%label.sampleRate%}</label>
+				<span class="selCon">
+					<span id="sampleRate" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="line lineD">
+				<label class="des desA">{%label.audioCode%}</label>
+				<span class="selCon">
+					<span id="audioType" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+			<li class="line lineD">
+				<label class="des desA">{%label.audioInput%}</label>
+				<span class="selCon">
+					<span id="audioInput" class="select">
+						<span class="value hsValueA"></span>
+						<i class="arrow"></i>
+					</span>
+				</span>
+			</li>
+		</div>
+		<li class="line lineD">
+			<div id="inputVolume" class="ipcDragLineDiv"></div>
+		</li>
+		<li class="line lineD">
+			<label id="noiseFilter" class="des desA">{%label.noiseFilter%}</label>
+			<div id="noiseSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH"></label>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.audioRecord%}</label>
+			<div id="inputMute" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH"></label>
+		</li>
+		<div style="position:relative;*z-index:1;">
+				<li class="line lineD hidden">
+					<label class="des desA">{%label.bitrate%}</label>
+					<span class="selCon">
+						<span id="bitrate" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</li>
+		</div>
+	</ul>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="reset" type="button" value="{%btn.resetDefault%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

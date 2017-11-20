@@ -1,0 +1,377 @@
+﻿<style type="text/css">
+	div.sysConf{
+		position:relative;
+		*zoom:1;
+	}
+	#restoreIf{
+		top:-9999px;
+		position:absolute;
+		visibility:hidden;
+	}
+	div.fileDiv{
+		*display:inline;
+		*zoom:1;
+		height:32px;
+		*height:32px;
+		overflow:hidden;
+		position:relative;
+		vertical-align:middle;
+	}
+	input.file{
+		font-size:110px;
+		top:-5px;
+		right:-5px;
+		opacity:0;
+		filter:alpha(opacity:0);
+		cursor:pointer;
+		position:absolute;
+		vertical-align:top;
+		z-index:1;
+	}
+	#sysRestore{
+		margin-left:10px !important;
+		*margin-top:4px;
+		*padding:2px 20px;
+	}
+	#upFileForm{
+		display:inline-block;
+		vertical-align:middle;
+		overflow:hidden;
+		padding-top:2px;
+		*display:inline;
+		*zoom:1;
+	}
+	label.upTip{
+		vertical-align:middle;
+	}
+	input.brower{
+		margin-left:20px;
+		width:88px;
+	}
+	div.sysConf li.lineG{
+		font-size:0px;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		/* 恢复出厂设置 */
+		function resetDefault()
+		{
+			var data, domainName, facIp = "";
+
+			if (true == $.local)
+			{
+				sysResetBtn.onclick = function()
+				{
+					showConfirmIpc(label.resetConfirmIpc, function(choose)
+					{
+						if (true == choose)
+						{
+							var reqData = {
+								system: {
+									reset:null
+								}
+							};
+
+							$.action(reqData, function(result){
+								if (ENONE == result[ERR_CODE])
+								{
+									showProgBar(RESTORE_SECONDS, label.resetConing, function()
+									{
+										closeProgBar();
+									}, false, statusStr.resetOk, statusStr.resetTip);
+								}
+							});
+						}
+					});
+				};
+				return;
+			}
+
+			if (USER_GROUP_REMOTE == $.authRltObj["group"])
+			{
+				disableBtn(sysResetBtn, true);
+			}
+			else
+			{
+				data = {};
+				data[uciProto.fileName] = {};
+				data[uciProto.fileName][KEY_NAME] = uciProto.secName.sta;
+				data[uciDeviceInfo.fileName] = {};
+				data[uciDeviceInfo.fileName][KEY_NAME] = uciDeviceInfo.secName.info;
+
+				$.query(data, function(result){
+					if (IPCUMGUESTNAUTH == result[ERR_CODE])
+					{
+						showAlert(errStr.invPermissionDenied);
+					}
+					if (ENONE != result[ERR_CODE])
+					{
+						return;
+					}
+
+					facIp = result[uciProto.fileName][uciProto.secName.sta][uciProto.optName.facIp];
+					domainName = result[uciDeviceInfo.fileName][uciDeviceInfo.secName.info][uciDeviceInfo.optName.domainName];
+
+					sysResetBtn.onclick = function()
+					{
+						if (GROUP_ROOT != $.group)
+						{
+							showAlert(errStr.guestPermissionDenied);
+							return;
+						}
+
+						showConfirmIpc(label.resetConfirmIpc, function(choose)
+						{
+							if (true == choose)
+							{
+								var reqData = {
+									system: {
+										reset:null
+									}
+								};
+
+								$.action(reqData, function(result){
+									if (ENONE == result[ERR_CODE])
+									{
+										showProgBar(RESTORE_SECONDS, label.resetConing, function()
+										{
+											$.setLg("", "");
+											$.changeDomain(facIp);
+											lanDetecting(function(){
+												window.location.href = ((location.href.toString()).indexOf(domainName) == -1) ? ("http://" + facIp) : ("http://" + domainName);
+											});
+										}, false, statusStr.resetOk, statusStr.resetTip);
+									}
+									else
+									{
+										showAlert(errStr.invSendReqMsgFailed);
+									}
+								});
+							}
+						});
+					};
+				});
+			}
+		}
+
+		function checkFile()
+		{
+			var fileName = file.value;
+
+			if (fileName == "")
+			{
+				showAlert(label.upConfigWarn);
+				return false;
+			}
+			else if (fileName.search(/\.bin$/) == -1)
+			{
+				showAlert(errStr.fileFmttErr);
+				return false;
+			}
+
+			return true;
+		}
+
+		function reboot()
+		{
+			var reqData = {system: {reboot:null}};
+
+			$.action(reqData, function(){});
+		}
+
+		function restoreTimeout()
+		{
+			closeLoading();
+			closeProgBar();
+			restoreTimeoutTag = true;
+			clearTimeout(restoreTimeoutHd);
+			id("restoreIf").onload = null;
+			showAlert(errStr.restoreFail);
+			closeToast();
+		}
+
+		function upLoadCallBack(code)
+		{
+			closeToast();
+			if (true == restoreTimeoutTag)
+			{
+				return;
+			}
+
+			clearTimeout(restoreTimeoutHd);
+			restoreTimeoutHd = null;
+			closeLoading();
+
+			if (code == ENONE)	/* 固件没问题 */
+			{
+				var domain, wanType, httpPort, lanIp;
+				var reqData = {};
+
+				reqData[networkFN] = {};
+				reqData[uciDeviceInfo.fileName] = {};
+				reqData[networkFN][KEY_NAME] = [networkSN.wan];
+				reqData[uciDeviceInfo.fileName][KEY_NAME] = [uciDeviceInfo.secName.info];
+
+				reqData[uhttpdFN] = {};
+				reqData[uhttpdFN][NAME] = [uhttpdSN.main];
+
+				$.query(reqData, function(data){
+					data = data || {};
+					if (data[ERR_CODE] == ENONE)
+					{
+						lanIp = data[networkFN][networkSN.wan][networkON.ip];
+						domain = data[uciDeviceInfo.fileName][uciDeviceInfo.secName.info][uciDeviceInfo.optName.domainName];
+						wanType = data[networkFN][networkSN.wan][networkON.wanType];
+						httpPort = data[uhttpdFN][uhttpdSN.main][uhttpdON.listenHttpPort];
+					}
+				}, false);
+
+				reboot();
+
+				showProgBar(REBOOT_SECONDS, undefined, function(){
+					if (wanType == uciNetwork.optValue.proto.staticIp && lanIp != undefined)
+					{
+						var url = lanIp + ":" + httpPort;
+						$.changeDomain(url);
+						lanDetecting(function(){
+							window.location.href = ((location.href.toString()).indexOf(domain) == -1) ? ("http://" + url) : ("http://" + domain + ":" + httpPort);
+						});
+					}
+					else if (wanType == uciNetwork.optValue.proto.dynIp)
+					{
+						var str = label.configDhcpMode + "，" + label.portValue + httpPort;
+						closeProgBar();
+						showAlert(str);
+					}
+				}, false, statusStr.rebootOk, statusStr.rebootTip);
+			}
+			else if (code == EFILETOOBIG)
+			{
+				showAlert(errStr.fileSizeErr);
+			}
+			else /* 固件有问题 */
+			{
+				showAlert(errStr.bakNRestoreFail);
+			}
+		}
+
+		function BNREventBind()
+		{
+			file.onchange = function (){
+				var tempStr = this.value;
+
+				tempStr = tempStr.substring(tempStr.lastIndexOf('\\') + 1);	/* 统一所有浏览器不显示完全的文件路径 */
+				id("textfield").value = tempStr;
+			};
+
+			if (USER_GROUP_REMOTE == $.authRltObj["group"])
+			{
+				disableBtn(sysRestore, true);
+				disableBtn(sysBackup, true);
+			}
+			else
+			{
+				sysRestore.onclick = function(){
+					if (true == checkFile())
+					{
+						showConfirmIpc(label.upConfig, function(choose){
+							if (true == choose)
+							{
+								var reqData = {};
+
+								reqData[uciSystem.fileName] = {};
+								reqData[uciSystem.fileName][uciSystem.actionName.uploadConf] = null;
+
+								$("#restoreIf").one("load", function(){
+									iFrmOnload("restoreIf", upLoadCallBack);
+								});
+
+								//showLoading(label.bakUploadingTip, undefined, undefined, false);
+								showToast("bakUpload");
+								restoreTimeoutHd = $.setTimeout(restoreTimeout, 10000);
+
+								/* 判断是否超时 */
+								$.action(reqData, function(data){
+									if (ENONE == data[ERR_CODE])
+									{
+										formObj.action = $.orgURL(data["url"]);
+										formObj.submit();
+										formObj.reset();
+										restoreTimeoutTag = false;
+									}
+									else
+									{
+										restoreTimeout();
+									}
+								});
+							}
+						});
+					}
+				};
+
+				sysBackup.onclick = function() {
+					var reqData = {};
+					reqData[uciSystem.fileName] = {};
+					reqData[uciSystem.fileName][uciSystem.actionName.downloadConf] = null;
+
+					/* 判断是否超时 */
+					$.action(reqData, function(data){
+						location.href = $.domainUrl + $.orgURL(data["url"]);
+					}, true);
+				};
+			}
+		}
+
+		var sysResetBtn = id("sysReset");
+		var sysRestore = id("sysRestore");
+		var sysBackup = id("sysBackup");
+		var formObj = document.forms[0];
+		var file = id("fileName");
+
+		/* uci 变量 */
+		var uhttpdFN = uciUhttpd.fileName;
+		var uhttpdSN = uciUhttpd.secName;
+		var uhttpdON = uciUhttpd.optName;
+		var protoFN = uciProto.fileName;
+		var protoST = uciProto.secType;
+		var protoSN = uciProto.secName;
+		var protoON = uciProto.optName;
+		var networkDD = uciNetwork.dynData;
+		var networkOV = uciNetwork.optValue;
+
+		var networkFN = uciNetwork.fileName;
+		var networkON = uciNetwork.optName;
+		var networkSN = uciNetwork.secName;
+
+		resetDefault();
+		BNREventBind();
+		showDetailCon();
+	}
+	init();
+</script>
+<div class="sysConf detailCon detailConMorePad">
+	<ul class="line">
+		<li class="line lineG">
+			<label class="des desD">{%label.resetDefaultConf%}</label>
+			<input type="button" value="{%label.resetDefaultConf%}" id="sysReset" class="subBtnB btnA" />
+		</li>
+		<li class="line lineG">
+			<label class="des desD">{%label.loadIpcFile%}</label>
+			<input type="button" value="{%label.backupConf%}" id="sysBackup" class="subBtnB btnA" />
+		</li>
+		<li class="line lineG">
+			<label class="des desD">{%label.upConf%}</label>
+			<form enctype="multipart/form-data" id="upFileForm" method="post" target="restoreIf">
+				<div class="fileDiv">
+					<iframe id="restoreIf" name="restoreIf"></iframe>
+					<input type="text" id="textfield" class="text textB7" readonly="true" />
+					<input type="button" value="{%btn.browse%}" class="subBtnB btnA brower" />
+					<input type="file" class="file" name="filename" id="fileName" />
+				</div>
+			</form>
+			<input type="button" id="sysRestore" class="subBtnB btnA" value="{%btn.restoreConf%}" />
+		</li>
+	</ul>
+</div>

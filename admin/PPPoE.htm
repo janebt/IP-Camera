@@ -1,0 +1,527 @@
+<script type="text/javascript">
+	function init()
+	{
+		var uciFile = uciProto.fileName;
+		var uciWan = uciProto.secName.wan;
+		var uciPppoe = uciProto.secName.pppoe;
+		var uciMtu = uciProto.optName.mtu;
+		var uciWanType = uciProto.optName.type;
+		var uciUsrName = uciProto.optName.pppoeUsr;
+		var uciPwd = uciProto.optName.pppoePwd;
+		var uciDialMode = uciProto.optName.dialMode;
+		var connectStat = id("connectStat");
+
+		var nwFN = uciNetwork.fileName;
+		var nwST = uciNetwork.secType;
+		var nwSN = uciNetwork.secName;
+		var nwON = uciNetwork.optName;
+		var nwOV = uciNetwork.optValue;
+		var nwDD = uciNetwork.dynData;
+		var nwAN = uciNetwork.action;
+		var nwAV = uciNetwork.actionValue;
+
+		var proFN = uciProto.fileName;
+		var proST = uciProto.secType;
+		var proSN = uciProto.secName;
+		var proON = uciProto.optName;
+
+		var GET_STATUS_INTERVAL = 2000;
+		var dialOptions = [{str:label.autoDial, value:"auto"}, {str:label.normDial, value:"normal"}];
+		var updateTimerHandle;
+
+		var proV = uciProto.optValue;
+		var dynIp = DEF_WAN_T = proV.proto.dynIp;
+		var staticIp = proV.proto.staticIp;
+		var pppoe = proV.proto.pppoe;
+		var urlArr = {dynIp:"DynamicIp.htm",
+			staticIp:"StaticIp.htm",
+			pppoe:"PPPoE.htm"
+			};
+
+		function errHandle(errNo, objOrId)
+		{
+			var str = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case EPPPOEUSER:
+				str = errStr.pppoeUserErr;
+				break;
+			case EPPPOEPWD:
+				str = errStr.pppoePwdErr;
+				break;
+			case EINVNET:
+				str = errStr.ipAddrNetErr;
+				break;
+			case EINVIP:
+				str = errStr.ipAddrErr;
+				break;
+			case EINVIPFMT:
+				str = errStr.ipAddrFmtErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case EINVGROUPIP:
+				str = errStr.ipAddrGroupErr;
+				break;
+			case EINVLOOPIP:
+				str = errStr.ipAddrLoopErr;
+				break;
+			case ECOMFLICTNET:
+				str = errStr.ispIpLanConflict;
+				break;
+			case EINVFDNSVR:
+				str = errStr.primDnsErr;
+				break;
+			case EINVSDNSVR:
+				str = errStr.seDnsErr;
+				break;
+			case EINVTIME:
+				str = errStr.pppoeOffTimeErr;
+				break;
+			case ENOLINK:
+				str = errStr.wanLinkDown;
+				break;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function errHandleBeforeSave(errNo, objOrId)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case EINVMTU:
+				str = errStr.pppoeMtuErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showNote(objOrId, str);
+			closeToast();
+			return false;
+		}
+
+		for (var i = 1; i < 8; i++)
+		{
+			dialOptions.push({str:label.specDial+i, value:"special" + i});
+		}
+
+		function setPPPoEStatusValue(data)
+		{
+			var wanStatus = data[uciNetwork.fileName][uciNetwork.dynData.wanStatus];
+
+			var dis = "none";
+			var code = wanStatus[ERR_CODE];
+			var stateMsg = "";
+
+			if (parseInt(wanStatus[uciNetwork.optName.phyStatus]) == LINK_UP)
+			{
+				switch(parseInt(wanStatus[uciNetwork.optName.pppoeLinkSta]))
+				{
+				case LINK_DOWN:
+					stateMsg = statusStr.disconcted;
+					$(connectStat).css("color", "#FF5500");
+					/* 异常断开连接的，加注错误提示 */
+					if ((LINK_CODE_MANUAL != code) && (LINK_CODE_NORMAL != code))
+					{
+						dis = "inline-block";
+
+						switch(code)
+						{
+						case LINK_CODE_NOECHO:
+							break;
+						case LINK_CODE_AUTH_ERR:
+							break;
+						case LINK_CODE_UNKNOWN:
+						case LINK_CODE_DENY:
+						case LINK_CODE_SRVDOWN:
+						case LINK_CODE_OPT_UNSUPPORT:
+						case LINK_CODE_AUTH_UNSUPPORT:
+							break;
+						case LINK_CODE_PHYDOWN:
+						default:
+							dis = "none";
+							break;
+						}
+					}
+					else
+					{
+					}
+
+					break;
+				case LINK_UP:
+					stateMsg = statusStr.concted + " (" + wanStatus[uciNetwork.optName.pppoeIpv4] + ")";
+					$(connectStat).css("color", "#325FE0");
+					break;
+				case LINKING_DOWN:
+					stateMsg = statusStr.disconcting;
+					$(connectStat).css("color", "#325FE0");
+					break;
+				case LINKING_UP:
+					stateMsg = statusStr.connting;
+					$(connectStat).css("color", "#325FE0");
+					if ((LINK_CODE_MANUAL != code) && (LINK_CODE_NORMAL != code))
+					{
+						dis = "inline-block";
+
+						switch(code)
+						{
+						case LINK_CODE_NOECHO:
+							break;
+						case LINK_CODE_AUTH_ERR:
+							break;
+						case LINK_CODE_UNKNOWN:
+						case LINK_CODE_DENY:
+						case LINK_CODE_SRVDOWN:
+						case LINK_CODE_OPT_UNSUPPORT:
+						case LINK_CODE_AUTH_UNSUPPORT:
+							break;
+						case LINK_CODE_PHYDOWN:
+						default:
+							dis = "none";
+							break;
+						}
+					}
+					else
+					{
+					}
+
+					break;
+				default:
+					break;
+				}
+
+				connectStat.innerHTML = stateMsg;
+			}
+			else
+			{
+				stateMsg = statusStr.disconcted; /* TODO Lan未连接显示什么状态？ */
+			}
+			if (statusStr.disconcted == connectStat.innerHTML)
+			{
+				$(connectStat).css("color", "#FF5500");
+			}
+			else
+			{
+				$(connectStat).css("color", "#325FE0");
+			}
+
+			clearTimeout(updateTimerHandle);
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		function onSaveCbk(result)
+		{
+			var conReq = {};
+
+			conReq[nwFN] = {};
+			conReq[nwFN][nwAN.chgWanSta] = {};
+			conReq[nwFN][nwAN.chgWanSta][nwON.proto] = nwOV.proto.pppoe;
+			conReq[nwFN][nwAN.chgWanSta][nwAN.operate] = nwAV.connect;
+
+			if (true == errHandle(result[ERR_CODE]))
+			{
+				showToast("success");
+				$.action(conReq, function(result){});
+			}
+		}
+
+		function onSave()
+		{
+			var cfg = {}, cfgProto = {}, cfgPppoe = {}, cfgWan = {};
+			cfg[uciFile] = cfgProto;
+			cfgProto[uciWan] = cfgWan;
+			cfgProto[uciPppoe] = cfgPppoe;
+
+			var nameVal = id("name").value;
+			var pswVal = id("psw").value;
+			var diagModeVal = id("wanDialSel").value;
+			var mtuVal = id("mtu").value;
+
+			/* 去掉前导0 */
+			mtuVal = hideLeadingZeros(mtuVal);
+			id("mtu").value = mtuVal;
+
+			if (nameVal.length < 1)
+			{
+				showNote("name", errStr.pppoeUserEmptyErr);
+				return;
+			}
+			if (nameVal.length > 118)
+			{
+				showNote("name", errStr.pppoeUserErr);
+				return;
+			}
+
+			if (pswVal.length < 1)
+			{
+				showNote("psw", errStr.pppoePwdEmptyErr);
+				return;
+			}
+			if (pswVal.length > 118)
+			{
+				showNote("psw", errStr.pppoePwdErr);
+				return;
+			}
+
+			if (false == errHandleBeforeSave(checkMtu(mtuVal, 1492, 576), "mtu"))
+			{
+				return;
+			}
+
+			cfgPppoe[uciUsrName] = nameVal;
+			cfgPppoe[uciPwd] = pswVal;
+			cfgPppoe[uciDialMode] = diagModeVal;
+			cfgPppoe[uciMtu] = mtuVal;
+
+			cfgWan[uciWanType] = uciProto.optValue.proto.pppoe;
+
+			showToast("loading");
+			$.modify(cfg, onSaveCbk);
+
+			//刷新WAN口状态
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+		}
+
+		function afterDisconnect()
+		{
+			var req = {};
+
+	 		req[nwFN] = {};
+	 		req[nwFN][KEY_NAME] = [nwSN.wan];
+	 		$.query(req, function(resp){
+	 			if (true == errHandle(resp[ERR_CODE]))
+	 			{
+	 				var wanType = resp[nwFN][nwSN.wan][nwON.proto];
+	 				var setPro = {};
+	 				setPro[proFN] = {};
+	 				setPro[proFN][proSN.wan] = {};
+	 				setPro[proFN][proSN.wan][proON.type] = wanType;
+	 				$.modify(setPro, function(resp){
+	 					if (true == errHandle(resp[ERR_CODE]))
+	 					{
+	 						// on success
+	 					}
+	 				});
+	 			}
+	 		});
+		}
+
+		function onDisconnect()
+		{
+			var discReq = {};
+
+			discReq[nwFN] = {};
+			discReq[nwFN][nwAN.chgWanSta] = {};
+			discReq[nwFN][nwAN.chgWanSta][nwON.proto] = nwOV.proto.pppoe;
+			discReq[nwFN][nwAN.chgWanSta][nwAN.operate] = nwAV.disconnect;
+			showToast("loading");
+			$.action(discReq, function(result){
+				if (true == errHandle(result[ERR_CODE]))
+				{
+					afterDisconnect();
+					showToast("success");
+				}
+			});
+		}
+
+		function setPppoeData(ALL_DATA)
+		{
+			if (false == errHandle(ALL_DATA[ERR_CODE]))
+			{
+				return;
+			}
+			else if (true == $.local)
+			{
+				$("#" + "name").val("张三");
+				$("#" + "psw").val("123456");
+				selectInit("wanDialSel", dialOptions, "auto");
+				$("#" + "mtu").val(1480);
+				return;
+			}
+
+			var data = ALL_DATA[uciFile];
+			var wanCfg = data[uciWan];
+			var pppoeCfg = data[uciPppoe];
+			var uciDialModeCfg = pppoeCfg[uciDialMode] ? pppoeCfg[uciDialMode] : "normal";
+
+			$("#" + "name").val(pppoeCfg[uciUsrName]);
+			$("#" + "psw").val(pppoeCfg[uciPwd]);
+			$("#" + "mtu").val(pppoeCfg[uciMtu]);
+
+			selectInit("wanDialSel", dialOptions, uciDialModeCfg);
+
+			if (statusStr.disconcted == connectStat.innerHTML)
+			{
+				$(connectStat).css("color", "#FF5500");
+			}
+			else
+			{
+				$(connectStat).css("color", "#325FE0");
+			}
+			//设置WAN口状态
+			setPPPoEStatusValue(ALL_DATA);
+
+			showDetailCon();
+		}
+
+		function getPppoeData()
+		{
+			var data = {};
+
+			data[uciFile] = {};
+			data[uciFile][KEY_NAME] = [uciWan, uciPppoe];
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+
+			$.query(data, setPppoeData);
+		}
+
+		function refreshWanStatus()
+		{
+			var data = {};
+
+			data[uciNetwork.fileName] = {};
+			data[uciNetwork.fileName][KEY_NAME] = [uciNetwork.dynData.wanStatus];
+			$.queryP(data, setPPPoEStatusValue);
+		}
+
+		function pageInit()
+		{
+
+			getPppoeData();
+			updateTimerHandle = $.setTimeout(refreshWanStatus, GET_STATUS_INTERVAL);
+
+			id("save").onclick = onSave;
+			id("disconnect").onclick = onDisconnect;
+		}
+
+		pageInit();
+	}
+
+	init();
+</script>
+<style type="text/css">
+	li.line label.infoLabel{
+		display:inline-block;
+		font-size:14px;
+		vertical-align:middle;
+		color:#a0a0a0;
+		width:190px;
+		height:30px;
+		line-height:30px;
+		padding-left:15px;
+	}
+	input.textInput{
+		width:190px;
+	}
+	ul.line li.lineD, ul.line li.lineC{
+		display:block;
+	}
+	ul.line label.desTitle{
+		font-size:16px;
+		color:#333333;
+		line-height:30px;
+		width:85px;
+	}
+</style>
+<div class="detailCon">
+	<div class="stateDiv">
+		<label class="statLabel">{%label.phState%}{%label.colon%}</label>
+		<label id="connectStat" class="statLabel">{%statusStr.disconcted%}</label>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.basicSet%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+				<li class="line lineD ">
+					<label class="des desTitle">{%label.basicSet%}</label>
+				</li>
+				<li class="line lineD">
+					<label class="des desA">{%label.userName%}</label>
+					<input id="name" class="text textA1"/><i class="tip"></i>
+				</li>
+				<li class="line lineD">
+					<label class="des desA">{%label.passwd%}</label>
+					<input id="psw" class="text textA1" type="password"/><i class="tip"></i>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.highSet%}</label>
+		</div>
+		<div class="configDiv" id="configDiv">
+			<ul class="line">
+				<li class="line lineC">
+					<label class="des desTitle">{%label.highSet%}</label>
+				</li>
+				<li class="line lineC">
+					<label class="des desA">{%label.mode%}</label>
+					<span class="selCon">
+						<span id="wanDialSel" class="select">
+							<span class="value hsValueA"></span>
+							<i class="arrow"></i>
+						</span>
+					</span>
+				</li>
+				<li class="line lineC">
+					<label class="des desA">{%label.mtu%}</label>
+					<input id="mtu" class="text textA1" maxLength="4" />
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<div class="funcBtnCon">
+		<input id="disconnect" type="button" value="{%btn.disconnect%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.connect%}" class="subBtn btnA" />
+	</div>
+</div>

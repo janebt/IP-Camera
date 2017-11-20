@@ -1,0 +1,448 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		function errorHandle(code, objOrId)
+		{
+			var showStr = "";
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCSMDENABLEERR:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case EINVARG:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCSMDSENSITIVITYERR:
+				showStr = errStr.ipcImInfsErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCNOTIFYEMAILENERR:
+			case IPCNOTIFYALARMENERR:
+			case IPCNOTIFYRECORDENERR:
+			case IPCNOTIFYFTPENERR:
+				showStr = errStr.IPCHandleInalid;
+				break;
+			case IPCARMINGSCHEDULEEOVERFLOW:
+				showStr = errStr.armingScheduleOverflow;
+				break;
+			case IPCARMINGSCHEDULEMIX:
+				showStr = errStr.armingScheduleMix;
+				break;
+			case IPCARMINGSCHEDULEILLEGAL:
+				showStr = errStr.armingScheduleIllegal;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function toolArrToString(arr, maxLen)
+		{
+			var res, i, str;
+			var	tvArr;
+			var bt;
+			var et;
+			if (arr == undefined)
+			{
+				return "";
+			}
+			if (maxLen == undefined)
+			{
+				maxLen = 6;
+			}
+			res = "[";
+			if (arr.length < 1)
+			{
+				res += "\"0000-0000\"";
+			}
+			else
+			{
+				for (i = 0; i < arr.length && i < maxLen; i++)
+				{
+					str = arr[i].toString();
+					tvArr = str.split(/[-,:]/, 3);
+					bt = parseInt(tvArr[0], 10);
+					et = parseInt(tvArr[1], 10);
+					str = recPlanGrid._getStringWithoutType(bt, et);
+					if (i > 0)
+					{
+						res += ",";
+					}
+					res += ("\"" + str + "\"");
+				}
+			}
+			res += "]";
+			return res;
+		}
+
+		function addType(strTimeVal) {
+			var curTV;
+			var res = new Array();
+
+			if (strTimeVal == undefined)
+			{
+				curTV = "\"0000-0000:0\"";
+				res.push(curTV);
+
+				return res;
+			}
+
+			if (!(strTimeVal instanceof Array))
+			{
+				strTimeVal = strTimeVal.match(/\d{4}-\d{4}/g);
+			}
+
+			for (var i = 0; i < strTimeVal.length; i++)
+			{
+				curTV = strTimeVal[i];
+				var	tvArr = curTV.split(/[-]/, 2);
+				var bt = parseInt(tvArr[0], 10);
+				var et = parseInt(tvArr[1], 10);
+				if(0 == bt && 0 == et)
+				{
+					res.push(recPlanGrid._getString(bt, et, 0));
+				}
+				else
+				{
+					res.push(recPlanGrid._getString(bt, et, 1));
+				}
+			}
+
+			return res;
+		}
+
+		function saveArmingSchedule()
+		{
+			var i;
+			var res = recPlanGrid.getTimeVal();
+
+			var data = {};
+			for (i = 0; i < weekArray.length; i++)
+			{
+				data[uciDays[i]] = toolArrToString(res[weekArray[i]]);
+			}
+
+			return data;
+		}
+
+		function saveHandle()
+		{
+			var reqData = {};
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][DETECTION] = {};
+			reqData[FILE_NAME][NOTIFY_LIST] = {};
+			reqData[FILE_NAME][ARMING_SCHEDULE] = {};
+
+			reqData[FILE_NAME][DETECTION][SENSITIVITY] = sensitivityValue;
+			reqData[FILE_NAME][DETECTION][ENABLED] = switchState;
+
+			reqData[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] = emailCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][FTP_ENABLED] = ftpCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] = deviceCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] = recordCheck.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][ARMING_SCHEDULE] = saveArmingSchedule();
+
+			showToast();
+			$.modify(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					//saveRecordPlan();
+					showToast("success");
+				}
+			});
+		}
+
+		function intelligentDetectionSwitchHd(state)
+		{
+			intelligentDetectionSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+			switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				var saveHeight = getoffset(id("save")).top - getoffset(id("sensitivityDragLine")).top;
+
+				if($('#peCon').length == 0 || $("#peCon").css("display") == "none")
+				{
+					hideobj.style.height = saveHeight + "px";
+				}
+				else
+				{
+					var peConHeight = getoffset(id("peCon")).top - getoffset(id("sensitivityDragLine")).top + id("peCon").offsetHeight;
+					hideobj.style.height = ((saveHeight > peConHeight) ? saveHeight : peConHeight) + "px";
+				}
+			}
+			else
+			{
+				hideobj.style.display = "none";
+			}
+		}
+
+		function sensitivityChange(val) {
+			sensitivityValue = val;
+			sensitivityDragLine.setValue(val);
+			if ((true == checkNum(val)) &&
+					(true == checkNumRange(parseInt(val), 100, 1)))
+			{
+				sensitivityErr = false;
+			}
+			else
+			{
+				showNote("sensitivityDragLineDragLineInput", errStr.sensitivityErr);
+				sensitivityErr = true;
+			}
+		}
+
+		function showArmingSchedule()
+		{
+			var i;
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][NAME] = ARMING_SCHEDULE;
+			$.query(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					recPlanGrid.reset();
+					for (i = 0; i < weekArray.length; i++)
+					{
+						recPlanGrid.setTimeVal(weekArray[i], addType(resp[FILE_NAME][ARMING_SCHEDULE][uciDays[i]]));
+					}
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			enable = 0;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [DETECTION, NOTIFY_LIST];
+
+			sensitivityDragLine = new DragLine({id:"sensitivityDragLine", name:label.sensitivity, cb:sensitivityChange, lowerBound:1});
+			recPlanGrid = new PlanSet("recPlanGrid", {curType:1});
+			showArmingSchedule();
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", 0, intelligentDetectionSwitchHd);
+						return;
+					}
+
+					switchState = result[FILE_NAME][DETECTION][ENABLED];
+					enable = (switchState == ENABLED_ON) ? 1 : 0;
+					intelligentDetectionSwitch = new Switch("intelligentDetectionSwitch", enable, intelligentDetectionSwitchHd);
+
+					sensitivityValue = result[FILE_NAME][DETECTION][SENSITIVITY];
+					sensitivityDragLine.setValue(sensitivityValue);
+
+					enable = (result[FILE_NAME][NOTIFY_LIST][EMAIL_ENABLED] == ENABLED_ON);
+					changeCheckInput(emailCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][FTP_ENABLED] == ENABLED_ON);
+					changeCheckInput(ftpCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][ALARM_ENABLED] == ENABLED_ON);
+					changeCheckInput(deviceCheck, enable);
+					enable = (result[FILE_NAME][NOTIFY_LIST][RECORD_ENABLED] == ENABLED_ON);
+					changeCheckInput(recordCheck, enable);
+
+					showDetailCon();
+				}
+			});
+
+			id("save").onclick = saveHandle;
+			id("clearAll").onclick = function(event){
+				recPlanGrid.reset();
+			};
+		}
+
+		var FILE_NAME = uciSceneDetection.fileName;
+		var DETECTION = uciSceneDetection.secName.detection;
+		var ARMING_SCHEDULE = uciSceneDetection.secName.armingSchedule;
+		var NOTIFY_LIST = uciSceneDetection.secName.notifyList;
+		var REGION = uciSceneDetection.secName.region;
+		var ENABLED = uciSceneDetection.optName.enabled;
+		var SENSITIVITY = uciSceneDetection.optName.sensitivity;
+		var EMAIL_ENABLED = uciSceneDetection.optName.emailEnabled;
+		var FTP_ENABLED = uciSceneDetection.optName.ftpEnabled;
+		var ALARM_ENABLED = uciSceneDetection.optName.alarmEnabled;
+		var RECORD_ENABLED = uciSceneDetection.optName.recordEnabled;
+		var ENABLED_ON = uciSceneDetection.optValue.enableVal.on;
+		var ENABLED_OFF = uciSceneDetection.optValue.enableVal.off;
+
+		var bFirstReady = true;
+		var enable, secObj;
+		var intelligentDetectionSwitch;
+		var switchState;
+		var intelligentDetectionSwitchDes = id("intelligentDetectionSwitchDes");
+		var sensitivityDragLine;
+
+		var sensitivityValue;
+		var emailCheck = id("emailCheck");
+		var ftpCheck = id("ftpCheck");
+		var deviceCheck = id("deviceCheck");
+		var recordCheck = id("recordCheck");
+		var weekArray = [label.Mon, label.Tue, label.Wen, label.Thu, label.Fri, label.Sta, label.Sun];
+		var uciDays = [uciSceneDetection.optName.mon, uciSceneDetection.optName.tue, uciSceneDetection.optName.wed, uciSceneDetection.optName.thu, uciSceneDetection.optName.fri, uciSceneDetection.optName.sat, uciSceneDetection.optName.sun];
+		var sensitivityErr = false;
+
+		var recPlanGrid;
+		pageInit();
+		initCheckInput("showInfo", null);
+	}
+	init();
+</script>
+<style type="text/css">
+	/* ----------------plan edit -------- */
+	div.peCol span.select{
+		font-size:0px !important;
+	}
+	span.peSelect{
+		width:124px !important;
+		_width:116px !important;
+		font-size:14px !important;
+	}
+
+	/* ----------------plan set---------- */
+	#orgDC{
+		width:662px;
+	}
+	.displayNone{
+		display:none !important;
+	}
+
+	/* ----------------类型选择---------- */
+	i.peTypeRd
+	{
+		width:25px !important;
+		height:25px !important;
+	}
+	i.timeSeled
+	{
+		background:url(../web-static/images/timeSeled.png) center no-repeat !important;
+	}
+	i.timeUnSeled
+	{
+		background:url(../web-static/images/timeUnSeled.png) center no-repeat !important;
+	}
+	i.mdtUnSeled
+	{
+		background:url(../web-static/images/mdtUnSeled.png) center no-repeat !important;
+	}
+	i.mdtSeled
+	{
+		background:url(../web-static/images/mdtSeled.png) center no-repeat !important;
+	}
+	#timingLabel{
+		margin-right:35px;
+		display: inline-block;
+		*display: inline;
+		*zoom:1;
+	}
+	#mdtLabel{
+		margin-right:347px;
+		*margin-right:340px;
+		display: inline-block;
+		*display: inline;
+		*zoom:1;
+	}
+	label.typeSeled{
+		color:#fff !important;
+	}
+
+	/* ----------------plan cpy---------- */
+	div.peCon{
+		left:136px;
+		top:190px;
+		_left:-30px;
+		_top:-10px;
+	}
+	div.peCon div.peConDetail div.peCol4{
+		display: none;
+	}
+	ul.line li.lineR{
+		display:inline-block;
+		*display:inline;
+		*zoom:1;
+		height:100%;
+		font-size:0px;
+		vertical-align:middle;
+		float: right;
+	}
+</style>
+<div class="detailCon">
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="configDiv">
+			<ul class="line">
+				<li class="dragLine">
+					<div id="sensitivityDragLine" class="ipcDragLineDiv"></div>
+				</li>
+			</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.defenceTime%}</label>
+		</div>
+		<div id="timeSchedule">
+			<ul class="line">
+				<li class="line linePlan">
+					<span class="clearAll" id="clearAll">{%label.clear%}</span>
+					<label class="tips">{%label.sceneChangeTips%}</label>
+				</li>
+			</ul>
+			<div class="armingSchedule" id="armingSchedule">
+				<div id="recPlanGrid" class="test"></div>
+			</div>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="recordCheck" class="chObj" value="1"></i>
+					<label class="des desA">{%label.triggerRecord%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="emailCheck" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineE">
+					<i name="showInfo" id="deviceCheck" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="ftpCheck" class="chObj" value="2"></i>
+					<label class="des desA">{%label.sendFtp%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>

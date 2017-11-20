@@ -1,0 +1,170 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		// uci
+		var fileName = uciPicturePlan.fileName;
+		var schedule = uciPicturePlan.secName.schedule;
+		var pictureConfig = uciPicturePlan.secName.pictureConfig;
+		var codecType = uciPicturePlan.optName.codecType;
+		var resolution = uciPicturePlan.optName.resolution;
+		var quality = uciPicturePlan.optName.quality;
+
+		// tmp
+		var data;
+		var tmp, tmpStr, i;
+
+		// switch
+		var exSwitch = null;
+		var exSwitchState = 0;
+
+		function errorHandler(code)
+		{
+			var str = "";
+
+			switch (parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case EINVARG:
+				str = errStr.IPCParamInvalid;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function onCancel()
+		{
+			fetchServerSta();
+		}
+
+		function onSave()
+		{
+			var i;
+
+			data = {};
+			data[fileName] = {};
+			data[fileName][pictureConfig] = {};
+			data[fileName][pictureConfig][quality] = id("pictureQuality").value;
+
+			showToast();
+			$.modify(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+				showDetailCon();
+			});
+		}
+		function fetchServerSta()
+		{
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [pictureConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					pictureQuality.resetSel(resp[fileName][pictureConfig][quality]);
+				}
+			});
+		}
+
+		/* 绑定各个按钮的响应事件 */
+		function bindEvent()
+		{
+			id("cancel").onclick = onCancel;
+
+			id("save").onclick = onSave;
+		}
+
+		function exSwitchHd(state)
+		{
+			exSwitchState = state;
+		}
+
+		function constructDom()
+		{
+			selectInit("pictureType", [{str:"JPEG", value:0}], 0);
+			selectInit("resolution", [{str:"1920*1080", value:0}], 0);
+			selectInit("pictureQuality", [{str:"高", value:"high"},
+										{str:"中", value:"medium"},
+										{str:"低", value:"low"}], "high");
+		}
+
+		function pageInit()
+		{
+			constructDom();
+			data = {};
+			data[fileName] = {};
+			data[fileName][NAME] = [pictureConfig];
+			$.query(data, function(resp){
+				if (true == errorHandler(resp[ERR_CODE]))
+				{
+					pictureQuality.resetSel(resp[fileName][pictureConfig][quality]);
+				}
+				showDetailCon();
+			});
+		}
+
+		pageInit();
+		bindEvent();
+	}
+	init();
+</script>
+<style type="text/css">
+	ul.line li.lineD{
+		width:100%;
+	}
+</style>
+
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desA">{%label.pictureType%}</label>
+			<span class="selCon">
+				<span id="pictureType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.resolution%}</label>
+			<span class="selCon">
+				<span id="resolution" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineF2 lineD">
+			<label class="des desA">{%label.pictureQuality%}</label>
+			<span class="selCon">
+				<span id="pictureQuality" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+
+	<!-- 功能按钮 -->
+	<div class="funcBtnCon">
+		<input id="cancel" type="button" value="{%btn.gridCancel%}" class="subBtnB btnA"/>
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA"/>
+	</div>
+</div>

@@ -1,0 +1,340 @@
+<style type="text/css">
+	#tplinkId{
+		font-size:15px;
+		color:#000000;
+	}
+	#bindTpTip{
+		font-size:12px;
+		color:#666666;
+	}
+	#unbindBlock{
+		display:none;
+	}
+	ul.line li.lineG2{
+		height:80px;
+		line-height:80px;
+	}
+	ul.line li.lineAccount{
+		width:100%;
+		height:40px;
+		line-height:40px;
+	}
+	li.lineBtn{
+		width:100%;
+		margin-bottom: 40px;
+		text-align: center;
+	}
+	ul.line li.lineImg{
+		width:100%;
+		height:170px;
+		margin-bottom:12px;
+		text-align:right;
+	}
+	input.cloudBtn{
+		width:200px;
+		height:48px;
+		border-radius:24px;
+		font-size:16px;
+		padding:4px 25px 5px;
+		color:#fff;
+		border:0px;
+		cursor:pointer;
+		vertical-align: middle;
+	}
+	input.bindBtn{
+		background: #1c87eb;
+	}
+	input.unbindBtn{
+		background: #434343;
+	}
+	#downloadApp{
+		margin-right:10px;
+		width:170px;
+		height:170px;
+		background-color: #ffffff;
+	}
+	#viewVideo{
+		margin-left:10px;
+		width:170px;
+		height:170px;
+		background-color: #ffffff;
+	}
+	ul.line label.leftDesImgNote{
+		font-size:12px;
+		color:#666666;
+		width:170px;
+		margin-left:40px;
+		text-align:center;
+	}
+	ul.line label.leftDesImgNoteB{
+		font-size:13px;
+		color:#333333;
+		width:170px;
+		margin-left:40px;
+		text-align:center;
+		vertical-align:top;
+	}
+	ul.line label.rightDesImgNote{
+		font-size:12px;
+		color:#666666;
+		width:170px;
+		margin-left:20px;
+		*margin-left:15px;
+		text-align:center;
+	}
+	ul.line label.rightDesImgNoteB{
+		font-size:13px;
+		color:#333333;
+		line-height:18px;
+		width:120px;
+		margin-left:45px;
+		text-align:center;
+	}
+	div.menuLessMT{
+		padding-top:40px;
+	}
+	div.detailCon{
+		height:280px;
+	}
+	ul.lineL{
+		width:317px;
+		height:240px;
+		border-right:1px solid #CED7E0;
+		margin-bottom:40px;
+	}
+	ul.lineR1{
+		width:400px;
+		height:262px;
+		margin-bottom:18px;
+		float:left;
+	}
+	ul.line label.desTip{
+		font-size:40px;
+		color:#000000;
+		width:100%;
+	}
+	ul.line li.lineBind{
+		width:100%;
+		height:40px;
+		line-height:40px;
+		margin-top:40px;
+	}
+	ul.line label.desBlind{
+		font-size:14px;
+		color:#325FE0;
+		text-decoration:underline;
+		cursor:pointer;
+	}
+</style>
+
+<script type="text/javascript">
+	var TpLinkIdBindStatus = 0;
+	var lUCC = uciCloudConfig;
+	function init()
+	{
+		var tplinkId = id("tplinkId");
+		var bindTpTip = id("bindTpTip");
+		var bindBtn = id("bindTpId");
+		var unbindBtn = id("unbindTpId");
+		var bindBlock = id("bindBlock");
+		var unbindBlock = id("unbindBlock");
+		var BINDED = 1, UNBINDED = 0;
+
+		function errHandle(code, id, callBack)
+		{
+			var showStr = "";
+			var showNoteStr = "";
+
+			switch(parseInt(code))
+			{
+				case ENONE:
+					return true;
+				case EINDEVICEALREADYUNBOUND:
+					tplinkId.innerHTML = label.cloudNotBind;
+					bindTpTip.innerHTML = label.cloudBindBenefit;
+					unbindBtn.style.display = "none";
+					unbindBlock.style.display = "none";
+					bindBtn.style.display = "inline-block";
+					bindBlock.style.display = "inline-block";
+					TpLinkIdBindStatus = UNBINDED;
+					showStr = errStr.cloudAccountReadyUnbind;
+					break;
+				case IPCUMGUESTNAUTH:
+					showStr = errStr.invPermissionDenied;
+					break;
+				default:
+					showStr = errStr.unknown + code;
+					break;
+			}
+			
+			closeToast();
+			
+			if (typeof callBack == "function")
+			{
+				callBack(parseInt(code));
+			}
+			else if ("" != showStr)
+			{
+				showAlert(showStr);
+			}
+			else if ("" != showNoteStr)
+			{
+				showNote(id, showNoteStr);
+			}
+			
+			return false;
+		}
+		function pageInit()
+		{
+			var len = 0;
+			var data = {};
+
+			data[lUCC.fileName] = {};
+			data[lUCC.fileName][KEY_NAME] = uciCloudConfig.secName.deviceStatus;
+
+			$.query(data, function(result) {
+				if (ENONE == parseInt(result[ERR_CODE]))
+				{
+					TpLinkIdBindStatus = parseInt(result[lUCC.fileName][uciCloudConfig.secName.deviceStatus][uciCloudConfig.optName.bindStatus]);
+					getTplinkIdInfo();
+				}
+				else if (IPCUMGUESTNAUTH == parseInt(result[ERR_CODE]))
+				{
+					showAlert(errStr.invPermissionDenied);
+					return;
+				}
+			});
+		}		
+		function pageFail()
+		{
+			closeToast();
+		}
+		function getTplinkIdInfo()
+		{
+			if (uciCloudConfig.optValue.bindStatusBind == TpLinkIdBindStatus)
+			{
+				var data = {};
+				data[uciCloudConfig.fileName] = {};
+				data[uciCloudConfig.fileName][KEY_NAME] = uciCloudConfig.secName.bind;
+
+				$.queryP(data, function(result){
+					if (ENONE == parseInt(result[ERR_CODE]))
+					{
+						tplinkId.innerHTML = result[uciCloudConfig.fileName][uciCloudConfig.secName.bind][uciCloudConfig.optName.username];
+						bindTpTip.innerHTML = "";
+						unbindBtn.style.display = "inline-block";
+						unbindBlock.style.display = "inline-block";
+						bindBtn.style.display = "none";
+						bindBlock.style.display = "none";
+						showDetailCon();
+					}
+				});
+			}
+			else
+			{
+				tplinkId.innerHTML = label.cloudNotBind;
+				bindTpTip.innerHTML = label.cloudBindBenefit;
+				unbindBtn.style.display = "none";
+				unbindBlock.style.display = "none";
+				bindBtn.style.display = "inline-block";
+				bindBlock.style.display = "inline-block";
+				showDetailCon();
+			}
+		}
+
+		function basicBRGoBackHandle(result)
+		{
+			var binded = result["binded"];
+			var account = result["account"];
+
+			if (true == binded)
+			{
+				TpLinkIdBindStatus = BINDED;
+				tplinkId.innerHTML = account;
+				bindTpTip.innerHTML = "";
+				unbindBtn.style.display = "inline-block";
+				unbindBlock.style.display = "inline-block";
+				bindBtn.style.display = "none";
+				bindBlock.style.display = "none";
+			}
+
+			showDetailCon();
+		}
+
+		function unbindAccount(unbindConfirm)
+		{
+			if (true == unbindConfirm)
+			{
+				showToast("loading");
+				cloudAccountUnind(function(code){
+					if (true == errHandle(code))
+					{
+						tplinkId.innerHTML = label.cloudNotBind;
+						bindTpTip.innerHTML = label.cloudBindBenefit;
+						unbindBtn.style.display = "none";
+						unbindBlock.style.display = "none";
+						bindBtn.style.display = "inline-block";
+						bindBlock.style.display = "inline-block";
+						TpLinkIdBindStatus = UNBINDED;
+						showToast("success");
+					}
+				});
+			}
+		}
+		
+		bindBtn.onclick = function(){
+				if (GROUP_GUEST == $.group)
+				{
+					showAlert(errStr.invPermissionDenied);
+					return ;
+				}
+			cloudSetBackBRHd(basicBRGoBackHandle);
+			showCloudPage("CloudBindCfg.htm");
+		};
+
+		unbindBtn.onclick = function(){
+				if (GROUP_GUEST == $.group)
+				{
+					showAlert(errStr.invPermissionDenied);
+					return ;
+				}		
+			showConfirm(label.cloudUnbindConfirm, unbindAccount);
+		};
+		pageInit();
+		$("#viewVideo").attr("src","../web-static/images/qrcode.png?t=" + Math.random());
+	}
+	init();
+</script>
+<div class="detailCon menuLessMT">
+	<ul class="line lineL">
+		<li class="line lineG2">
+			<label class="des desTip">{%label.tpLinkID%}</label>
+		</li>
+		<li class="line lineAccount">
+			<label id="tplinkId" class="des">{%label.cloudNotBind%}</label>
+		</li>
+		<li class="line lineAccount">
+			<label id="bindTpTip" class="des">{%label.cloudBindBenefit%}</label>
+		</li>
+		<li id="bindBlock" class="line lineBind">
+			<label id="bindTpId" class="des desBlind" >{%btn.bindTpIdNow%}</label>
+		</li>
+		<li id="unbindBlock" class="line lineBind">
+			<label id="unbindTpId" class="des desBlind" >{%btn.unbindTpId%}</label>
+		</li>
+	</ul>
+	<ul class="line lineR1">
+		<li class="line lineAccount">
+			<label class="des leftDesImgNote">{%label.undownloadApp%}</label>
+			<label class="des rightDesImgNote">{%label.downloadedApp%}</label>
+		</li>
+		<li class="line lineImg">
+			<img src="../web-static/images/downloadApp.png" id="downloadApp"></img>
+			<img id="viewVideo"></img>
+		</li>
+		<li class="line lineAccount">
+			<label class="des leftDesImgNoteB">{%label.downloadAppNote%}</label>
+			<label class="des rightDesImgNoteB">{%label.viewVideoNote%}</label>
+		</li>
+	</ul>
+</div>

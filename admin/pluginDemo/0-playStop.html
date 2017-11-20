@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>how to start and stop the video player</title>
+	<meta charset="utf-8">
+	<style>
+        .pluginOuter {
+            width: 640px;
+            height: 480px;
+            border: 1px solid gray;
+        }
+        
+	</style>
+</head>
+<body>
+<div id="mdPage">
+	<p> Motion Detection </p>
+	<div class="pluginOuter"><!--application/x-tp-camera-h264--><!--myplugin CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6--><!--CLSID:71B417B2-B60E-4680-B6FC-8C342DFC4757-->
+	<object id="ieCameraPlugin" CLASSID="CLSID:15B54F54-CD6C-4395-A697-FAE11E3562A6" width="640" height="480">
+		<object id="npCameraPlugin" type="application/x-tp-camera-h264" width="640" height="480">
+			<a href="#">get new plugin</a>			
+		</object>
+	</object>
+	</div>
+	<form action="#"> 
+		<p>
+			<label>请输入IPC的IP地址：</label><input type="text" value="192.168.1.186" id="serverIp">
+		</p>
+		
+		<p>			
+			<input type="button" value="start play" id="startPlay" onclick="startPlayFunc();">
+			<input type="button" value="stop play" id="stopPlay" onclick="stopPlayFunc();">
+		</p>
+	</form>
+</div>
+<script>
+	function detectBrowser() {
+		var userAgent = navigator.userAgent,
+			rMsie = /(msie\s|trident.*rv:)([\w.]+)/;
+		var ua = userAgent.toLowerCase();　　
+		var match = rMsie.exec(ua);　　
+		if (match != null) {　
+			return "IE";
+		}
+	}	
+	var obj = "IE" == detectBrowser() ? document.getElementById("ieCameraPlugin") : document.getElementById("npCameraPlugin");
+	
+	function startPlayFunc(){
+		obj.ip = document.getElementById('serverIp').value;   //服务器IP
+		obj.port = 8080;     //服务器端口
+		obj.username = "admin";    //访问服务器的用户名
+		obj.password = "YWRtaW4=";  //访问服务器的密码
+	
+		//指定视频编码方式 0 = MJPEG 1=MJPEG_MIXED 2=H264 3=H264_MIXED
+		obj.streamtype = 2;
+		
+		//设置视频分辨率 0=VGA（640*480） 1=QVGA（320*240） 2=HD（1280*720）  
+		//该接口的输入值后面会有变化，支持的分辨率不止3种
+		obj.streamresolution = 0;	
+        
+        obj.width = 640;    //视频窗口的显示宽度
+		obj.height = 480;   //视频窗口的显示高度
+		
+		
+		//开始播放视频
+		obj.PlayVideo();	
+	}
+	
+	function stopPlayFunc(){
+		//停止播放视频
+		obj.StopVideo();
+	}
+</script>
+
+<div>
+<p>
+	简要说明一下object元素:<br>
+	在IE中引用插件需要用CLAID属性，我们自己的视频播放插件的class id参见本例。IE会通过在注册表中查找相应class id的方式找到需要调用的插件。<br>
+	在chrome(旧版本)、ff、safari等浏览器中引用插件需要指定type属性，该属性指定了媒体的MIME属性。因为插件的一个重要目的就是处理浏览器自身无法处理的媒体类型，当遇到这种类型的文件就会调用相应插件。同样可以在注册表中找到MIME类型对应的插件。<br>
+	使用object元素的方法可以判断浏览器类型后用动态插入，也可以像本例中这样层叠使用；因为chrome、ff等浏览器不能识别CLSID属性会自动忽略，并解析它内部的标签。<br>
+    插件对象属于BOM对象的一种，获取插件对象的方法也和普通HTML元素相同，例如可通过getElementById方法获取。插件对象提供的接口分为属性[ 如obj.ip ]和方法[ 如obj.PlayVideo() ]，调用方法和同其他HTML元素相同，通过“.”即可调用。
+</p>
+
+<h2>开始/停止视频播放涉及的对象属性：</h2>
+<h5>ip</h5>
+<p>
+	IPC服务器的IP<br>
+	数据类型 - String<br>
+	必须在开启视频前设置，因为插件中的默认值为空字符串""
+</p>
+<h5>port</h5>
+<p>
+	IPC服务器的PORT<br>
+	数据类型 - Number<br>
+	必须在开启视频前设置，因为插件中的默认值为 0；现在IPC服务器的端口号为 8080
+</p>
+<h5>username</h5>
+<p>
+	访问IPC服务器的用户名<br>
+	数据类型 - String<br>
+	必须在开启视频前设置，因为插件中的默认值为空字符串""；现在IPC服务器的默认用户名为 "admin"
+</p>
+<h5>password</h5>
+<p>
+	访问IPC服务器的密码<br>
+	数据类型 - String<br>
+	必须在开启视频前设置，因为插件中的默认值为空字符串""；现在IPC服务器的默认密码为 "admin"，转码后为 "YWRtaW4="
+</p>
+<h5>streamtype</h5>
+<p>
+	设置视频编码方式<br>
+	数据类型 - Number<br>
+    必须在开启视频前设置，现在可选的合法值有：0（MJPEG）， 1（MJPEG_MIXED）， 2（H264）， 3（H264_MIXED），插件中的默认值为 0（MJPEG）；海思方案IPC只支持 2（H264）
+</p>
+<h5>streamresolution</h5>
+<p>
+    设置视频分辨率<br>
+    数据类型 - Number<br>
+    必须在开启视频前设置，现在可选的合法值有：0（VGA，640*480） 1（QVGA，320*240） 2（HD，1280*720），插件中的默认值为 0（VGA，640*480）；可选合法值后面还会有变化，支持的分辨率不止3种<br>
+    PS. 必须在开启视频前设置的属性值都已介绍完毕，以后介绍的属性都可以在视频播放过程中随时设置
+</p>
+<h5>width</h5>
+<p>
+    视频窗口的显示宽度<br>
+    数据类型 - Number<br>
+    如果不设置会使用插件中的默认值为 640；可以通过js设置，也可以在HTML标签中用width属性直接设置，甚至可以通过css设置
+</p>
+<h5>height</h5>
+<p>
+    视频窗口的显示高度<br>
+    数据类型 - Number<br>
+    如果不设置会使用插件中的默认值为 480；可以通过js设置，也可以在HTML标签中用height属性直接设置，甚至可以通过css设置
+</p>
+
+<h2>开始/停止视频播放涉及的对象方法：</h2>
+<h5>PlayVideo()</h5>
+<p>开始播放视频，无参数</p>
+<h5>StopVideo()</h5>
+<p>
+    停止播放视频，无参数<br>
+    补充说明：在打开页面并允许运行插件时，插件的生命周期已经开始；但需要开始播放视频才会向服务器发起请求，并开始接收视频数据留；同理，停止播放视频时插件仍在运行，只是不再接收视频数据流了。
+</p>
+</div>
+
+</body>

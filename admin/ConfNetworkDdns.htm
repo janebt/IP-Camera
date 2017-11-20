@@ -1,0 +1,95 @@
+﻿<script type="text/javascript">
+	var TpLinkIdBindStatus = 0;
+	var lUCC = uciCloudConfig;
+	var ucitpddnsFile = uciDdns.fileName;
+
+	function init()
+	{
+		var TP_LINK_SER = 0;
+		var ORAY_SER = 1;
+		var ddnsTyOpt = [{str:label.oray, value:ORAY_SER},
+							{str:label.tpLinkDdns, value:TP_LINK_SER}];
+		
+		function DdnsSelectChange(type)
+		{
+			switch (type)
+			{
+			case TP_LINK_SER:
+				loadPage("ConfNetworkTpDdns.htm", "DdnsCon");
+				break;
+			case ORAY_SER:
+				loadPage("ConfNetworkOrayDdns.htm", "DdnsCon");
+				break;
+			default:
+				break;
+			}
+
+			return true;
+		}
+
+		function pageInit()
+		{
+			var len = 0;
+			var orayStatus = 0;
+			var tpddnsStatus = 0;
+			var data = {};
+			
+			data[ucitpddnsFile] = {};
+			data[ucitpddnsFile][KEY_NAME] = [uciDdns.dynData.ddnsStatus, uciDdns.secName.tpddns];
+
+			data[lUCC.fileName] = {};
+			data[lUCC.fileName][KEY_NAME] = uciCloudConfig.secName.deviceStatus;
+
+			if (true == $.local)
+			{
+				selectInit("ddnsType", ddnsTyOpt, TP_LINK_SER, DdnsSelectChange, 24);
+				loadPage("ConfNetworkTpDdns.htm", "DdnsCon");
+				return;
+			}
+
+			$.query(data, function(result) {
+				if (ENONE == parseInt(result[ERR_CODE]))
+				{
+					orayStatus = parseInt(result[ucitpddnsFile][uciDdns.dynData.ddnsStatus][uciDdns.optName.status]);
+					tpddnsStatus = parseInt(result[ucitpddnsFile][uciDdns.secName.tpddns][uciDdns.optName.used]);
+					TpLinkIdBindStatus = parseInt(result[lUCC.fileName][uciCloudConfig.secName.deviceStatus][uciCloudConfig.optName.bindStatus]);
+
+					if ((DDNS_STATE_UP == orayStatus || DDNS_STATE_READY == orayStatus || 		
+						 DDNS_STATE_CONNECTING_WORKING_SERVER == orayStatus) && 
+						(0 == TpLinkIdBindStatus || (0 == tpddnsStatus && 1 == TpLinkIdBindStatus)))
+					{
+						selectInit("ddnsType", ddnsTyOpt, ORAY_SER, DdnsSelectChange, 24);
+						loadPage("ConfNetworkOrayDdns.htm", "DdnsCon");
+					}
+					else
+					{
+						selectInit("ddnsType", ddnsTyOpt, TP_LINK_SER, DdnsSelectChange, 24);
+						loadPage("ConfNetworkTpDdns.htm", "DdnsCon");
+					}
+				}
+				else if (IPCUMGUESTNAUTH == parseInt(result[ERR_CODE]))
+				{
+					showAlert(errStr.invPermissionDenied);
+					return;
+				}
+			});
+		}
+
+		pageInit();
+	}
+	init();
+</script>
+<div class="detailCon menuLessMT">
+	<ul class="line">
+		<li class="line lineG">
+			<label class="des desA">{%label.type%}</label>
+			<span class="selCon">
+				<span id="ddnsType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+	<div id="DdnsCon"></div>
+</div>

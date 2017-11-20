@@ -1,0 +1,104 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		function errHandle(errNo)
+		{
+			var str = "";
+			closeNoteAll();
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCSYSRPARAERR:
+				str = errStr.ipcSysRparaErr;
+				break;
+			case IPCSYSRCONFERR:
+				str = errStr.ipcSysRconfErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				str = errStr.invPermissionDenied;
+				break;
+			case IPCUBUSCONNFAIL:
+				str = errStr.ipcUbusConnFail;
+				break;
+			case IPCUBUSCALLERR:
+				str = errStr.ipcUbusCallErr;
+				break;
+			case IPCFILEOPENERR:
+				str = errStr.ipcFileOpenErr;
+				break;
+			case IPCDIRMKERR:
+				str = errStr.ipcDirMkErr;
+				break;
+			case IPCDATESETERR:
+				str = errStr.ipcDateSetErr;
+				break;
+			case IPCFUNCPARAEXPT :
+				str = errStr.ipcFuncParaExpt;
+				break;
+			case IPCUCCONVERR:
+				str = errStr.ipcUcConvErr;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			showAlert(str);
+			return false;
+		}
+
+		function afterReboot(resp)
+		{
+			if (!errHandle(resp[ERR_CODE]))
+			{
+				return;
+			}
+
+			showProgBar(REBOOT_SECONDS, undefined, function(){
+				lanDetecting(function(){
+					window.location.reload();
+				});
+			});
+
+		}
+
+		$("#reboot").click(function(){
+			var reqData = {
+				system: {
+					reboot:null
+				}
+			};
+
+			showConfirm(label.rebootConfirmIpc, function(flag){
+				if (flag == true)
+				{
+					$.action(reqData, afterReboot);
+				}
+			});
+		});
+
+		showDetailCon();
+	}
+	init();
+</script>
+<style type="text/css">
+	ul.line label.desRes{
+		width:70px;
+		font-size:13px;
+		color:#333333;
+		line-height:32px;
+	}
+	ul.line li.lineA{
+		margin-bottom:0px;
+	}
+</style>
+<div class="detailCon detailConMorePad">
+	<ul class="line">
+		<li class="line lineA">
+			<label class="des desRes">{%label.restartDevice%}</label>
+			<input type="button" value="{%label.reboot%}" id="reboot" class="subBtn btnA" />
+		</li>
+	</ul>
+</div>

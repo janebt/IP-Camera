@@ -1,0 +1,131 @@
+﻿<style type="text/css">
+	div.cloudForgRelCon{
+		padding-top:60px;
+		text-align:center;
+		font-size:0px;
+	}
+	p.cloudForgReltTip{
+		height:40px;
+		line-height:40px;
+		font-size:28px;
+		color:#333333;
+		margin-top:12px;
+	}
+	p.cloudForgReltTipS{
+		height:40px;
+		line-height:40px;
+		font-size:13px;
+		color:#666666;
+		margin-top:8px;
+	}
+	p.cloudForgReltTipS span{
+		color:#2797FF;
+	}
+	p.cloudForgReltTipS a{
+		color:#184283;
+		font-weight:bold;
+	}
+	#cloudForgFuncCon{
+		margin-top:48px;
+		height:40px;
+		line-height:40px;
+	}
+	i.cloudBRSuccess{
+		background:url(../web-static/images/cloudSuccess.png) no-repeat;
+		display:inline-block;
+		height:190px;
+		width:190px;
+	}
+	i.cloudBRFail{
+		background:url(../web-static/images/warn.png) no-repeat;
+		display:inline-block;
+		height:190px;
+		width:190px;
+	}
+	i.closeTip{
+		background:url(../web-static/images/closeTip.png);
+		cursor:pointer;
+		width:16px;
+		height:16px;
+		position:absolute;
+		top:10px;
+		right:15px;
+	}
+</style>
+<script type="text/javascript">
+	function init()
+	{
+		var redirectWaitTime = 5;
+		var redirectTimeout = 1000;
+		var pageRedirectHD;
+		var cloudForgPwdRelt = id("cloudForgPwdRelt");
+		var close = id("close");
+
+		function pageRedirect()
+		{
+			if (0 == redirectWaitTime)
+			{
+				cloudGoBack();
+				return;
+			}
+
+			id("periodLast").innerHTML = redirectWaitTime--;
+			pageRedirectHD = $.setTimeout(pageRedirect, redirectTimeout);
+		}
+
+		function pageSet()
+		{
+			if (true == gCloudAccount["success"])
+			{
+				cloudForgPwdRelt.className = "cloudBRSuccess";
+				id("cloudForgSuccess").style.display = "block";
+				close.style.display = "none";
+				retry.style.display = "none";
+				finish.style.display = "inline";
+				pageRedirect();
+			}
+			else
+			{
+				cloudForgPwdRelt.className = "cloudBRFail";
+				id("cloudForgFail").style.display = "block";
+				id("cloudForgFuncCon").style.display = "block";
+				retry.style.display = "inline";
+				finish.style.display = "none";
+				close.style.display = "block";
+			}
+		}
+
+		pageSet();
+		retry.onclick = function(){
+			gResetCloudAccountPwd(pageSet, pageSet, cloudAccountQueryStop);
+		}
+		finish.onclick = function(){
+			clearTimeout(pageRedirectHD);
+			cloudGoBack();
+		};
+		close.onclick = function(){
+			cloudGoBack();
+		};
+	}
+	init();
+</script>
+<div class="cloudForgRelCon">
+	<i id="close" class="closeTip"></i>
+	<i id="cloudForgPwdRelt"></i>
+	<div id="cloudForgSuccess" class="disNone">
+		<p class="cloudForgReltTip">{%label.cloudResetPwdSuccess%}</p>
+		<p class="cloudForgReltTipS">
+			{%label.cloudResetPwdSusTipF%}
+			<span id="periodLast">5</span>
+			{%label.cloudResetPwdSusTipS%}
+		</p>
+	</div>
+	<div id="cloudForgFail" class="disNone">
+		<p class="cloudForgReltTip">{%label.cloudResetPwdFail%}</p>
+		<p class="cloudForgReltTipS">{%label.cloudServerNoRespCheckNetwork%}</p>
+	</div>
+	<div id="cloudForgFuncCon">
+		<input id="retry" type="button" class="subBtn btnA disNone" value="{%btn.retry%}" />
+		<input id="finish" type="button" class="subBtn btnA disNone" value="{%btn.finish%}" />
+	</div>
+</div>

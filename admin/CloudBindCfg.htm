@@ -1,0 +1,290 @@
+<style type="text/css">
+	body{
+		font-size:14px;
+		height:100%;
+	}
+	i.closeTip{
+		background:url(../web-static/images/closeTip.png);
+		cursor:pointer;
+		height:15px;
+		position:absolute;
+		top:10px;
+		right:15px;
+		width:15px;
+	}
+	#fegtPwdLink{
+		margin-right:111px;
+	}
+	#registLink{
+		margin-right:208px;
+	}
+	.link{
+		color:#666666;
+		font-size:13px;
+		display:inline-block;
+		height:30px;
+		line-height:30px;
+	}
+	input.subBtnB{
+		margin-left:220px;
+		margin-right:14px;
+	}
+	ul.line li.lineF3{
+		position:relative;
+	}
+	div.coverLoadCon{
+		margin:400px auto 0;
+	}
+</style>
+<script type="text/javascript">
+	function gCloudAccountBindErrHandle(errNo, objOrId)
+	{
+		var showStr = "";
+		var cloudErrRel;
+
+		switch (errNo)
+		{
+		case ENONE:
+			gCloudAccountBR["success"] = true;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindSuccess;
+			return true;
+		case EINDEVICEALREADYBOUND:
+		case EINVACCOUNTBINDED:
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindFail;
+			gCloudAccountBR["noteS"] = label.cloudAccountBindedTip;
+			return true;
+		case EINVDEVICEIDNOTEXIST:
+		case EINVERRORDEVICEIDFORMATERROR:
+			showStr = label.cloudDeviceInfoExpt;
+			break;
+		case EINVACCOUNTNOTEXIST:
+			showStr = errStr.invCloudAccountNotExist;
+			break;
+		case IPCUMGUESTNAUTH:
+			showStr = errStr.invPermissionDenied;
+			break;
+		case EINVPASSWORDFMT:
+		case EINVACCOUNTPWDFMT:
+			showStr = errStr.pwdInvalid;
+			break;
+		case EINVACCOUNTPWDERR:
+			showStr = label.passwdErr;
+			break;
+		case EINVACCOUNTPHONENUMFMT:
+		case EINVMAILFMT:
+		case EINVMAILLEN:
+		case EINVACCOUNTEMAILFMT:
+		case EINVCLOUDUSRCOUNTFORMAT:
+			showStr = errStr.invCloudAccountFmtErr;
+			break;
+		case EINVACCOUNTLOCKED:
+			showStr = errStr.invCloudAccountLocked;
+			break;
+		default:
+			cloudErrRel = cloudErrHandle(errNo)
+			if (cloudErrRel.result == false)
+			{
+				showStr = cloudErrRel.tip;
+			}
+			else
+			{
+				showStr = errStr.invRequestFail;
+			}
+			break;
+		}
+
+		gCloudAccountBR["success"] = false;
+		showAlert(showStr, objOrId);
+		return false;
+	}
+
+	function gCloudAccountBRHd(callBack, timeoutCallBack, closeHandle)
+	{
+		showLoading(label.cloudAccoundBindWaiting, closeHandle, undefined, false);
+		cloudAccountBind(gCloudAccountBR["account"], gCloudAccountBR["pwd"], function(code){
+			closeLoading();
+			if (true == gCloudAccountBindErrHandle(parseInt(code)))
+			{
+				typeof callBack == "function" && callBack();
+			}
+		}, function(){
+			gCloudAccountBR["success"] = false;
+			gCloudAccountBR["noteF"] = label.cloudAccountBindFail;
+			gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+			typeof timeoutCallBack == "function" && timeoutCallBack();
+		});
+	}
+
+	function init()
+	{
+		var account = id("cloudAccount");
+		var cloudPwd = id("cloudPwd");
+		var closeTip = id("close");
+		var cancelBind = id("cancelBindBtn");
+
+		function lgChkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+
+		function checkAccount()
+		{
+			var accountVal = account.value;
+
+			if (0 == accountVal.length)
+			{
+				showNote("cloudAccount", label.cloudAccountNull);
+				return false;
+			}
+
+			if (false == checkNum(accountVal))
+			{
+				if(false == checkEmail(accountVal))
+				{
+					showNote("cloudAccount", label.cloudAccountEmailFmtErr);
+					return false;
+				}
+			}
+			else if (false == checkPhoneNum(accountVal))
+			{
+				showNote("cloudAccount", errStr.invCloudAccountFmtErr);
+				return false;
+			}
+			else
+			{
+				closeNote("cloudAccount");
+			}
+			
+			gCloudAccountBR["account"] = accountVal;
+
+			return true;
+
+		}
+		function externInputFocusHandle(input)
+		{
+			$(input.parentNode).find("label.desInner").css("display", "none");
+		}
+		function externInputBlurHandle(input)
+		{
+			if (input.value.length == 0)
+			{
+				$(input.parentNode).find("label.desInner").css("display", "inline");
+			}
+			else
+			{
+				$(input.parentNode).find("label.desInner").css("display", "none");
+			}
+		}
+		function checkPwd()
+		{
+			var pwd = cloudPwd.value;
+			/* 检查密码 */
+			if (pwd.length > 32 || pwd.length < 6)
+			{
+				showNote("cloudPwd", errStr.pwdLenErrTip);
+				return false;
+			}
+			else
+			{
+				closeNote("cloudPwd");
+			}
+
+			if (!lgChkPswVal(pwd))
+			{
+				showNote("cloudPwd", errStr.pwdCharValid);
+				return false;
+			}
+			else
+			{
+				closeNote("cloudPwd");
+			}
+			
+			gCloudAccountBR["pwd"] = pwd;
+
+			return true;
+		}
+
+		account.value = gCloudColObj.account;
+		externInputBlurHandle(account);
+		cloudPageSetNodes(true);
+		id("fegtPwdLink").onclick = function(){
+			/* 此处设置忘记密码的返回处理函数 */
+			cloudSetBackHd(function(){
+				showCloudPage("CloudBindCfg.htm");
+			});
+			showCloudPage("CloudForgPwd.htm");
+		};
+		id("registLink").onclick = function(){
+			showCloudPage("CloudRegistCfg.htm");
+		};
+		id("cloudBindBtn").onclick = function(){
+			if (true == $.local)
+			{
+				gCloudAccountBR["success"] = false;
+				gCloudAccountBR["noteF"] = label.cloudAccountBindFail;
+				gCloudAccountBR["noteS"] = label.cloudServerNoRespCheckNetwork;
+				loadPage("CloudBindRegistResult.htm", "cloudMgtDetial", undefined, {bClearPageTickArray:false});
+			}
+
+			if (true == checkAccount() && true == checkPwd())
+			{
+				gCloudAccountBRHd(function(){
+					loadPage("CloudBindRegistResult.htm", "cloudMgtDetial", undefined, {bClearPageTickArray:false});
+				}, function(){
+					loadPage("CloudBindRegistResult.htm", "cloudMgtDetial", undefined, {bClearPageTickArray:false});
+				}, cloudAccountQueryStop);
+			}
+		};
+
+		closeTip.onclick = cancelBind.onclick = function(){
+			cloudGoBackBR({binded:false});
+		};
+		account.onblur = function(){
+			gCloudColObj.account = this.value;
+			externInputBlurHandle(this);
+		};
+		account.onfocus = function(){
+			externInputFocusHandle(this);
+		};
+		cloudPwd.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		cloudPwd.onfocus = function(){
+			externInputFocusHandle(this);
+		};
+	}
+	init();
+</script>
+<div class="cloudAccountLogo"></div>
+<div class="cloudManageCon">
+	<div id="cloudMgtDetial" class="cloudMgtDetial">
+		<i id="close" class="closeTip"></i>
+		<p class="title">{%label.cloudAccountBinds%}</p>
+		<p class="cloudTip">{%label.tpLinkID%}</p>
+		<ul class="line">
+			<li class="line lineF3">
+				<label class="des desE"></label>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudAccount">{%label.tpLinkID%}</label>
+				<input id="cloudAccount" class="text textC imeModeN" maxLength="64" />
+				<label class="desInner" for="cloudAccount">{%label.cloudAccountPhoneMumNull%}</label>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudPwd">{%label.password%}</label>
+				<input id="cloudPwd" class="text textC imeModeN" type="password" maxLength="32" />
+				<label class="desInner" for="cloudPwd">{%label.cloudPwdNull%}</label>
+			</li>
+			<li class="line lineF3">
+				<a id="fegtPwdLink" class="link" href="javascript:void(0);">{%label.loginPwdLost%}</a>
+				<a id="registLink" class="link" href="javascript:void(0);">{%label.cloudRegist%}</a>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE"></label>
+			</li>
+		</ul>
+		<input id="cancelBindBtn" type="button" value="{%btn.cancel%}" class="subBtnB btnA" />
+		<input id="cloudBindBtn" type="button" value="{%btn.bind%}" class="subBtn btnA" />
+	</div>
+</div>

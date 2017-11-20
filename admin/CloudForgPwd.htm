@@ -1,0 +1,662 @@
+﻿<style type="text/css">
+	body{
+		height:100%;
+	}
+	i.closeTip{
+		background:url(../web-static/images/closeTip.png);
+		cursor:pointer;
+		height:15px;
+		position:absolute;
+		top:10px;
+		right:15px;
+		width:15px;
+	}
+	ul.line li.lineF3{
+		position:relative;
+	}
+	div.coverLoadCon{
+		margin:400px auto 0;
+	}
+	span.depSpan{
+		font-size:13px;
+		color:#FF5500;
+		display:none;
+		vertical-align:middle;
+		position:absolute;
+		top:11px;
+		right:110px;
+	}
+	#cancelBtn{
+		margin-left:220px;
+		margin-right:14px;
+	}
+	#resend{
+		margin-right:208px;
+		margin-left:12px;
+		width:124px;
+		*width:122px;
+		padding:0 18px;
+		background-color:#E1E4E6;
+	}
+	#CAPTCHAGet{
+		margin-right:208px;
+		margin-left:12px;
+		width:124px;
+		*width:122px;
+	}
+</style>
+<script type="text/javascript">
+	var gCloudAccount = {
+		account:"",
+		pwd:"",
+		CAPTCHAR:"",
+		accountType:"",
+		success:false
+	};
+
+	function gResetCloudAccountErrHandle(errNo, objOrId)
+	{
+		var showStr = "";
+		var cloudErrRel;
+
+		switch (parseInt(errNo))
+		{
+		case ENONE:
+			return true;
+		case EINVACCOUNTRESETPWDCAPTCHAERR:
+		case EINVVERICODEFORMAT:
+			showStr = errStr.CAPTCHAErrorTip;
+			break;
+		case EINVACCOUNTNOTEXIST:
+			showStr = errStr.invCloudAccountNotExist;
+			break;
+		case EINVMAILFMT:
+		case EINVMAILLEN:
+		case EINVACCOUNTEMAILFMT:
+			showStr = errStr.invCloudAccountEmailErr;
+			break;
+		case EINVPASSWORDFMT:
+		case EINVACCOUNTPWDFMT:
+			showStr = errStr.pwdInvalid;
+			break;
+		case EINDEVICEALREADYBOUND:
+		case EINVACCOUNTBINDED:
+			showStr = errStr.invCloudAccountBinded;
+			break;
+		case IPCUMGUESTNAUTH:
+			showStr = errStr.invPermissionDenied;
+			break;
+		case EINVACCOUNTLENGTH:
+			showStr = errStr.invCloudAccountLen;
+			break;
+		case EINVACCOUNTTYPEERR:
+			showStr = errStr.invCloudAccountType;
+			break;
+		case EINVACCOUNTPHONENUMFMT:
+			showStr = errStr.invCloudAccountPhoneErr;
+			break;
+		case EINVCLOUDERRORCAPTCHAINVAL:
+			showStr = errStr.invCloudCAPTCHAInval;
+			break;
+		default:
+			cloudErrRel = cloudErrHandle(errNo)
+			if (cloudErrRel.result == false)
+			{
+				showStr = cloudErrRel.tip;
+			}
+			else
+			{
+				showStr = errStr.invRequestFail;
+			}
+			break;
+		}
+
+		showAlert(showStr, objOrId);
+		return false;
+	}
+
+	function gResetCloudAccountPwd(callBack, timeoutCallBack, closeHandle)
+	{
+		showLoading(label.cloudResetPwdWaiting, closeHandle, undefined, false);
+		cloudAccountRstPwd(gCloudAccount["account"], gCloudAccount["pwd"], gCloudAccount["CAPTCHAR"], gCloudAccount["accountType"], function(code){
+			closeLoading();
+			if (true == gResetCloudAccountErrHandle(code))
+			{
+				gCloudAccount["success"] = true;
+				typeof callBack == "function" && callBack();
+			}
+		}, function(){
+			gCloudAccount["success"] = false;
+			typeof timeoutCallBack == "function" && timeoutCallBack();
+		});
+	}
+
+	function init()
+	{
+		var data = {};
+		var idStr = "cloudPwd";
+		var depId = "pwdDep";
+		var depDeId = "pwdDepSp";
+		var account = id("account");
+		var cloudPwd = id(idStr);
+		var cloudConfPwd = id("cloudConfPwd");
+		var pwdDep = id(depId);
+		var pwdDepSp = id(depDeId);
+		var chgPwdDep = id("chgPwdDep");
+		var CAPTCHAGet = id("CAPTCHAGet");
+		var resend = id("resend");
+		var CAPTCHASendTip = id("CAPTCHASendTip");
+		var WAITING_CLOUD_RESPONSE_CAPTCHA = 2000;
+		var CAPTCHA_TIME = 1000;
+		var CAPTCHA_MAX_TIME = 120;
+		var DEP_STRONG = 0;
+		var DEP_MEDIA = 1;
+		var DEP_WEAK = 2;
+		var bGettingCAPTCHA = false;
+		var accountType = uciCloudConfig.optValue.accountTypePhoneNum;
+
+		function errHandle(errNo, objOrId)
+		{
+			var showStr = "";
+			var cloudErrRel;
+
+			switch (parseInt(errNo))
+			{
+			case ENONE:
+				return true;
+			case EINVERICODEEMPTY:
+				objOrId = "CAPTCHA";
+				showStr = errStr.invVericodeNULL;
+				break;
+			case EINVACCOUNTRESETPWDCAPTCHAERR:
+			case EINVVERICODEFORMAT:
+				objOrId = "CAPTCHA";
+				showStr = errStr.CAPTCHAErrorTip;
+				break;
+			case EINVACCOUNTNOTEXIST:
+				objOrId = "account";
+				showStr = errStr.invCloudAccountNotExist;
+				break;
+			case EINVACCOUNTTYPEERR:
+				objOrId = "account";
+				showStr = errStr.invCloudAccountType;
+				break;
+			case EINVACCOUNTPHONENUMFMT:
+				objOrId = "account";
+				showStr = errStr.invCloudAccountPhoneErr;
+				break;
+			case EINVCLOUDUSRCOUNTFORMAT:
+			case EINVACCOUNTEMAILFMT:
+				objOrId = "account";
+				showStr = errStr.invCloudAccountEmailErr;
+				break;
+			case EINVDEVICELOCKED:
+				showStr = errStr.invCloudDeviceLocked;
+				break;
+			case EINVCLOUDERRORCAPTCHAINVAL:
+				showStr = errStr.invCloudCAPTCHAInval;
+				break;
+			default:
+				cloudErrRel = cloudErrHandle(errNo)
+				if (cloudErrRel.result == false)
+				{
+					showStr = cloudErrRel.tip;
+				}
+				else
+				{
+					showStr = errStr.invRequestFail;
+				}
+				break;
+			}
+
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function chkPswVal(szValue)
+		{
+			return (/^[\x21-\x7e]+$/.test(szValue));
+		}
+		function pwdConfFocus()
+		{
+			pwdDep.style.display = "none";
+		}
+		function pwdFocus()
+		{
+			closeNote("cloudConfPwd");
+		}
+		function pwdConfCheck()
+		{
+			pwdConfFocus();
+
+			if (cloudConfPwd.value == cloudPwd.value)
+			{
+				closeNote("cloudConfPwd");
+				return true;
+			}
+			else
+			{
+				showNote("cloudConfPwd", label.chgPwdDif);
+				return false;
+			}
+		}
+		function pwdBlur()
+		{
+			var len = cloudPwd.value.length;
+
+			if (len >= 0 && len < 6)
+			{
+				showNote(idStr, label.chgPwdLess);
+			}
+		}
+		function pwdCheckMixChars(str)
+		{
+			var hasNum = false;
+			var hasLetter = false;
+			var hasSymbol = false;
+
+			hasNum = /\d/g.test(str);
+			hasLetter = /[a-zA-Z]/g.test(str);
+			hasSymbol = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]/g.test(str);
+
+			return hasNum&&hasSymbol&&hasLetter;
+		}
+		function externInputFocusHandle(input)
+		{
+			$(input.parentNode).find("label.desInner").css("display", "none");
+		}
+		function externInputBlurHandle(input)
+		{
+			if (input.value.length == 0)
+			{
+				$(input.parentNode).find("label.desInner").css("display", "inline");
+			}
+			else
+			{
+				$(input.parentNode).find("label.desInner").css("display", "none");
+			}
+		}
+		function checkPwdDep(pwdValue)
+		{
+			var dep = DEP_WEAK;
+			var len = pwdValue.length;
+
+			if (/^\d+$/.test(pwdValue) ||
+					/^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\s]+$/.test(pwdValue) ||
+					/^[a-zA-Z]+$/.test(pwdValue))
+			{
+				if (len <= 10)
+				{
+					dep = DEP_WEAK;
+				}
+				else
+				{
+					dep = DEP_MEDIA;
+				}
+			}
+			else if (true == pwdCheckMixChars(pwdValue))
+			{
+				dep = DEP_STRONG;
+			}
+			else
+			{
+				if (len <= 10)
+				{
+					dep = DEP_MEDIA;
+				}
+				else
+				{
+					dep = DEP_STRONG;
+				}
+			}
+
+			return dep;
+		}
+		function getPwdDepStr(dep)
+		{
+			var str = {};
+
+			if (dep == DEP_STRONG)
+			{
+				str["str"] = "<span class='dep depStrong'>" + label.strong + "</span>";
+				str["orgStr"] = label.strong;
+			}
+			else if (dep == DEP_MEDIA)
+			{
+				str["str"] = "<span class='dep depMedia'>" + label.media + "</span>";
+				str["orgStr"] = label.media;
+			}
+			else
+			{
+				str["str"] = "<span class='dep depWeak'>" + label.weak + "</span>";
+				str["orgStr"] = label.weak;
+			}
+
+			return str;
+		}
+		function pwdCheck()
+		{
+			var tip = "";
+			var dep = id(depId);
+			var depDe = id(depDeId);
+			var pwdValue = cloudPwd.value;
+			var len = pwdValue.length;
+			var result = true;
+			var lgPwdInVal = false;
+			var lgPwdless = false;
+
+			closeNoteAll();
+
+			if (len >= 0 && len < 6 || len > 32)
+			{
+				showNote(idStr, label.chgPwdChar);
+				dep.style.display = "none";
+				result = false;
+			}
+			else if (!chkPswVal(pwdValue))
+			{
+				showNote(idStr, errStr.pwdCharValid);
+				dep.style.display = "none";
+				result = false;
+			}
+			else
+			{
+				tip = getPwdDepStr(checkPwdDep(pwdValue))["orgStr"];
+				if (tip == label.weak)
+				{
+					depDe.style.color = "#FF5500";
+				}
+				else if (tip == label.media)
+				{
+					depDe.style.color = "#FF9F00";
+				}
+				else
+				{
+					depDe.style.color = "#19B68F";
+				}
+
+				depDe.innerHTML = label.chgPwdDep + label.colon + tip;
+				dep.style.display = "inline";
+			}
+
+			return result;
+		}
+		function checkAccount()
+		{
+			var accountVal = account.value;
+
+			if (0 == accountVal.length)
+			{
+				showNote("account", label.cloudAccountPhoneMumNull);
+				return false;
+			}
+
+			if (false == checkNum(accountVal))
+			{
+				if(false == checkEmail(accountVal))
+				{
+					showNote("account", label.cloudAccountEmailFmtErr);
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+			else if (false == checkPhoneNum(accountVal))
+			{
+				showNote("account", label.cloudAccountPhoneNumFmtErr, "twoLine");
+				return false;
+			}
+			else
+			{
+				closeNote("account");
+				return true;
+			}
+			return true;
+		}
+
+		/* 获取验证码 */
+		function getCAPTCHA()
+		{
+			var captchaHd;
+			var accountVal = account.value;
+			var emailAddr = null;
+
+			if (true == bGettingCAPTCHA)
+			{
+				return;
+			}
+
+			if (true == checkAccount())
+			{
+				bGettingCAPTCHA = true;
+				captchaHd = $.setTimeout(function(){
+					showLoading(label.cloudServerWaitingResp, function(){
+						bGettingCAPTCHA = false;
+						cloudAccountQueryStop();
+					}, undefined, false);
+				}, WAITING_CLOUD_RESPONSE_CAPTCHA);
+
+				cloudAccountRstPwdAC(accountVal, accountType, function(code){
+					bGettingCAPTCHA = false;
+					clearTimeout(captchaHd);
+					closeLoading();
+
+					if (true == errHandle(code))
+					{
+						showCAPTCHABtn(CAPTCHA_MAX_TIME);
+						CAPTCHASendTip.style.display = "block";
+						CAPTCHASendTip.innerHTML = label.CAPTCHASentPhTip;
+					}
+				}, function(){
+					clearTimeout(captchaHd);
+					bGettingCAPTCHA = false;
+					closeLoading();
+				});
+			}
+			else
+			{
+				bGettingCAPTCHA = false;
+			}
+		}
+
+		/* 设置验证码剩余的时间 */
+		function showCAPTCHABtn(time)
+		{
+			time = parseInt(time);
+
+			if (time <= 0)
+			{
+				CAPTCHAGet.style.display = "inline";
+				resend.style.display = "none";
+				resend.time = -1;
+				CAPTCHASendTip.style.display = "none";
+			}
+			else
+			{
+				CAPTCHAGet.style.display = "none";
+				resend.value = btn.resend + "(" + time + ")";
+				resend.time = --time;
+				resend.style.display = "inline";
+			}
+		}
+
+		/* 验证码剩余的时间的守护函数 */
+		function CAPTCHATime()
+		{
+			if (resend.style.display != "none")
+			{
+				showCAPTCHABtn(resend.time);
+			}
+
+			$.setTimeout(arguments.callee, CAPTCHA_TIME);
+		}
+
+		function checkSub()
+		{
+			var accountVal = account.value;
+			var pwdValue = cloudPwd.value;
+			var CAPTCHAVal = id("CAPTCHA").value;
+
+			/* 检查帐号信息 */
+			if (false == checkAccount())
+			{
+				return false;
+			}
+
+			/* 检查密码 */
+			if (false == pwdCheck() || false == pwdConfCheck())
+			{
+				return false;
+			}
+			else
+			{
+				gCloudAccountBR["pwd"] = pwdValue;
+			}
+
+			/* 检查验证码 */
+			if (0 == CAPTCHAVal.length)
+			{
+				errHandle(EINVERICODEEMPTY);
+				return false;
+			}
+
+			gCloudAccountBR["account"] = accountVal;
+			gCloudAccountBR["CAPTCHAR"] = CAPTCHAVal;
+
+			return true;
+		}
+
+		function resetAccountSub()
+		{
+			gCloudAccount["pwd"] = cloudPwd.value;
+			gResetCloudAccountPwd(function(){
+				loadPage("CloudForgPwdResult.htm", "cloudForgDetial", undefined, {bClearPageTickArray:false});
+			}, function(){
+				loadPage("CloudForgPwdResult.htm", "cloudForgDetial", undefined, {bClearPageTickArray:false});
+			}, cloudAccountQueryStop);
+		}
+
+		function checkACSub(callBack)
+		{
+			var accountVal = account.value;
+			var CAPTCHAVal = id("CAPTCHA").value;
+
+			/* 提交帐号和验证码 */
+			cloudAccountRstPwdCheckCAPTCHA(accountVal, CAPTCHAVal, function(code){
+				closeLoading();
+
+				if (true == errHandle(code))
+				{
+					/* 保存帐号等相关参数 */
+					gCloudAccount["account"] = accountVal;
+					gCloudAccount["CAPTCHAR"] = CAPTCHAVal;
+					gCloudAccount["accountType"] = accountType;
+
+					callBack();
+				}
+			});
+
+			showLoading(label.cloudAccountCAPTCHAChecking, cloudAccountQueryStop, undefined, false);
+		}
+
+		cloudPageSetNodes(true);
+		CAPTCHATime();
+
+		/* 获取验证码剩余时间 */
+		data[cloudClientStatus.fileName] = {};
+		data[cloudClientStatus.fileName][KEY_NAME] = cloudClientStatus.secName.resetVeriCodeTimer;
+		$.query(data, function(result){
+			if (true == $.local)
+			{
+				showCAPTCHABtn(5);
+				return;
+			}
+
+			if (errHandle(result[ERR_CODE]))
+			{
+				var regTimerObj = result[cloudClientStatus.fileName][cloudClientStatus.secName.resetVeriCodeTimer];
+
+				showCAPTCHABtn(parseInt(regTimerObj[cloudClientStatus.optName.resetVeriCodeTimer]));
+			}
+
+			showDetailCon();
+		});
+
+		account.value = gCloudColObj.account;
+		externInputBlurHandle(account);
+		id("close").onclick = id("cancelBtn").onclick = function(){
+			cloudGoBack();
+		};
+		account.onblur = function(){
+			gCloudColObj.account = this.value;
+			externInputBlurHandle(this);
+		};
+		account.onfocus = function(){
+			externInputFocusHandle(this);
+		};
+		cloudConfPwd.onkeyup = pwdConfCheck;
+		cloudConfPwd.onfocus = function(){
+			pwdConfFocus();
+			externInputFocusHandle(this);
+		};
+		cloudConfPwd.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		cloudPwd.onkeyup = pwdCheck;
+		cloudPwd.onblur = function(){
+			externInputBlurHandle(this);
+		};
+		cloudPwd.onfocus = function(){
+			pwdFocus();
+			externInputFocusHandle(this);
+		};
+		id("subBtn").onclick = function(){
+			if (true == checkSub())
+			{
+				checkACSub(resetAccountSub);
+			}
+		};
+		CAPTCHAGet.onclick = getCAPTCHA;
+	}
+	init();
+</script>
+<div class="cloudAccountLogo"></div>
+<div class="cloudManageCon">
+	<div id="cloudForgDetial">
+		<i id="close" class="closeTip"></i>
+		<p class="title">{%label.cloudGetBackPwd%}</p>
+		<p class="cloudTip">{%label.tpLinkID%}</p>
+		<ul class="line">
+			<li class="line lineF3">
+				<label class="des desE" for="account">{%label.tpLinkID%}</label>
+				<input id="account" class="text textC imeModeN" maxLength="64" />
+				<label class="desInner" for="account">{%label.cloudAccountPhoneMumNull%}</label>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudPwd">{%label.loginSetPwd%}</label>
+				<input id="cloudPwd" class="text textC imeModeN" type="password" maxLength="32" />
+				<label class="desInner" for="cloudPwd">{%label.cloudPwdTip%}</label>
+				<span id="pwdDep" class="depSpan"><span id="pwdDepSp"></span></span>
+			</li>
+			<li class="line lineF3">
+				<label class="des desE" for="cloudConfPwd">{%label.loginPwdConf%}</label>
+				<input id="cloudConfPwd" type="password" class="text textC imeModeN" />
+				<label class="desInner" for="cloudConfPwd">{%label.cloudConfPwdTip%}</label>
+			</li>
+			<li class="line lineF4">
+				<label class="des desE" for="CAPTCHA">{%label.loginCAPTCHA%}</label>
+				<input id="CAPTCHA" class="text textC1 imeModeN"  maxLength="6" />
+				<input id="resend" type="button" value="{%btn.resend%}" disabled="true" class="subBtnB btnA disNone" />
+				<input id="CAPTCHAGet" type="button" value="{%btn.CAPTCHAGet%}" class="subBtn btnA disNone" />
+			</li>
+			<p id="CAPTCHASendTip" class="inputTip disNone">{%label.CAPTCHASentPhTip%}</p>
+			<li class="line lineF3">
+				<label class="des desE"></label>
+			</li>
+			<input id="cancelBtn" type="button" value="{%btn.cancel%}" class="subBtnB btnA" />
+			<input id="subBtn" type="button" value="{%btn.ok%}" class="subBtn btnA" />
+		</ul>
+	</div>
+</div>

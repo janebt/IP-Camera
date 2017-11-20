@@ -1,0 +1,186 @@
+<script type="text/javascript">
+	function init()
+	{
+		var fileName = uciAbnormalEvents.fileName;
+		var secType = uciAbnormalEvents.secType;
+		var secName = uciAbnormalEvents.secName;
+		var alarmEnabled = uciAbnormalEvents.optName.alarmEnabled;
+		var emailEnabled = uciAbnormalEvents.optName.emailEnabled;
+		var enabled = uciAbnormalEvents.optName.enabled;
+		var ON = uciAbnormalEvents.optValue.enableVal.on;
+		var OFF = uciAbnormalEvents.optValue.enableVal.off;
+
+		var exSwitch;
+		var exSwitchDes = id("exSwitchDes");
+		var bPageFirstLoaded = true;
+
+		function errorHandle(code)
+		{
+			var str;
+			closeNoteAll();
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.invRequestFail;
+				break;
+			}
+
+			showAlert(str);
+			closeToast();
+
+			return false;
+		}
+
+		function onSave()
+		{
+			var data = {};
+			var para = {};
+			data[fileName] = {};
+			data[fileName][id("aeType").value] = {};
+			para = data[fileName][id("aeType").value];
+			
+			para[enabled] = (exSwitch.state == 1 ? ON : OFF);
+			if (id("aeType").value != secName.ipConflict && id("aeType").value != secName.networkBroken)
+			{
+				para[emailEnabled] = emailCheck.getAttribute("checked") == "true" ? ON : OFF;
+			}
+			para[alarmEnabled]= deviceCheck.getAttribute("checked") == "true" ? ON : OFF;
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function fillCheckBox(dataObj)
+		{
+			if (id("aeType").value == secName.ipConflict || id("aeType").value == secName.networkBroken)
+			{
+				id("emailCheckLine").style.display = "none";
+			}
+			else
+			{
+				id("emailCheckLine").style.display = "block";
+				changeCheckInput("emailCheck", dataObj[emailEnabled] == ON ? true : false);
+				
+			}
+			exSwitch = new Switch("exSwitch", dataObj[enabled] == ON ? true : false);
+			id("exSwitchDes").value = id("aeType").value;
+			
+			changeCheckInput("deviceCheck", dataObj[alarmEnabled] == ON ? true : false);
+		}
+
+		function aeTypeSel(val)
+		{
+			var data = {};
+			data[fileName] = {};
+			data[fileName][KEY_NAME] = val;
+
+			$.query(data, function(resp){
+				if (true == errorHandle(resp[ERR_CODE]))
+				{
+					fillCheckBox(resp[fileName][val]);
+				}
+
+				if (bPageFirstLoaded == true)
+				{
+					bPageFirstLoaded = false;
+					showDetailCon();
+				}
+			});
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			var enable = 0;
+			var defType = secName.sdLack;
+			var aeTypeOpt = [{str:menuStr.sdCardFull, value:secName.sdLack},
+					{str:menuStr.sdCardError, value:secName.sdError},
+					{str:menuStr.netBroken, value:secName.networkBroken},
+					{str:menuStr.ipConflict, value:secName.ipConflict}
+			];
+
+			initCheckInput("showInfo", null);
+			selectInit("aeType", aeTypeOpt, defType, aeTypeSel);
+			aeTypeSel(defType);
+
+			id("save").onclick = onSave;
+			//id("reset").onclick = onReset;
+		}
+		pageInit();
+	}
+	init();
+</script>
+<style type="text/css">
+	input.textTime{
+		border:1px solid #2e2e2e;
+		height:24px;
+		line-height:24px;
+		margin-right:12px;
+		width:40px;
+	}
+	#chanLi{
+		margin-left:85px;
+		width:408px;
+	}
+	#chanLi i{
+		margin-left:30px;
+		margin-top:6px;
+		float:left;
+	}
+	#chanLi label{
+		float:left;
+	}
+	.displayNone {
+		display:none !important;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desA">{%label.exceptionType%}</label>
+			<span class="selCon">
+				<span id="aeType" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+	</ul>
+	<ul class="line firUl">
+		<li class="line lineA">
+			<label id="exSwitchDes" class="des desA">{%label.enabled%}</label>
+			<div id="exSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label class="des desH">ON</label>
+		</li>
+	</ul>
+	<ul class="line">
+		<li class="line">
+			<label class="des desA">{%label.handleWay%}</label>
+			<i id="deviceCheck" name="showInfo"></i><label class="des desH" for="deviceCheck">{%label.triggerDevice%}{%label.triggerDeviceInfo2%}</label>
+		</li>
+	</ul>
+	<ul class="line">
+		<li id="emailCheckLine" class="line">
+			<label class="des desA"></label>
+			<i id="emailCheck" name="showInfo"></i><label class="des desH" for="emailCheck">{%label.sendEmail%}{%label.exampleMailAddress%}}</label>
+		</li>
+	</ul>
+	<div class="funcBtnCon">
+		<!--<input id="reset" type="button" class="subBtn btnA" value="{%btn.resetDefault%}" />-->
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

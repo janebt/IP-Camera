@@ -1,0 +1,90 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var systemFN = uciSystem.fileName;
+		var systemSN = uciSystem.secName;
+		var systemON = uciSystem.optName;
+		var eptName = id("eptName");
+		var eptData;
+
+		function errorHandle(code, objOrId)
+		{
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCDEVDNAMEERR:
+				showStr = errStr.invEptName;
+				break;
+			case IPCSTRLENINV:
+				showStr = errStr.deviceAliasNameSizeErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function initPage()
+		{
+			var data = {};
+			var module = data[systemFN] = {};
+
+			module[NAME] = systemSN.sys;
+			$.query(data, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						eptName.value = "TL-SIPC523K(P)-4 1.0";
+						return;
+					}
+					var devName;
+
+					eptData = result[systemFN][systemSN.sys];
+					devName = eptData[systemON.devAlias];
+					eptName.value = typeof devName == "undefined" ? "" : devName;
+
+					showDetailCon();
+				}
+			});
+
+			id("save").onclick = function(){
+				var data = {};
+				var module = data[systemFN] = {};
+
+				module[systemSN.sys] = {};
+				module[systemSN.sys][systemON.devAlias] = eptName.value;
+
+				showToast();
+				$.modify(data, function(result){
+					if (true == errorHandle(result[ERR_CODE]))
+					{
+						showToast("success");
+					}
+				});
+			};
+		}
+
+		initPage();
+	}
+	init();
+</script>
+<div class="detailCon detailConMorePad">
+	<ul class="line lineL">
+		<li class="line lineE">
+			<label class="des desA" for="eptName">{%label.eptName%}</label>
+			<input id="eptName" type="text" class="text textA1" maxlength="32" />
+		</li>
+	</ul>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>

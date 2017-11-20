@@ -1,0 +1,617 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		var FILE_NAME = uciFtp.fileName;
+		var INFO = uciFtp.secName.ftpInfo;
+		var DIRECTORY1 = uciFtp.secName.directory1;
+		var DIRECTORY_TYPE = uciFtp.optName.directoryType;
+		var ANONYMOUS_ENBLED = uciFtp.optName.anonymousEnabled;
+		var ADDRESS = uciFtp.optName.address;
+		var PORT = uciFtp.optName.port;
+		var USERNAME = uciFtp.optName.username;
+		var PASSWORD = uciFtp.optName.password;
+		var DIRSTRUCTURE = uciFtp.optName.dirStructure;
+		var CUSTOM_NAME = uciFtp.optName.customName;
+		var TEST_FTP = uciFtp.actionName.testFtp;
+
+		var dirOptions = [{str:label.rootDir, value:"root"}, {str:label.useFirstDir, value:"first"}];
+		var childDirOptions = [{str:label.customize, value:"custom"}, {str:label.useDevName, value:"dev_name"}, {str:label.useDevIP, value:"dev_ip"}];
+		var $firstDirect = $(".firstDirect");
+		var $firstDirText = $(".firstDirText");
+		var anonymous = "off";
+
+		var addrVal = id("srvAddr").value;
+		var portVal = id("port").value;
+		var nameVal = id("name").value;
+		var pswVal = id("psw").value;
+		var pswConfVal = id("pswConfirm").value;
+		var customAVal = id("custom_1").value;
+		var error = false;
+		var get_status_times = 0;
+		var pwdChgFlg = 0;
+
+		function errHandle(errNo, objOrId)
+		{
+			var str = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return true;
+			case IPCUBUSCONNFAIL:
+                str = errStr.ipcUbusConnFail;
+                break;
+            case IPCUBUSCALLERR:
+                str = errStr.ipcUbusCallErr;
+                break;
+			case IPCFTPADDRERR:
+				str = errStr.ftpAddrErr;
+				break;
+			case IPCFTPPORTERR:
+				str = errStr.ftpPortErr;
+				break;
+			case IPCFTPANOENERR:
+				str = errStr.ftpAnoEnErr;
+				break;
+			case IPCFTPUNAMEERR:
+				str = errStr.ftpUnameErr;
+				break;
+			case IPCFTPPAWDERR:
+				str = errStr.ftpPawdErr;
+				break;
+			case IPCFTPDIRSTRCERR:
+				str = errStr.ftpDirstrcErr;
+				break;
+			case IPCFTPDIRTYPEERR:
+				str = errStr.ftpDirtypeErr;
+				break;
+			case IPCFTPCUSNAMEERR:
+				str = errStr.ftpCusnameErr;
+				break;
+			case IPCFTPTESTERR:
+				str = errStr.ftpTestErr;
+				break;
+			case IPCFTPSERERR:
+				str = errStr.ftpSerErr;
+				break;
+			case IPCFTPAUTHERR:
+				str = errStr.ftpAuthErr;
+				break;
+			case IPCFTPCREAERR:
+				str = errStr.ftpCreaErr;
+				break;
+			case IPCFTPWRITERR:
+				str = errStr.ftpWritErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			default:
+				str = errStr.unknown + errNo;
+				break;
+			}
+
+			closeToast();
+			showAlert(str);
+			return false;
+		}
+
+		function errHandleBeforeSave(errNo, objOrId)
+		{
+			var str = "";
+
+			switch (errNo)
+			{
+			case ENONE:
+				return error = false;
+			case EINVNET:
+			case EINVIP:
+			case EINVGROUPIP:
+			case EINVLOOPIP:
+				str = errStr.ftpAddrErr;
+				break;
+			//case EINVIPFMT:
+			default:
+				if(true == checkDomain(id("srvAddr").value)){
+					return error = false;
+				}
+				else{
+					str = errStr.ftpAddrErr;
+				}
+				break;
+			}
+
+			showNote(objOrId, str);
+			closeToast();
+			return error = true;
+		}
+
+		function onBlur()
+		{
+			errHandleBeforeSave(checkIp(id("srvAddr").value), "srvAddr");
+			if (false == checkNum(id("port").value))
+			{
+				showNote("port", errStr.acObjIlleagalPort);
+				error = true;
+			}
+
+			if (false == checkNumRange(id("port").value, 65535, 1))
+			{
+				showNote("port", errStr.acObjInvalidPort);
+				error = true;
+			}
+
+			if("off" == anonymous)
+			{
+				if (id("name").value.length < 1)
+				{
+					showNote("name", errStr.ftpNameEmpty);
+					error = true;
+				}
+
+				if (id("name").value.length > 63)
+				{
+					showNote("name", errStr.ftpInvalidNameLen);
+					error = true;
+				}
+
+				if ((id("psw").value.length < 1) && pwdChgFlg)
+				{
+					showNote("psw", errStr.ftpPasswordEmpty);
+					id("pwdTipStr").style.display = "none";
+					error = true;
+				}
+
+				if (id("psw").value.length > 63)
+				{
+					showNote("psw", errStr.ftpInvalidPasswordLen);
+					id("pwdTipStr").style.display = "none";
+					error = true;
+				}
+
+				if (id("psw").value != id("pswConfirm").value)
+				{
+					showNote("pswConfirm", errStr.ftpPasswordDifferent);
+					id("pwdConfirmTipStr").style.display = "none";
+					error = true;
+				}
+			}
+
+			if(("first" == $("#dirStrucSel")[0].value)&&("custom" == $("#firstDirSel")[0].value))
+			{
+				if (id("custom_1").value.length < 1)
+				{
+					showNote("custom_1", errStr.ftpDirEmpty);
+					error = true;
+				}
+				else if(!checkFileName(id("custom_1").value))
+				{
+					showNote("custom_1", errStr.ftpDirErr);
+					error = true;
+				}
+
+				if (id("custom_1").value.length > 63)
+				{
+					showNote("custom_1", errStr.ftpInvalidDirLen);
+					error = true;
+				}
+			}
+
+		}
+
+		/*文件名合法性检测*/
+		function checkFileName(val)
+		{
+			return /^[^\\/:*?"'<>|%]+$/gi.test(val);
+		}
+		/*域名检测*/
+		function checkDomain(domain){
+			var reg = /^\w[\w\.\-]+$/;
+
+			if((typeof(domain) != "string" )|| (domain.length > 63) ){
+				return false;
+			}
+
+			//检查域名是否含有非法字符以及是否以数字或是字母开头
+			if(!domain.match(reg)){
+				return false;
+			}
+
+			var tokens = domain.split(".");
+			for(var v in tokens){
+				if((tokens[v].length == 0) || (tokens[v].length >= 64)){
+					return false;
+				}
+			}
+
+			var reg1 = /\.[\w]+$/;
+			var end_string = domain.match(reg1);
+			if(end_string){
+				end_string = end_string[0].toLowerCase();
+				var top_domain = [
+				".com", ".top", ".win", ".net", ".org", ".wang", ".gov", ".edu", ".mil", ".biz", ".name", ".info",
+				".mobi", ".pro", ".travel", ".museum", ".int", ".aero", ".post", ".rec", ".asia", ".arts", ".firm",
+				".info", ".nom", ".store", ".web", ".au", ".ad", ".ae", ".af", ".ag", ".ai", ".al", ".am", ".an",
+				".ao", ".aa", ".ar", ".as", ".at", ".au", ".aw", ".az", ".ba", ".bb", ".bd", ".be", ".bf", ".bg",
+				".bh", ".bi", ".bj", ".bm", ".bn", ".bo", ".br", ".bs", ".bt", ".bv", ".bw", ".by", ".bz", ".ca",
+				".cc", ".cf", ".cd", ".ch", ".ci", ".ck", ".cl", ".cm", ".cn", ".co", ".cq", ".cr", ".cu", ".cv",
+				".cx", ".cy", ".cz", ".de", ".dj", ".dk", ".dm", ".do", ".dz", ".ec", ".ee", ".eg", ".eh", ".er",
+				".es", ".et", ".ev", ".fi", ".fj", ".fk", ".fm", ".fo", ".fr", ".ga", ".gd", ".ge", ".gf", ".gg",
+				".gh", ".gi", ".gl", ".gm", ".gn", ".gp", ".gr", ".gs", ".gt", ".gu", ".gw", ".gy", ".hk", ".hm",
+				".hn", ".hr", ".ht", ".hu", ".id", ".ie", ".il", ".im", ".in", ".io", ".iq", ".ir", ".is", ".it",
+				".jm", ".jo", ".jp", ".je", ".ke", ".kg", ".kh", ".ki", ".km", ".kn", ".kp", ".kr", ".kw", ".ky",
+				".kz", ".la", ".lb", ".lc", ".li", ".lk", ".lr", ".ls", ".lt", ".lu", ".lv", ".ly", ".ma", ".mc",
+				".md", ".me", ".mg", ".mh", ".mk", ".ml", ".mm", ".mn", ".mo", ".mp", ".mq", ".mr", ".ms", ".mt",
+				".mu", ".mv", ".mw", ".mx", ".my", ".mz", ".na", ".nc", ".ne", ".nf", ".ng", ".ni", ".nl", ".no",
+				".np", ".nr", ".nt", ".nu", ".nz", ".om", ".qa", ".pa", ".pe", ".pf", ".pg", ".ph", ".pk", ".pl",
+				".pm", ".pn", ".pr", ".pt", ".pw", ".py", ".re", ".rs", ".ro", ".ru", ".rw", ".sa", ".sb", ".sc",
+				".sd", ".se", ".sg", ".sh", ".si", ".sj", ".sk", ".sl", ".sm", ".sn", ".so", ".sr", ".st", ".sv",
+				".su", ".sy", ".sz", ".sx", ".tc", ".td", ".tf", ".tg", ".th", ".tj", ".tk", ".tl", ".tm", ".tn",
+				".to", ".tr", ".tt", ".tv", ".tw", ".tz", ".ua", ".ug", ".uk", ".um", ".us", ".uy", ".uz", ".va",
+				".vc", ".ve", ".vg", ".vi", ".vn", ".vu", ".wf", ".ws", ".ye", ".yt", ".za", ".zm", ".zw"
+				];
+				for(var v in top_domain){
+					if(top_domain[v] == end_string){
+						return true;
+					}
+				}
+				return false;
+			}
+			else{
+				return false;
+			}
+
+			return true;
+		}
+
+		function onSave()
+		{
+			onBlur();
+			if(error){
+				return;
+			}
+			var data = {};
+			var info, dir;
+
+			data[FILE_NAME] = {};
+			info = data[FILE_NAME][INFO] = {};
+
+			info.address = id("srvAddr").value;
+			info.port = id("port").value;
+			info.anonymous_enabled = anonymous;
+			if("off" == anonymous){
+				info.username = id("name").value;
+				if (pwdChgFlg){
+					info.password = id("psw").value;
+				}
+			}
+			info.directory_structure = $("#dirStrucSel")[0].value;
+			if("first" == $("#dirStrucSel")[0].value){
+				dir = data[FILE_NAME][DIRECTORY1] = {};
+				dir.directory_type = $("#firstDirSel")[0].value;
+				if("custom" == $("#firstDirSel")[0].value){
+					dir.custom_name = id("custom_1").value;
+				}
+			}
+
+			showToast("loading");
+			$.modify(data, function(resp){
+				if (true == errHandle(resp[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function getTestStatus(){
+			var data = {};
+
+			get_status_times = get_status_times + 1;
+			if (get_status_times > 180)
+			{
+				closeToast();
+				showAlert(errStr.testTimeout);
+				return;
+			}
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][uciFtp.actionName.get_test_status] = null;
+			showToast();
+			$.action(data, function(result){
+				if (errHandle(result[ERR_CODE]))
+				{
+					if (result["result"] == "success")
+					{
+						closeToast();
+						showAlert(errStr.ftpTestSuccuss);
+					}
+					else if (result["result"] == "waiting")
+					{
+						$.setTimeout(getTestStatus, 1000);
+					}
+				}
+			});
+		}
+
+		function onTest()
+		{
+			onBlur();
+			if(error){
+				return;
+			}
+			var data = {};
+			var infoDo,dirDo;
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][TEST_FTP] = {};
+			infoDo = data[FILE_NAME][TEST_FTP][INFO] = {};
+
+			infoDo.address = id("srvAddr").value;
+			infoDo.port = id("port").value;
+			infoDo.anonymous_enabled = anonymous;
+			if("off" == anonymous){
+				infoDo.username = id("name").value;
+				if (pwdChgFlg){
+					infoDo.password = id("psw").value;
+				}
+			}
+			infoDo.directory_structure = $("#dirStrucSel")[0].value;
+			if("first" == $("#dirStrucSel")[0].value){
+				dirDo = data[FILE_NAME][TEST_FTP][DIRECTORY1] = {};
+				dirDo.directory_type = $("#firstDirSel")[0].value;
+				if("custom" == $("#firstDirSel")[0].value){
+					dirDo.custom_name = id("custom_1").value;
+				}
+			}
+
+			showToast("loading");
+			$.action(data, function(resp){
+				if (true == errHandle(resp[ERR_CODE]))
+				{
+					//showToast("success");
+					get_status_times = 0;
+					$.setTimeout(getTestStatus, 1000);
+				}
+			});
+		}
+		function setFtpData(resp)
+		{
+			if (false == errHandle(resp[ERR_CODE]))
+			{
+				return;
+			}
+
+			var ftpCfg = resp[FILE_NAME][INFO];
+			var dirCfg = resp[FILE_NAME][DIRECTORY1];
+
+			var firstDirVal = dirCfg[DIRECTORY_TYPE]? dirCfg[DIRECTORY_TYPE] : "custom";
+			anonymous = ftpCfg[ANONYMOUS_ENBLED]? ftpCfg[ANONYMOUS_ENBLED] : "off";
+			var enable = (anonymous == "on");
+
+			$("#srvAddr").val(ftpCfg[ADDRESS]);
+			$("#port").val(ftpCfg[PORT]);
+			changeCheckInput("anonymity", enable, chkClick(enable, 0));
+			$("#name").val(ftpCfg[USERNAME]);
+			//$("#psw").val(ftpCfg[PASSWORD]);
+			//$("#pswConfirm").val(ftpCfg[PASSWORD]);
+
+			dirStrucSel.resetSel(ftpCfg[DIRSTRUCTURE]);
+			selDir(ftpCfg[DIRSTRUCTURE]);
+			firstDirSel.resetSel(firstDirVal);
+			selfirstDir(firstDirVal);
+			$("#custom_1").val(dirCfg[CUSTOM_NAME]);
+
+			showDetailCon();
+		}
+
+		function selDir(val)
+		{
+			switch (val)
+			{
+			case "root":
+				$firstDirect.hide();
+				closeNote("custom_1");
+				break;
+			case "first":
+				$firstDirect.show();
+				break;
+			default:
+				break;
+			}
+		}
+
+		function selfirstDir(val)
+		{
+			switch (val)
+			{
+			case "custom":
+				$("#custom_1").show();
+				break;
+			case "dev_name":
+				$("#custom_1").hide();
+				closeNote("custom_1");
+				break;
+			case "dev_ip":
+				$("#custom_1").hide();
+				closeNote("custom_1");
+				break;
+			default:
+				break;
+			}
+		}
+
+		function pwdChg()
+		{
+			id("pwdTipStr").style.display = "none";
+			pwdChgFlg = 1;
+		};
+
+		function chkClick(checked, index)
+		{
+			if(true == checked)
+			{
+				closeNote("name");
+				closeNote("psw");
+				closeNote("pswConfirm");
+				$("#name").css({"opacity":"0.3"}).attr("disabled", true);
+				$("#psw").css({"opacity":"0.3"}).attr("disabled", true);
+				$("#pswConfirm").css({"opacity":"0.3"}).attr("disabled", true);
+				anonymous = "on";
+			}
+			else
+			{
+				$("#name").css({"opacity":"1"}).attr("disabled", false);
+				$("#psw").css({"opacity":"1"}).attr("disabled", false);
+				$("#pswConfirm").css({"opacity":"1"}).attr("disabled", false);
+				anonymous = "off";
+			}
+		}
+
+		function constructDom()
+		{
+			initCheckInput("showInfo", function(checked, index){
+				chkClick(checked, index);
+			});
+			selectInit("dirStrucSel", dirOptions, "root", selDir);
+			selectInit("firstDirSel", childDirOptions, "custom", selfirstDir);
+		}
+
+		function getFtpData()
+		{
+			var data = {};
+
+			data[FILE_NAME] = {};
+			data[FILE_NAME][KEY_NAME] = [INFO,DIRECTORY1];
+
+			$.query(data, setFtpData);
+		}
+
+		function pageInit()
+		{
+
+			constructDom();
+			getFtpData();
+
+			id("save").onclick = onSave;
+			id("test").onclick = onTest;
+			id("srvAddr").onblur = onBlur;
+			id("port").onblur = onBlur;
+			id("name").onblur = onBlur;
+			id("psw").onblur = onBlur;
+			id("pswConfirm").onblur = onBlur;
+			id("custom_1").onblur = onBlur;
+			id("srvAddr").onfocus = closeNoteAll;
+			id("port").onfocus = closeNoteAll;
+			id("name").onfocus = closeNoteAll;
+			id("psw").onfocus = function(){pwdChg();closeNoteAll();}
+			id("pswConfirm").onfocus = closeNoteAll;
+			id("custom_1").onfocus = closeNoteAll;
+		}
+
+		pageInit();
+	}
+
+	init();
+</script>
+<style type="text/css">
+	li.line label.infoLabel{
+		display: inline-block;
+		font-size: 14px;
+		vertical-align: middle;
+		color: #a0a0a0;
+		width: 190px;
+		height: 32px;
+		line-height: 32px;
+		padding-left: 15px;
+	}
+	input.textInput{
+		width:190px;
+	}
+	input.textR{
+		margin-left:10px;
+	}
+	#selOptsUlpicArchManageSel{
+		max-height:198px;
+	}
+	#anonymity{
+		margin-right: 5px;
+		margin-left: 10px;
+	}
+	#pwdTipStr{
+		color:#707070;
+		font-size:13px;
+		left:172px;
+		line-height:30px !important;
+		position:absolute;
+		top:208px;
+    }
+	#pwdConfirmTipStr{
+		color:#707070;
+		font-size:13px;
+		left:172px;
+		line-height:30px !important;
+		position:absolute;
+		top:256px;
+    }
+	ul.line label.desA{
+		width:104px;
+	}
+	ul.line li.lineD{
+		width:100%;
+	}
+	div.funcBtnCon{
+		padding-top:60px;
+	}
+</style>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineD">
+			<label class="des desA">{%label.srvAddr%}</label>
+			<input id="srvAddr" class="text textA1"/><i class="tip"></i>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.port%}</label>
+			<input id="port" class="text textA1"/><i class="tip"></i>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.userName%}</label>
+			<input id="name" class="text textA1"/><i class="tip"></i>
+			<i name="showInfo" id="anonymity" value="0"></i>
+			<label class="des desA">{%label.anonymity%}</label>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.passwd%}</label>
+			<input id="psw" class="text textA1" type="password"/><i class="tip"></i>
+			<label id="pwdTipStr" for="psw">●●●●●●</label>
+		</li>
+		<li class="line lineD">
+			<label class="des desA">{%label.pswConfirm%}</label>
+			<input id="pswConfirm" class="text textA1" type="password"/><i class="tip"></i>
+			<label id="pwdConfirmTipStr" for="pswConfirm">●●●●●●</label>
+		</li>
+
+		<li class="line lineD">
+			<label class="des desA">{%label.dirStructure%}</label>
+			<span class="selCon">
+				<span id="dirStrucSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+		</li>
+		<li class="line lineD firstDirect">
+			<label class="des desA">{%label.firstDir%}</label>
+			<span class="selCon">
+				<span id="firstDirSel" class="select">
+					<span class="value hsValueA"></span>
+					<i class="arrow"></i>
+				</span>
+			</span>
+			<input id="custom_1" class="text textA1 textR"/><i class="tip"></i>
+		</li>
+	</ul>
+	<div class="funcBtnCon">
+		<input id="test" type="button" value="{%btn.test%}" class="subBtnB btnA" />
+		<input id="save" type="button" value="{%btn.save%}" class="subBtn btnA" />
+	</div>
+</div>

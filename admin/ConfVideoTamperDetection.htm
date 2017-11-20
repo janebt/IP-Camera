@@ -1,0 +1,200 @@
+﻿<script type="text/javascript">
+	function init()
+	{
+		function errorHandle(code, objOrId)
+		{
+			var showStr = "";
+
+			switch(parseInt(code))
+			{
+			case ENONE:
+				return true;
+			case IPCTDNUMERR:
+				showStr = errStr.IPCRangeOver;
+				break;
+			case IPCTDENERR:
+				showStr = errStr.IPCParamInvalid;
+				break;
+			case IPCTDSENERR:
+				showStr = errStr.ipcImInfsErr;
+				break;
+			case IPCUMGUESTNAUTH:
+				showStr = errStr.invPermissionDenied;
+				break;
+			case IPCTDEMAILERR:
+			case IPCTDALARMERR:
+				showStr = errStr.IPCHandleInalid;
+				break;
+			default:
+				showStr = errStr.invRequestFail;
+				break;
+			}
+
+			closeToast();
+			showAlert(showStr, objOrId);
+			return false;
+		}
+
+		function saveHandle()
+		{
+			var reqData = {};
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][TAMPER_DET] = {};
+			reqData[FILE_NAME][TAMPER_NOTIF_LIST] = {};
+			reqData[FILE_NAME][TAMPER_DET][SENSITIVITY] = sensitivityValue;
+			reqData[FILE_NAME][TAMPER_DET][ENABLED] = switchState;
+			reqData[FILE_NAME][TAMPER_NOTIF_LIST][EMAIL_ENABLED] = sendEmail.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+			reqData[FILE_NAME][TAMPER_NOTIF_LIST][ALARM_ENABLED] = triggerAlarmDevice.getAttribute("checked") == "true" ? ENABLED_ON : ENABLED_OFF;
+
+			showToast();
+			$.modify(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					showToast("success");
+				}
+			});
+		}
+
+		function tamperSwichHd(state)
+		{
+			tamperSwitchDes.innerHTML = state == 1 ? btn.enableN : btn.close;
+			switchState = state == 1 ? ENABLED_ON : ENABLED_OFF;
+			var hideobj = document.getElementById("hidebg");
+
+			if(0 == state)
+			{
+				hideobj.style.display = "block";
+				hideobj.style.height = getoffset(id("save")).top - getoffset(id("top")).top + "px";
+				$("#sensitivityDragLineDragLineStrip").css({"*z-index":"-1"}); /* IE6/7兼容 */
+			}
+			else
+			{
+				hideobj.style.display = "none";
+				$("#sensitivityDragLineDragLineStrip").css({"*z-index":"0"});
+			}
+		}
+
+		function sensitivityChange(val) {
+			sensitivityValue = val;
+			sensitivityDragLine.setValue(val);
+			if ((true == checkNum(val)) &&
+					(true == checkNumRange(parseInt(val), 100, 1)))
+			{
+				sensitivityErr = false;
+			}
+			else
+			{
+				showNote("sensitivityDragLineDragLineInput", errStr.sensitivityErr);
+				sensitivityErr = true;
+			}
+		}
+
+		function pageInit()
+		{
+			var reqData = {};
+			enable = 0;
+
+			reqData[FILE_NAME] = {};
+			reqData[FILE_NAME][NAME] = [TAMPER_DET, TAMPER_NOTIF_LIST];
+
+			sensitivityDragLine = new DragLine({id:"sensitivityDragLine", name:label.sensitivity, cb:sensitivityChange, lowerBound:1});
+
+			$.query(reqData, function(result){
+				if (true == errorHandle(result[ERR_CODE]))
+				{
+					if (true == $.local)
+					{
+						tamperSwitch = new Switch("tamperSwitch", 0, tamperSwichHd);
+						return;
+					}
+
+					switchState = result[FILE_NAME][TAMPER_DET][ENABLED];
+					enable = (switchState == ENABLED_ON) ? 1 : 0;
+					tamperSwitch = new Switch("tamperSwitch", enable, tamperSwichHd);
+
+					sensitivityValue = result[FILE_NAME][TAMPER_DET][SENSITIVITY];
+					sensitivityDragLine.setValue(sensitivityValue);
+
+					enable = (result[FILE_NAME][TAMPER_NOTIF_LIST][EMAIL_ENABLED] == ENABLED_ON);
+					changeCheckInput(sendEmail, enable);
+					enable = (result[FILE_NAME][TAMPER_NOTIF_LIST][ALARM_ENABLED] == ENABLED_ON);
+					changeCheckInput(triggerAlarmDevice, enable);
+
+					showDetailCon();
+				}
+			});
+
+			initCheckInput("showInfo", null);
+			id("save").onclick = saveHandle;
+		}
+
+		var FILE_NAME = uciTamperDetection.fileName;
+		var TAMPER_DET = uciTamperDetection.secName.tamperDet;
+		var TAMPER_NOTIF_LIST = uciTamperDetection.secName.tamperNotifList;
+		var ENABLED = uciTamperDetection.optName.enabled;
+		var SENSITIVITY = uciTamperDetection.optName.sensitivity;
+		var EMAIL_ENABLED = uciTamperDetection.optName.emailEnabled;
+		var ALARM_ENABLED = uciTamperDetection.optName.alarmEnabled;
+		var ENABLED_ON = uciTamperDetection.optValue.enableVal.on;
+		var ENABLED_OFF = uciTamperDetection.optValue.enableVal.off;
+
+		var enable;
+		var tamperSwitch;
+		var switchState;
+		var tamperSwitchDes = id("tamperSwitchDes");
+		var sensitivityDragLine;
+		var sensitivityValue;
+		var sensitivityErr = false;
+		var sendEmail = id("sendEmail");
+		var triggerAlarmDevice = id("triggerAlarmDevice");
+		pageInit();
+	}
+	init();
+</script>
+<div class="detailCon">
+	<ul class="line">
+		<li class="line lineA">
+			<label class="des desA">{%menuStr.tamperDetection%}</label>
+			<div id="tamperSwitch" class="switchCon">
+				<i class="switchBg"></i>
+				<i class="switchBall"></i>
+			</div>
+			<label id="tamperSwitchDes" class="des desH">{%btn.close%}</label>
+		</li>
+	</ul>
+	<div style="position:relative;*z-index:1;">
+		<div id="hidebg"></div>
+	</div>
+	<div class="actionBarDiv" id="top">
+		<div class="actionTitleDiv"></div>
+		<div class="configDiv">
+			<ul class="line">
+				<li class="dragLine">
+					<div id="sensitivityDragLine" class="ipcDragLineDiv"></div>
+				</li>
+			</ul>
+			<div class="height"></div>
+		</div>
+	</div>
+	<div class="actionBarDiv">
+		<div class="actionTitleDiv">
+			<label class="actionTitle">{%label.handleWay%}</label>
+		</div>
+		<div class="handleWay" id="handleWay">
+			<ul class="Line">
+				<li class="Line lineFirst">
+					<i name="showInfo" id="sendEmail" class="chObj" value="-1"></i>
+					<label class="des desA">{%label.sendEmail%}</label>
+				</li>
+				<li class="Line lineLast">
+					<i name="showInfo" id="triggerAlarmDevice" class="chObj" value="0"></i>
+					<label class="des desA">{%label.triggerAlarmDevice%}</label>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="funcBtnCon">
+		<input id="save" type="button" class="subBtn btnA" value="{%btn.save%}" />
+	</div>
+</div>
