@@ -129,17 +129,21 @@
 
 			if (true == $.local)
 			{
+				closeToast();
 				files = [];
 				totalNum = PAGE_NUM;
 				var file = {};
+
+				file["time"] = "123123123";
 				file["start_time"] = "123123123";
 				file["end_time"] = "123123456";
 				file["size"] = "147852";
 
-				for (var i = 1, len = 9; i < len; i++)
+				for (var i = 0, len = 10; i < len; i++)
 				{
-					files[i - 1] = file;
+					files[i] = file;
 				}
+
 			}
 
 			for(var i = 0, len = files.length; i < len; i++)
@@ -147,6 +151,7 @@
 				item = {};
 				originItem = {};
 				fileStr = files[i];
+
 				if ("picture" == curDownloadType)
 				{
 					item["filename"] = generateFileName(fileStr["time"]);
@@ -590,6 +595,8 @@
 			if (true == $.local)
 			{
 				totalNum = 20;
+				typeof callBack == "function" && callBack();
+				return;
 			}
 
 			$.action(data, function(result){
@@ -643,6 +650,16 @@
 				endTimeD.value = endDT[1].replace(/\:/g, " : ");
 			});
 			id("searchLog").onclick = function(){
+				if(true == $.local)
+				{
+						showToast();
+						getFileNum(getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType, function (){
+							getFiles(INIT_PAGE_NUM, getSelSeconds(beginDate, beginTime), getSelSeconds(endDate, endTimeD), searchType);
+						});
+						closeToast();
+						return;
+				}
+
 				showToast();
 				typeOnShow = searchType;
 				getUserId(function(){

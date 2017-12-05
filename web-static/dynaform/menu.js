@@ -506,7 +506,7 @@ function menuInit_conf_S()
 			className:"",
 			url:"",
 			load:function(){
-				
+
 				confCon.innerHTML = '<ul id="confCloudServiceUlSSS" class="menuSSS"></ul>' +
 									'<div id="confCloudServiceCon"></div>';
 				menuInit_conf_cloud_SSS({menuId:"confCloudServiceUlSSS", conId:"confCloudServiceCon"});
